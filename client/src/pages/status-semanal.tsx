@@ -11,6 +11,8 @@ import {
 import MemberAvatarsStack from "@/components/review/MemberAvatarsStack";
 import MembersDialog from "@/components/review/MembersDialog";
 import AddProjectDialog from "@/components/review/AddProjectDialog";
+import AddItemButton, { type NewItemInput } from "@/components/review/AddStatusItemButton";
+import StatusText from "@/components/review/StatusText";
 import RoomTitleEditor from "@/components/review/RoomTitleEditor";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -365,7 +367,7 @@ async function mutationFetch(url: string, method: string, body?: any) {
 function MentionInput({ value, onChange, onKeyDown, placeholder, className, users = [] }: {
   value: string;
   onChange: (v: string) => void;
-  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   placeholder?: string;
   className?: string;
   users?: AppUser[];
@@ -374,20 +376,22 @@ function MentionInput({ value, onChange, onKeyDown, placeholder, className, user
   const [mentionFilter, setMentionFilter] = useState('');
   const [mentionStart, setMentionStart] = useState(-1);
   const [menuIdx, setMenuIdx] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useAutoResize(inputRef, value, true, 240);
 
   const filtered = users.filter(u =>
     !mentionFilter || u.name.toLowerCase().startsWith(mentionFilter.toLowerCase())
   ).slice(0, 6);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const v = e.target.value;
     onChange(v);
     const pos = e.target.selectionStart ?? v.length;
     const lastAt = v.lastIndexOf('@', pos - 1);
     if (lastAt >= 0) {
       const fragment = v.slice(lastAt + 1, pos);
-      if (!fragment.includes(' ')) {
+      if (!/\s/.test(fragment)) {
         setMentionStart(lastAt);
         setMentionFilter(fragment);
         setShowMentions(true);
@@ -407,7 +411,7 @@ function MentionInput({ value, onChange, onKeyDown, placeholder, className, user
     setTimeout(() => inputRef.current?.focus(), 0);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (showMentions && filtered.length > 0) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setMenuIdx(i => Math.min(i + 1, filtered.length - 1)); return; }
       if (e.key === 'ArrowUp') { e.preventDefault(); setMenuIdx(i => Math.max(i - 1, 0)); return; }
@@ -419,14 +423,15 @@ function MentionInput({ value, onChange, onKeyDown, placeholder, className, user
 
   return (
     <div className="relative flex-1">
-      <input
+      <textarea
+        rows={1}
         ref={inputRef}
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         onBlur={() => setTimeout(() => setShowMentions(false), 150)}
         placeholder={placeholder}
-        className={className}
+        className={cn("w-full resize-none leading-relaxed", className)}
       />
       {showMentions && filtered.length > 0 && (
         <div className="absolute bottom-full left-0 mb-1 z-50 bg-white border border-slate-200 rounded-lg shadow-lg min-w-[140px] py-1 overflow-hidden">
@@ -504,8 +509,9 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
           className={cls} />;
   }
 
+  const Container = multiline ? "div" : "span";
   return (
-    <span onClick={() => setEditing(true)}
+    <Container onClick={() => setEditing(true)}
       className={cn(
         "group cursor-text rounded-md px-1.5 py-1 transition-all min-h-[26px] gap-1 w-full",
         multiline ? "flex items-start" : "inline-flex items-center",
@@ -513,9 +519,9 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
         value ? "text-slate-800" : "text-slate-400/70 italic",
         className
       )}>
-      <span className={cn("flex-1 leading-snug", multiline && "whitespace-pre-wrap break-words")}>{value || placeholder}</span>
+      {multiline && value ? <StatusText className="flex-1">{value}</StatusText> : <span className="flex-1 leading-snug">{value || placeholder}</span>}
       <Pencil className={cn("h-2.5 w-2.5 text-slate-400 opacity-0 group-hover:opacity-50 transition-opacity shrink-0", multiline && "mt-1")} />
-    </span>
+    </Container>
   );
 }
 
@@ -788,7 +794,7 @@ function ProposalCard({ proposal, currentUserId, isOwner, roomId, invalidate, is
       </div>
 
       <div className="px-3 py-2.5">
-        <p className="text-[13px] leading-relaxed text-slate-700 whitespace-pre-wrap break-words">{proposal.content}</p>
+        <StatusText className="text-[13px] text-slate-700">{proposal.content}</StatusText>
       </div>
 
       {proposal.attachments.length > 0 && (
@@ -1350,12 +1356,12 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             <span className="shrink-0 self-center"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
           </div>
           {!expanded && !hideSubtitle && item.currentAction && (
-            <p
-              className="text-[12px] truncate mt-0.5 leading-snug text-slate-400"
+            <div
+              className="text-[12px] line-clamp-3 mt-0.5 text-slate-400"
               onClick={e => { e.stopPropagation(); onToggle(); }}
             >
-              {item.currentAction}
-            </p>
+              <StatusText>{item.currentAction}</StatusText>
+            </div>
           )}
           {!expanded && hasUnread && item.lastNoteContent && (
             <button
@@ -1441,7 +1447,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                     <p className="text-[10px] text-slate-400 mb-0.5">Estado actual</p>
                     <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[12px] leading-relaxed text-slate-700" />
                   </div>
-{item.nextMilestone && <details className="text-xs text-slate-500"><summary className="cursor-pointer">Próximo paso anterior</summary><p className="mt-1 whitespace-pre-wrap">{item.nextMilestone}</p></details>}
+{item.nextMilestone && <details className="text-xs text-slate-500"><summary className="cursor-pointer">Próximo paso anterior</summary><StatusText className="mt-1">{item.nextMilestone}</StatusText></details>}
                 </div>
 
                 {/* Comentarios — flat */}
@@ -1661,13 +1667,13 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
                 </div>
                 {editingId === edKey ? (
                   <div className="space-y-1">
-                    <input value={editText} autoFocus
+                    <textarea value={editText} autoFocus rows={4}
                       onChange={e => setEditText(e.target.value)}
                       onKeyDown={e => {
-                        if (e.key === 'Enter') { e.preventDefault(); if (editText.trim()) editUpdateMutation.mutate({ entryId: entry.id, content: editText }); }
+                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (editText.trim()) editUpdateMutation.mutate({ entryId: entry.id, content: editText }); }
                         if (e.key === 'Escape') setEditingId(null);
                       }}
-                      className="w-full text-xs border border-indigo-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                      className="w-full min-h-[100px] resize-y text-xs leading-relaxed border border-indigo-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
                     />
                     <div className="flex gap-1">
                       <button onClick={() => { if (editText.trim()) editUpdateMutation.mutate({ entryId: entry.id, content: editText }); }}
@@ -1682,7 +1688,7 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{entry.content}</p>
+                  <StatusText className="text-xs text-slate-600">{entry.content}</StatusText>
                 )}
               </div>
             </div>
@@ -1692,7 +1698,7 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
 
       {/* Compose input — quiet by default, accent on focus */}
       <div className="mt-1">
-        <div className="flex items-center gap-2 rounded-md bg-slate-50 px-3 py-1.5 border border-transparent focus-within:bg-white focus-within:border-slate-200 transition-all">
+        <div className="flex items-end gap-2 rounded-md bg-slate-50 px-3 py-1.5 border border-transparent focus-within:bg-white focus-within:border-slate-200 transition-all">
           <MentionInput
             value={draft}
             onChange={setDraft}
@@ -1712,90 +1718,9 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
               : <ArrowRight className="h-3 w-3" />}
           </button>
         </div>
+        <p className="text-[10px] text-slate-400 mt-1">Enter para enviar · Shift+Enter nueva línea</p>
       </div>
     </div>
-  );
-}
-
-// ─── Add custom item dialog ───────────────────────────────────────────────────
-
-type NewItemInput = { title: string; subtitle: string; ownerId: number | null; healthStatus: string; deadline: string | null; firstUpdate: string };
-
-// Alta de ítem pensada para la daily: título + "qué está pasando" + quién lo lleva.
-// Con esas tres cosas el ítem nace con contexto y no cae en NUEVO/SILENCIO vacío.
-function AddItemButton({ onAdd, variant = 'header', users = [], currentUserId = null }: {
-  onAdd: (d: NewItemInput) => void; variant?: 'header' | 'inline' | 'daily'; users?: AppUser[]; currentUserId?: number | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [firstUpdate, setFirstUpdate] = useState('');
-  const [ownerId, setOwnerId] = useState<number | null>(currentUserId);
-  const [health, setHealth] = useState('verde');
-  const [deadline, setDeadline] = useState('');
-
-  useEffect(() => { if (open) setOwnerId(prev => prev ?? currentUserId); }, [open, currentUserId]);
-
-  const reset = () => { setTitle(''); setFirstUpdate(''); setOwnerId(currentUserId); setHealth('verde'); setDeadline(''); };
-  const submit = () => {
-    if (!title.trim()) return;
-    onAdd({ title: title.trim(), subtitle: '', ownerId, healthStatus: health, deadline: deadline ? encodeCivilDeadline(deadline) : null, firstUpdate: firstUpdate.trim() });
-    reset(); setOpen(false);
-  };
-  const onKey = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } };
-
-  return (
-    <Popover open={open} onOpenChange={o => { setOpen(o); if (!o) reset(); }}>
-      <PopoverTrigger asChild>
-        {variant === 'inline' ? (
-          <button className="flex items-center gap-1 text-xs text-slate-400 hover:text-indigo-600 font-medium transition-colors ml-1">
-            <Plus className="h-3.5 w-3.5" />
-          </button>
-        ) : variant === 'daily' ? (
-          <button className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800 px-2 py-1.5">
-            <Plus className="h-3.5 w-3.5" /> Agregar ítem
-          </button>
-        ) : (
-          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 text-indigo-600 border-indigo-200 hover:bg-indigo-50">
-            <Plus className="h-3.5 w-3.5" />
-            Agregar ítem
-          </Button>
-        )}
-      </PopoverTrigger>
-      <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] p-3" align={variant === 'inline' ? 'start' : 'end'}>
-        <p className="text-sm font-semibold mb-2">Nuevo ítem</p>
-        <div className="space-y-2.5">
-          <input value={title} onChange={e => setTitle(e.target.value)} onKeyDown={onKey}
-            placeholder="Qué es (ej: Propuesta Café Martínez)"
-            className="w-full text-sm border border-input rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 font-medium" autoFocus />
-          <textarea value={firstUpdate} onChange={e => setFirstUpdate(e.target.value)} onKeyDown={onKey} rows={2}
-            placeholder="Qué está pasando (queda como primer update)"
-            className="w-full text-sm border border-input rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none" />
-          <div className="grid min-w-0 grid-cols-2 items-center gap-2">
-            <select aria-label="Responsable del ítem" value={ownerId?.toString() ?? ''} onChange={e => setOwnerId(e.target.value ? parseInt(e.target.value) : null)}
-              className="col-span-2 min-w-0 w-full text-xs border border-input rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
-              <option value="">Sin owner</option>
-              {users.map(u => <option key={u.id} value={u.id}>{u.name}{u.id === currentUserId ? ' (yo)' : ''}</option>)}
-            </select>
-            <div className="flex items-center gap-1 px-1.5" title="Semáforo inicial">
-              {(['verde', 'amarillo', 'rojo'] as const).map(h => (
-                <button key={h} onClick={() => setHealth(h)} title={HEALTH[h].label} aria-label={HEALTH[h].label} aria-pressed={health === h}
-                  className={cn("w-4 h-4 rounded-full border-2 transition-transform hover:scale-110", HEALTH[h].dot, health === h ? "border-slate-700 scale-110" : "border-white")} />
-              ))}
-            </div>
-            <input type="date" aria-label="Fecha límite opcional" value={deadline} onChange={e => setDeadline(e.target.value)} title="Deadline (opcional)"
-              className="text-xs border border-input rounded px-1.5 py-1.5 min-w-0 w-full focus:outline-none focus:ring-1 focus:ring-indigo-400 text-slate-500" />
-          </div>
-        </div>
-        <div className="flex gap-2 mt-3">
-          <Button size="sm" onClick={submit} disabled={!title.trim()} className="bg-indigo-600 hover:bg-indigo-700 text-white flex-1 h-7 text-xs">
-            Agregar
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setOpen(false)} className="h-7 text-xs">
-            Cancelar
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
   );
 }
 
@@ -1854,7 +1779,7 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
               <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
             </div>
             {!expanded && item.currentAction && (
-              <p className="text-[11px] text-slate-500 mt-0.5 leading-snug line-clamp-2">{item.currentAction}</p>
+              <StatusText className="text-[11px] text-slate-500 mt-0.5 line-clamp-3">{item.currentAction}</StatusText>
             )}
             {/* Owner + deadline + notes meta row — only shown collapsed; the
                  expanded view has owner/deadline editable in the footer, so
@@ -1932,7 +1857,7 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
                 <InlineText value={item.currentAction} placeholder="¿Qué está pasando?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[12px] text-slate-700 leading-relaxed" />
               </div>
 
-              {item.nextMilestone && <details className="text-xs text-slate-500"><summary className="cursor-pointer">Próximo paso anterior</summary><p className="mt-1 whitespace-pre-wrap">{item.nextMilestone}</p></details>}
+              {item.nextMilestone && <details className="text-xs text-slate-500"><summary className="cursor-pointer">Próximo paso anterior</summary><StatusText className="mt-1">{item.nextMilestone}</StatusText></details>}
 
               {/* Comentarios — flat composer, no eyebrow, no colored bg */}
               <div>
@@ -2020,7 +1945,7 @@ function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, 
           <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
         </div>
         {!expanded && item.currentAction && (
-          <p className="text-[11px] text-slate-500 mt-0.5 leading-snug line-clamp-2">{item.currentAction}</p>
+          <StatusText className="text-[11px] text-slate-500 mt-0.5 line-clamp-3">{item.currentAction}</StatusText>
         )}
         {!expanded && (
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -2096,11 +2021,11 @@ function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, 
                 {onUpdate ? (
                   <InlineText value={item.currentAction} placeholder="¿Qué está pasando?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[12px] text-slate-700 leading-relaxed" />
                 ) : (
-                  <p className="text-[12px] text-slate-600 leading-relaxed">{item.currentAction || 'Sin update'}</p>
+                  <StatusText className="text-[12px] text-slate-600">{item.currentAction || 'Sin update'}</StatusText>
                 )}
               </div>
 
-              {item.nextMilestone && <details className="text-xs text-slate-500"><summary className="cursor-pointer">Próximo paso anterior</summary><p className="mt-1 whitespace-pre-wrap">{item.nextMilestone}</p></details>}
+              {item.nextMilestone && <details className="text-xs text-slate-500"><summary className="cursor-pointer">Próximo paso anterior</summary><StatusText className="mt-1">{item.nextMilestone}</StatusText></details>}
 
               {/* Comentarios — flat */}
               <div>
@@ -2324,7 +2249,7 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
                       </div>
                     </div>
                   ) : (
-                    <div className="text-[11px] bg-white border border-slate-100 rounded-md px-2.5 py-1.5 leading-relaxed whitespace-pre-wrap">{entry.content}</div>
+                    <StatusText className="text-[11px] bg-white border border-slate-100 rounded-md px-2.5 py-1.5">{entry.content}</StatusText>
                   )}
                 </div>
                 {isOwn && editingId !== entry.id && (
@@ -2476,7 +2401,7 @@ function DailyAgendaView({ agenda, quiet, dailyStatus, roomId, onStart, onOpenLi
                             {item.subtitle && <span className="text-xs text-slate-400 font-normal truncate">· {item.subtitle}</span>}
                             {item.ownerName && <span className="text-[10px] text-indigo-600 font-medium shrink-0">{item.ownerName.split(' ')[0]}</span>}
                           </div>
-                          <div className="text-xs text-slate-500 mt-0.5">{main.detail}</div>
+                          <StatusText className="text-xs text-slate-500 mt-0.5">{main.detail}</StatusText>
                         </div>
                         <span className="text-xs text-slate-400 italic shrink-0 max-md:hidden">{main.question}</span>
                         <ItemShareButton item={item} roomId={roomId} />
@@ -2540,7 +2465,7 @@ function DailyItemContext({ item }: { item: Item }) {
     <div className="space-y-2">
       {thread.map((e, i) => (
         <div key={e.id} className={cn("text-sm bg-slate-50 rounded-lg p-3 border border-slate-100", i > 0 && "opacity-70")}>
-          <div className="text-slate-700 whitespace-pre-wrap">{e.content}</div>
+          <StatusText className="text-slate-700">{e.content}</StatusText>
           <div className="text-[11px] text-slate-400 mt-1">{e.authorName?.split(' ')[0] ?? 'Usuario'} · {shortDateTime(e.createdAt)}</div>
         </div>
       ))}
@@ -4242,8 +4167,8 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
                             {item.ownerName && <span className="text-xs text-indigo-600 font-medium">{item.ownerName.split(' ')[0]}</span>}
                             {item.deadline && <span className="text-xs text-slate-500">{deadlineLabel(item.deadline)}</span>}
                           </div>
-                          {item.currentAction && <p className="text-xs text-slate-600 mt-0.5">{item.currentAction}</p>}
-                          {item.nextMilestone && <p className="text-xs text-slate-500 mt-0.5">→ {item.nextMilestone}</p>}
+                          {item.currentAction && <StatusText className="text-xs text-slate-600 mt-0.5">{item.currentAction}</StatusText>}
+                          {item.nextMilestone && <StatusText className="text-xs text-slate-500 mt-0.5">{item.nextMilestone}</StatusText>}
                         </div>
                       </div>
                     ))}
@@ -4263,8 +4188,8 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
                             {item.ownerName && <span className="text-xs text-indigo-600 font-medium">{item.ownerName.split(' ')[0]}</span>}
                             {item.deadline && <span className="text-xs text-slate-500">{deadlineLabel(item.deadline)}</span>}
                           </div>
-                          {item.currentAction && <p className="text-xs text-slate-600 mt-0.5">{item.currentAction}</p>}
-                          {item.nextMilestone && <p className="text-xs text-slate-500 mt-0.5">→ {item.nextMilestone}</p>}
+                          {item.currentAction && <StatusText className="text-xs text-slate-600 mt-0.5">{item.currentAction}</StatusText>}
+                          {item.nextMilestone && <StatusText className="text-xs text-slate-500 mt-0.5">{item.nextMilestone}</StatusText>}
                         </div>
                       </div>
                     ))}
@@ -4285,8 +4210,8 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
                             {item.ownerName && <span className="text-xs text-indigo-600 font-medium">{item.ownerName.split(' ')[0]}</span>}
                             {item.deadline && <span className="text-xs text-slate-500">{deadlineLabel(item.deadline)}</span>}
                           </div>
-                          {item.currentAction && <p className="text-xs text-slate-600 mt-0.5">{item.currentAction}</p>}
-                          {item.nextMilestone && <p className="text-xs text-slate-500 mt-0.5">→ {item.nextMilestone}</p>}
+                          {item.currentAction && <StatusText className="text-xs text-slate-600 mt-0.5">{item.currentAction}</StatusText>}
+                          {item.nextMilestone && <StatusText className="text-xs text-slate-500 mt-0.5">{item.nextMilestone}</StatusText>}
                         </div>
                       </div>
                     ))}
