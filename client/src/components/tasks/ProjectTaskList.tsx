@@ -745,6 +745,7 @@ interface SectionBlockProps {
 }
 
 function SectionBlock({ canManageSections = false, sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, onDuplicateSection, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, taskOrderOverride }: SectionBlockProps) {
+  const [visibleLimit, setVisibleLimit] = useState(80);
   const [collapsed, setCollapsed] = useState(false);
   const effectiveCollapsed = forceExpand ? false : collapsed;
   const [showAdd, setShowAdd] = useState(false);
@@ -929,7 +930,7 @@ function SectionBlock({ canManageSections = false, sectionName, tasks, projectId
       {!effectiveCollapsed && (
         <>
           <SortableContext items={pendingTasks.map(t => `task:${t.id}`)} strategy={verticalListSortingStrategy}>
-          {pendingTasks.map(task => (
+          {pendingTasks.slice(0, visibleLimit).map(task => (
             <SortableTaskRow
               key={task.id}
               taskId={task.id}
@@ -951,6 +952,8 @@ function SectionBlock({ canManageSections = false, sectionName, tasks, projectId
           ))}
           </SortableContext>
 
+          {pendingTasks.length > visibleLimit && <Button variant="ghost" className="m-2" onClick={() => setVisibleLimit(limit => limit + 80)}>Mostrar más tareas ({pendingTasks.length - visibleLimit})</Button>}
+          {(showCompleted || forceExpand) && completedTasks.length > visibleLimit && <Button variant="ghost" className="m-2" onClick={() => setVisibleLimit(limit => limit + 80)}>Mostrar más finalizadas ({completedTasks.length - visibleLimit})</Button>}
           {completedTasks.length > 0 && (
             <>
               <div
@@ -963,7 +966,7 @@ function SectionBlock({ canManageSections = false, sectionName, tasks, projectId
               </div>
               {(showCompleted || forceExpand) && (
                 <SortableContext items={completedTasks.map(t => `task:${t.id}`)} strategy={verticalListSortingStrategy}>
-                  {completedTasks.map(task => (
+                  {completedTasks.slice(0, visibleLimit).map(task => (
                     <SortableTaskRow
                       key={task.id}
                       taskId={task.id}
@@ -1203,6 +1206,7 @@ function BoardCard({ task, allPersonnel, onOpen }: { task: Task; allPersonnel: P
 }
 
 function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, projectId, projectMembers, onOpen, onRefresh }: BoardColumnProps) {
+  const [visibleLimit, setVisibleLimit] = useState(60);
   const [showAdd, setShowAdd] = useState(false);
   const { setNodeRef, isOver } = useDroppable({ id: `board-col:${status}`, disabled: status !== "blocked" });
 
@@ -1242,12 +1246,13 @@ function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, pro
           </div>
         )}
 
-        {tasks.map(task => (
+        {tasks.slice(0, visibleLimit).map(task => (
           <div key={task.id} className="group">
             <BoardCard task={task} allPersonnel={allPersonnel} onOpen={onOpen} />
           </div>
         ))}
 
+        {tasks.length > visibleLimit && <Button size="sm" variant="ghost" onClick={() => setVisibleLimit(limit => limit + 60)}>Mostrar más ({tasks.length - visibleLimit})</Button>}
         {status !== "done" && status !== "blocked" && (showAdd ? (
           <div className="bg-card rounded-lg border border-primary/30 p-2">
             <NewTaskRow

@@ -7,7 +7,6 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./init-data";
 import { storage } from "./storage";
-import { autoSyncService } from "./services/autoSyncService";
 import { pool } from "./db";
 import { feedbackMindV2MigrationSql } from "./migrations/feedback-mind-v2";
 import { feedbackMindV27MigrationSql } from "./migrations/feedback-mind-v2-7";
@@ -68,7 +67,11 @@ import { mcpOauthMigrationSql } from "./migrations/mcp-oauth";
 import { ensureServiceBlueprintSeeds } from "./services/service-blueprints";
 import { ensureObjectivesPlanSeed } from "./services/objectives-seed";
 import cors from 'cors';
-import { execSync } from 'child_process';
+import compression from "compression";
+import { requestPerformance } from "./middleware/performance";
+import { startAppEvents, stopAppEvents } from "./services/app-events";
+import { withJobLock, stopJobs } from "./services/job-lock";
+
 
 /** Applies any DDL that may be missing from the production database.
  *  All statements are idempotent (IF NOT EXISTS / ADD COLUMN IF NOT EXISTS).
@@ -76,13 +79,15 @@ import { execSync } from 'child_process';
  */
 async function applyPendingMigrations() {
   const client = await pool.connect();
+  const failures: string[] = [];
 
   const run = async (name: string, sql: string) => {
     try {
       await client.query(sql);
       console.log(`✅ Migration OK: ${name}`);
     } catch (err: any) {
-      console.error(`⚠️  Migration skipped (${name}): ${err.message}`);
+      failures.push(name);
+      console.error(`⚠️ Migration failed (${name}): ${err.message}`);
     }
   };
 
@@ -1000,6 +1005,7 @@ async function applyPendingMigrations() {
          OR "grand_total_usd" IS NULL;
     `);
 
+    if (failures.length && process.env.ALLOW_PARTIAL_MIGRATIONS !== "true") throw new Error(`Required migrations failed: ${failures.join(", ")}`);
   } finally {
     client.release();
   }
@@ -1074,6 +1080,17 @@ process.on('uncaughtException', (err) => {
 });
 
 const app = express();
+let ready = false;
+let draining = false;
+app.use(requestPerformance);
+app.use(compression({ threshold: 1024 }));
+app.get("/api/ready", async (_req, res) => {
+  if (!ready || draining) return res.status(503).json({ status: "starting" });
+  try {
+    await pool.query({ text: "SELECT 1", query_timeout: 1000 } as { text: string });
+    res.json({ status: "ready" });
+  } catch { res.status(503).json({ status: "unavailable" }); }
+});
 
 // Trust Replit's reverse proxy so express-session sets Secure cookies correctly
 app.set('trust proxy', 1);
@@ -1125,113 +1142,49 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// ==================== LOOKER STUDIO / BI ENDPOINTS ====================
-// Registered at top level (synchronous) so they always run before any catch-all
-app.get("/api/bi/pnl-mensual", async (_req, res) => {
-  try { res.json((await pool.query("SELECT * FROM vw_looker_pnl_mensual")).rows); }
-  catch (e: any) { res.status(500).json({ message: e.message }); }
-});
-app.get("/api/bi/proyectos-mensual", async (_req, res) => {
-  try { res.json((await pool.query("SELECT * FROM vw_looker_proyectos_mensual")).rows); }
-  catch (e: any) { res.status(500).json({ message: e.message }); }
-});
-app.get("/api/bi/costos-mensual", async (_req, res) => {
-  try { res.json((await pool.query("SELECT * FROM vw_looker_costos_mensual")).rows); }
-  catch (e: any) { res.status(500).json({ message: e.message }); }
-});
-app.get("/api/bi/equipo-mensual", async (_req, res) => {
-  try { res.json((await pool.query("SELECT * FROM vw_looker_equipo_mensual")).rows); }
-  catch (e: any) { res.status(500).json({ message: e.message }); }
-});
-app.get("/api/bi/cashflow", async (_req, res) => {
-  try { res.json((await pool.query("SELECT * FROM vw_looker_cashflow")).rows); }
-  catch (e: any) { res.status(500).json({ message: e.message }); }
-});
-app.get("/api/bi/revenue-por-cliente", async (_req, res) => {
-  try { res.json((await pool.query("SELECT * FROM vw_looker_revenue_por_cliente")).rows); }
-  catch (e: any) { res.status(500).json({ message: e.message }); }
-});
-
 const port = Number(process.env.PORT || 5000);
 
 (async () => {
   try {
-    // Kill any process holding the port before we try to bind
-    try {
-      execSync(`fuser -k ${port}/tcp 2>/dev/null || true`, { stdio: 'ignore' });
-    } catch (_) { /* no process on port, that's fine */ }
-
     console.log("🔄 Starting application...");
     console.log(`Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
     
     // Apply any pending schema migrations before initializing data
-    await applyPendingMigrations();
-
-    // Initialize database connection and data
-    await initializeDatabase();
-    await ensureServiceBlueprintSeeds();
-    await ensureObjectivesPlanSeed();
-    console.log("💾 Database initialized successfully");
-
-    const { startUserNotificationEmailWorker } = await import("./services/user-notifications");
-    startUserNotificationEmailWorker();
-
-    await backfillNativeLaborOnce();
-
-    // Start automatic synchronization service (Excel/Google Sheets → ledger/cashflow).
-    // Re-enabled per ops request. Guarded so a missing Google Sheets credential or a
-    // sync failure can't crash startup. Set DISABLE_AUTO_SYNC=true to turn it off.
-    const backgroundSyncDisabled = process.env.DISABLE_AUTO_SYNC === "true";
-    if (backgroundSyncDisabled) {
-      console.log("⏸️  Sincronizaciones y jobs externos deshabilitados por DISABLE_AUTO_SYNC=true");
-    } else {
-      try {
-        autoSyncService.start();
-        console.log("🔄 Sincronización automática iniciada (cada 30 minutos)");
-      } catch (e: any) {
-        console.error("⚠️  No se pudo iniciar el auto-sync:", e?.message);
-      }
-
-      // Lightweight Resumen Ejecutivo sync (every 2 hours + on startup)
-      const { startResumenEjecutivoSync } = await import("./jobs/resumen-ejecutivo-sync");
-      startResumenEjecutivoSync();
-      console.log("📊 Resumen Ejecutivo auto-sync iniciado (cada 2 horas)");
-
-      // Full SoT pipeline sync — every 6 hours, also runs 60s after startup
-      const { startDailySoTSync } = await import("./jobs/daily-sot-sync");
-      startDailySoTSync();
-      console.log("📅 [SoT Sync] Pipeline completo programado cada 6 horas");
-
-      // Start CRM reminder notifications job
-      const { startReminderNotifications } = await import("./jobs/reminder-notifications");
-      startReminderNotifications();
-      console.log("🔔 Job de notificaciones de recordatorios CRM iniciado");
-
-      // IPC sync (API pública ArgentinaDatos) + detección de ajustes de
-      // precio vencidos para contratos recurrentes en ARS. Sólo deja
-      // propuestas "pending_approval" — nunca cambia un precio ni manda un
-      // email sin aprobación explícita.
-      const { startIpcPriceAdjustmentsJob } = await import("./jobs/ipc-price-adjustments");
-      startIpcPriceAdjustmentsJob();
-      console.log("📈 Job de ajuste de precio por IPC iniciado (diario)");
+    if (process.env.RUN_STARTUP_MIGRATIONS !== "false" || process.env.MIGRATE_ONLY === "true") {
+      await withJobLock("schema-migrations", async () => {
+        await applyPendingMigrations();
+        await initializeDatabase();
+        await ensureServiceBlueprintSeeds();
+        await ensureObjectivesPlanSeed();
+        await backfillNativeLaborOnce();
+      }, { wait: true });
     }
 
-    if (process.env.DISABLE_TEAM_PAYROLL !== "true") {
-      const { startTeamPayroll } = await import("./jobs/team-payroll");
-      startTeamPayroll();
-    }
-
-    const { startQuotationExpirationJob } = await import("./jobs/quotation-expiration");
-    startQuotationExpirationJob();
-    console.log("📨 Job de vencimiento de cotizaciones iniciado");
+    if (process.env.MIGRATE_ONLY === "true") { await stopJobs(); await pool.end(); process.exit(0); }
+    await startAppEvents();
+    const { startBackgroundJobs } = await import("./services/background-jobs");
+    const stopBackground = process.env.RUN_BACKGROUND_JOBS !== "false" ? await startBackgroundJobs() : async () => {};
 
     // Register the routes and bind the exact same HTTP server they use for
     // WebSocket upgrades. Calling app.listen() here would create a second
     // server, leaving the chat WebSocket attached to an unbound instance.
     const server = await registerRoutes(app);
-    server.listen(port, "0.0.0.0", () => {
-      console.log(`🚀 Server running on port ${port}`);
-    });
+    const shutdown = async () => {
+      if (draining) return;
+      draining = true; ready = false;
+      const backgroundStopped = stopBackground();
+      server.emit("drain");
+      const deadline = setTimeout(() => process.exit(1), 25_000); deadline.unref();
+      await new Promise<void>(resolve => { server.close(() => resolve()); server.closeIdleConnections(); });
+      await stopJobs();
+      await backgroundStopped;
+      await stopAppEvents();
+      await pool.end();
+      clearTimeout(deadline);
+      process.exit(0);
+    };
+    process.once("SIGTERM", () => void shutdown());
+    process.once("SIGINT", () => void shutdown());
 
     server.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE") {
@@ -1252,13 +1205,19 @@ const port = Number(process.env.PORT || 5000);
 
     // Setup Vite or static file serving based on environment
     // CRITICAL: This must be called AFTER API routes are registered
-    if (isProduction) {
+    if (process.env.API_ONLY === "true") {
+      console.log("API-only server ready");
+    } else if (isProduction) {
       console.log("📦 Production mode: serving static files from dist/public");
-      serveStatic(app);
+      await serveStatic(app);
     } else {
       console.log("🔧 Development mode: setting up Vite middleware");
       await setupVite(app, server);
     }
+    server.listen(port, "0.0.0.0", () => {
+      ready = true;
+      console.log(`🚀 Server running on port ${port}`);
+    });
     
   } catch (error) {
     console.error("❌ Failed to start server:", error);

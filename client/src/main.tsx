@@ -12,3 +12,9 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     </QueryClientProvider>
   </React.StrictMode>
 );
+
+if (import.meta.env.PROD) {
+  const observe = () => void import("./lib/web-vitals").then(module => module.observeWebVitals()).catch(() => {});
+  if ("requestIdleCallback" in window) window.requestIdleCallback(observe);
+  else setTimeout(observe, 1000);
+}

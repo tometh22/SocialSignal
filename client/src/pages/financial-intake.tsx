@@ -1,5 +1,7 @@
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { QueryError } from "@/components/query-error";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authFetch, authFetchJson } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -112,11 +114,15 @@ export default function FinancialIntakePage() {
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const query = useQuery<{ items: IntakeItem[]; total: number }>({
-    queryKey: ["financial-native-intake", "all"],
-    queryFn: () => authFetchJson("/api/financial-native/intake?status=all&pageSize=100"),
+  const debouncedSearch = useDebouncedValue(search);
+  const query = useInfiniteQuery({
+    queryKey: ["financial-native-intake", statusFilter, debouncedSearch],
+    initialPageParam: 1,
+    queryFn: ({ pageParam, signal }) => authFetchJson<{ items: IntakeItem[]; total: number; page: number; pageSize: number }>(`/api/financial-native/intake?${new URLSearchParams({ status: statusFilter, search: debouncedSearch, page: String(pageParam), pageSize: "30" })}`, { signal }),
+    getNextPageParam: page => page.page * page.pageSize < page.total ? page.page + 1 : undefined,
+    refetchInterval: query => query.state.data?.pages.some(page => page.items.some(item => ["received", "processing"].includes(item.status))) ? 2000 : false,
   });
-  const allItems = query.data?.items ?? [];
+  const allItems = query.data?.pages.flatMap(page => page.items) ?? [];
   const normalizedSearch = search.trim().toLocaleLowerCase("es");
   const items = allItems.filter((item) => {
     const matchesStatus = statusFilter === "all"
@@ -239,17 +245,19 @@ export default function FinancialIntakePage() {
       <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
         <Card className="h-fit"><CardHeader className="space-y-3 pb-3"><div className="flex items-center justify-between"><CardTitle className="text-base">Entradas</CardTitle><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="open">Pendientes</SelectItem><SelectItem value="all">Todas</SelectItem><SelectItem value="needs_review">A revisar</SelectItem><SelectItem value="posted">Contabilizadas</SelectItem><SelectItem value="rejected">Rechazadas</SelectItem></SelectContent></Select></div><div className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar archivo, cliente o proyecto" /></div></CardHeader>
           <CardContent className="max-h-[720px] space-y-2 overflow-auto">
+            {query.error && <QueryError message="No se pudieron cargar las entradas." retry={query.refetch} />}
             {query.isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
-            {!query.isLoading && !items.length && <div className="py-10 text-center text-sm text-muted-foreground"><CheckCircle2 className="mx-auto mb-2 h-7 w-7" />No hay cargas en esta vista.</div>}
+            {!query.isLoading && !query.error && !items.length && <div className="py-10 text-center text-sm text-muted-foreground"><CheckCircle2 className="mx-auto mb-2 h-7 w-7" />No hay cargas en esta vista.</div>}
             {items.map((item) => <button key={item.id} onClick={() => setSelectedId(item.id)} className={`w-full rounded-xl border p-3 text-left transition ${selectedId === item.id ? "border-rose-300 bg-rose-50" : "hover:bg-slate-50"}`}>
               <div className="flex items-start justify-between gap-2"><span className="flex min-w-0 items-center gap-2 text-sm font-medium">{item.inputKind === "image" ? <Image className="h-4 w-4" /> : <FileText className="h-4 w-4" />}<span className="truncate">{item.originalFileName || KIND_LABELS[item.documentKind]}</span></span><StatusBadge status={item.status} /></div>
               <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{item.extractedData?.description || item.originalText || "Sin descripción"}</p>
               <p className="mt-2 text-[11px] text-muted-foreground">{new Date(item.createdAt).toLocaleString("es-AR")}</p>
             </button>)}
+            {query.hasNextPage && <Button variant="outline" className="w-full" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>{query.isFetchingNextPage ? "Cargando…" : "Cargar más entradas"}</Button>}
           </CardContent>
         </Card>
 
-        {!selected ? <Card><CardContent className="py-20 text-center text-muted-foreground">Seleccioná una entrada para revisar el borrador.</CardContent></Card> : !draft ? <Card><CardContent className="space-y-4 py-12 text-center"><AlertCircle className="mx-auto h-8 w-8 text-amber-600" /><div><p className="font-medium">No se pudo generar el borrador</p><p className="mt-1 text-sm text-muted-foreground">{selected.extractionError || "Reintentá el procesamiento o rechazá esta entrada."}</p></div><div className="flex justify-center gap-2"><Button variant="outline" disabled={busy} onClick={() => actionMutation.mutate({ action: "reprocess" })}><RefreshCw className="mr-2 h-4 w-4" />Reprocesar</Button><Button variant="ghost" className="text-red-600" disabled={busy} onClick={reject}><XCircle className="mr-2 h-4 w-4" />Rechazar</Button></div></CardContent></Card> :
+        {!selected ? <Card><CardContent className="py-20 text-center text-muted-foreground">Seleccioná una entrada para revisar el borrador.</CardContent></Card> : ["received", "processing"].includes(selected.status) ? <Card><CardContent className="space-y-3 py-12 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" /><p role="status">{selected.status === "received" ? "En cola para interpretar" : "Interpretando documento…"}</p><p className="text-sm text-muted-foreground">Podés seguir usando Mind. El borrador aparecerá al terminar.</p></CardContent></Card> : !draft ? <Card><CardContent className="space-y-4 py-12 text-center"><AlertCircle className="mx-auto h-8 w-8 text-amber-600" /><div><p className="font-medium">No se pudo generar el borrador</p><p className="mt-1 text-sm text-muted-foreground">{selected.extractionError || "Reintentá el procesamiento o rechazá esta entrada."}</p></div><div className="flex justify-center gap-2"><Button variant="outline" disabled={busy} onClick={() => actionMutation.mutate({ action: "reprocess" })}><RefreshCw className="mr-2 h-4 w-4" />Reprocesar</Button><Button variant="ghost" className="text-red-600" disabled={busy} onClick={reject}><XCircle className="mr-2 h-4 w-4" />Rechazar</Button></div></CardContent></Card> :
           <div className="space-y-4">
             <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle className="text-lg">Revisar antes de contabilizar</CardTitle><p className="mt-1 text-xs text-muted-foreground">Confianza de extracción: {Math.round((draft.confidence || 0) * 100)}%</p></div><div className="flex gap-2"><StatusBadge status={selected.status} />{selected.fileAvailable && <Button size="sm" variant="outline" asChild><a href={`/api/financial-native/intake/${selected.id}/file`} target="_blank" rel="noreferrer">Ver original</a></Button>}</div></div></CardHeader>
               <CardContent className="space-y-5">

@@ -143,6 +143,7 @@ export function setupAuth(app: Express, storage: IStorage) {
 
   // Middleware para verificar autenticación
   const requireAuth = async (req: Request, res: Response, next: Function) => {
+    if (req.user) return next(); // Already resolved by a parent route guard in this request.
     let userId = req.session?.userId;
 
     // Fallback: token-based auth for environments where cookies don't propagate (e.g. Replit preview iframe)
@@ -158,7 +159,7 @@ export function setupAuth(app: Express, storage: IStorage) {
     try {
       const user = await storage.getUser(userId);
 
-      if (!user) {
+      if (!user || user.isActive === false) {
         req.session?.destroy(() => {});
         return res.status(401).json({ message: "Usuario no encontrado" });
       }
@@ -271,7 +272,7 @@ export function setupAuth(app: Express, storage: IStorage) {
     try {
       const user = await storage.getUser(userId);
 
-      if (!user) {
+      if (!user || user.isActive === false) {
         req.session?.destroy(() => {});
         return res.status(401).json({ message: "Usuario no encontrado" });
       }

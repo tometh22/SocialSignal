@@ -66,7 +66,7 @@ export async function setupVite(app: Express, server: Server) {
   });
 }
 
-export function serveStatic(app: Express) {
+export async function serveStatic(app: Express) {
   const distPath = path.resolve(import.meta.dirname, "public");
 
   if (!fs.existsSync(distPath)) {
@@ -75,10 +75,34 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // An optional shared volume retains immutable chunks used by already-open tabs.
+  // Publish each complete file atomically; never delete assets from a prior release here.
+  if (process.env.STATIC_ASSET_ARCHIVE_DIR) {
+    const archive = path.resolve(process.env.STATIC_ASSET_ARCHIVE_DIR);
+    const assets = path.join(distPath, "assets");
+    if (archive === assets) throw new Error("STATIC_ASSET_ARCHIVE_DIR must be separate from the current build");
+    await fs.promises.mkdir(archive, { recursive: true });
+    for (const file of await fs.promises.readdir(assets, { withFileTypes: true })) {
+      if (!file.isFile()) continue;
+      const target = path.join(archive, file.name);
+      if (fs.existsSync(target)) continue;
+      const pending = `${target}.${process.pid}.pending`;
+      await fs.promises.copyFile(path.join(assets, file.name), pending);
+      await fs.promises.rename(pending, target);
+    }
+    app.use("/assets", express.static(archive, { maxAge: "1y", immutable: true }));
+  }
+
+  app.use(express.static(distPath, {
+    setHeaders(res, file) {
+      if (file.includes(`${path.sep}assets${path.sep}`)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      else res.setHeader("Cache-Control", "no-cache");
+    },
+  }));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

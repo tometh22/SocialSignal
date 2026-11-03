@@ -1,7 +1,8 @@
+import { QueryError } from "@/components/query-error";
 import OptionalDelegatedTasks from "@/components/tasks/OptionalDelegatedTasks";
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { authFetch } from "@/lib/queryClient";
+import { authFetch, authFetchJson } from "@/lib/queryClient";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -60,16 +61,15 @@ export default function HomeDashboard() {
   const canAccessTasks = hasPermission("projects") || hasPermission("operations") || hasPermission("task_manager");
   const canCreateQuotation = hasPermission("quotations");
 
-  const { data: projectCount } = useQuery<number>({
+  const { data: projectCount, error: projectError, refetch: retryProjects } = useQuery<number>({
     queryKey: ["/api/tasks/projects", "home-count"],
-    queryFn: () => authFetch("/api/tasks/projects?status=active&scope=mine")
-      .then(r => r.json()).then((projects: any[]) => Array.isArray(projects) ? projects.length : 0).catch(() => 0),
+    queryFn: ({ signal }) => authFetchJson<any[]>("/api/tasks/projects?status=active&scope=mine", { signal }).then(projects => projects.length),
     enabled: canAccessTasks,
   });
 
   const { data: personnel = [] } = useQuery<any[]>({
     queryKey: ["/api/personnel", "birthday"],
-    queryFn: () => authFetch("/api/personnel").then(r => r.ok ? r.json() : []),
+    queryFn: ({ signal }) => authFetchJson("/api/personnel", { signal }),
   });
   const myPersonnel = personnel.find((person) => person.id === (user as any)?.personnelId)
     ?? personnel.find((person) => person.email?.trim().toLowerCase() === user?.email?.trim().toLowerCase());
@@ -81,7 +81,7 @@ export default function HomeDashboard() {
 
   const { data: teamBirthdays = [] } = useQuery<BirthdayEntry[]>({
     queryKey: ["/api/birthdays"],
-    queryFn: () => authFetch("/api/birthdays").then(r => r.ok ? r.json() : []).catch(() => []),
+    queryFn: ({ signal }) => authFetchJson("/api/birthdays", { signal }),
     staleTime: 5 * 60_000,
   });
   // Los próximos 3 cumpleaños, sin importar cuán lejos caigan (366 días cubre todo el ciclo anual).
@@ -99,22 +99,16 @@ export default function HomeDashboard() {
     enabled: Boolean(myPersonnel),
   });
 
-  const { data: quotationStats } = useQuery<{ total: number; pending: number; draft: number }>({
+  const { data: quotationStats, error: quotesError, refetch: retryQuotes } = useQuery<{ total: number; pending: number; draft: number }>({
     queryKey: ["/api/quotations/stats"],
-    queryFn: () => authFetch("/api/quotations")
-      .then(r => r.json()).then((qs: any[]) => ({
-        total: qs?.length || 0,
-        pending: qs?.filter((q: any) => q.status === 'pending').length || 0,
-        draft: qs?.filter((q: any) => q.status === 'draft').length || 0,
-      })).catch(() => ({ total: 0, pending: 0, draft: 0 })),
+    queryFn: ({ signal }) => authFetchJson("/api/quotations/stats", { signal }),
     enabled: hasPermission('quotations'),
   });
 
   // Fetch projects for smart alerts
-  const { data: projectsRaw } = useQuery<{ projects: any[] }>({
+  const { data: projectsRaw, error: alertsError, refetch: retryAlerts } = useQuery<{ projects: any[] }>({
     queryKey: ["/api/projects/alerts-summary"],
-    queryFn: () => authFetch("/api/projects/alerts-summary")
-      .then(r => r.ok ? r.json() : { projects: [] }).catch(() => ({ projects: [] })),
+    queryFn: ({ signal }) => authFetchJson("/api/projects/alerts-summary", { signal }),
     enabled: hasPermission('projects'),
   });
 
@@ -138,7 +132,7 @@ export default function HomeDashboard() {
   const { alerts, insights, summary } = computeAlerts(projectsForAlerts);
 
   // Personal data for "Mi semana"
-  const { data: personalHours } = useQuery<{ personnelId: number | null; weekHours: number; monthHours: number }>({
+  const { data: personalHours, error: hoursError, refetch: retryHours } = useQuery<{ personnelId: number | null; weekHours: number; monthHours: number }>({
     queryKey: ["/api/tasks/my-hours"],
     queryFn: () => authFetch("/api/tasks/my-hours").then(r => { if (!r.ok) throw new Error("No se pudieron consultar tus horas"); return r.json(); }),
     enabled: canAccessTasks,
@@ -147,16 +141,13 @@ export default function HomeDashboard() {
   const myWeekHours = personalHours?.weekHours ?? 0;
   const myMonthHours = personalHours?.monthHours ?? 0;
   // Enriched tasks (with project/client names) for the member's active projects + calendar
-  const { data: myCalendarTasks = [] } = useQuery<any[]>({
-    queryKey: ["/api/tasks/team-calendar", "me", myPersonnelId],
-    queryFn: async () => {
-      const response = await authFetch(`/api/tasks/team-calendar?assigneeId=${myPersonnelId}`);
-      if (!response.ok) return [];
-      const payload = await response.json();
-      return Array.isArray(payload) ? payload : [];
-    },
-    enabled: !!myPersonnelId,
+  const { data: personalTasks, error: tasksError, isLoading: tasksLoading, refetch: retryTasks } = useQuery<{ tasks: any[]; counts: Record<string, number> }>({
+    queryKey: ["/api/tasks/my-tasks", "home", civilDateInBuenosAires(new Date())],
+    queryFn: ({ signal }) => authFetchJson(`/api/tasks/my-tasks?status=active&dateTo=${civilDateInBuenosAires(new Date())}&limit=100`, { signal }),
+    enabled: canAccessTasks,
+    staleTime: 30_000,
   });
+  const myCalendarTasks = personalTasks?.tasks ?? [];
 
   const todayCivil = civilDateInBuenosAires(new Date());
   // «Hoy»: lo vencido y lo que está en curso, primero lo más atrasado.
@@ -165,13 +156,14 @@ export default function HomeDashboard() {
     .filter(({ bucket }) => bucket === "overdue" || bucket === "in_progress")
     .sort((a, b) => (a.task.dueDate?.slice(0, 10) ?? "9999").localeCompare(b.task.dueDate?.slice(0, 10) ?? "9999"))
     .map(({ task }) => task);
+  const todayTaskCount = personalTasks ? (personalTasks.counts.overdue ?? 0) + (personalTasks.counts.in_progress ?? 0) : 0;
   const daysLate = (due: string) => Math.round((Date.parse(`${todayCivil}T00:00:00Z`) - Date.parse(`${due.slice(0, 10)}T00:00:00Z`)) / 86_400_000);
 
   // Capacidad del equipo: sólo para quien ya accede a Operaciones.
   const canSeeCapacity = hasPermission("operations");
   const { data: capacity } = useQuery<CapacityWeekly>({
     queryKey: ["/api/capacity/weekly", "home", currentBuenosAiresWeek().from],
-    queryFn: () => authFetch(`/api/capacity/weekly?weekStart=${currentBuenosAiresWeek().from}`).then(r => r.ok ? r.json() : {}).catch(() => ({})),
+    queryFn: ({ signal }) => authFetchJson(`/api/capacity/weekly?weekStart=${currentBuenosAiresWeek().from}`, { signal }),
     enabled: canSeeCapacity,
     staleTime: 5 * 60_000,
   });
@@ -205,9 +197,9 @@ export default function HomeDashboard() {
 
   // Qué bloques existen depende de lo que la persona puede ver: los demás no dejan hueco.
   const showToday = canAccessTasks && Boolean(myPersonnelId);
-  const showHours = Boolean(myPersonnelId);
-  const showQuotations = hasPermission('quotations');
-  const showPortfolio = hasPermission('projects');
+  const showHours = Boolean(myPersonnelId) && (!hoursError || personalHours !== undefined);
+  const showQuotations = hasPermission('quotations') && (!quotesError || quotationStats !== undefined);
+  const showPortfolio = hasPermission('projects') && ((!projectError && !alertsError) || projectsRaw !== undefined);
   const hasRightColumn = showHours || showQuotations || showPortfolio;
   const shownToday = todayTasks.slice(0, 6);
   const showOwnBirthdayCard = showOwnBirthday && birthday;
@@ -222,7 +214,7 @@ export default function HomeDashboard() {
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
             {todayLabel}
-            {showToday && ` · ${todayTasks.length === 0 ? "sin tareas pendientes para hoy" : `${todayTasks.length} ${todayTasks.length === 1 ? "tarea" : "tareas"} para hoy`}`}
+            {!tasksLoading && !tasksError && showToday && ` · ${todayTaskCount === 0 ? "sin tareas pendientes para hoy" : `${todayTaskCount} ${todayTaskCount === 1 ? "tarea" : "tareas"} para hoy`}`}
           </p>
         </div>
         {(canAccessTasks || canCreateQuotation) && (
@@ -253,6 +245,7 @@ export default function HomeDashboard() {
         </div>
       )}
 
+      {(projectError || quotesError || hoursError || alertsError) && <QueryError message="Algunas tarjetas no pudieron actualizarse; los valores pueden estar incompletos." retry={() => Promise.all([retryProjects(), retryQuotes(), retryHours(), retryAlerts()])} />}
       {(showToday || hasRightColumn) && (
         <div className="grid gap-3 lg:grid-cols-12 sm:gap-4" data-testid="home-primary-tiles">
           {showToday && (
@@ -262,7 +255,7 @@ export default function HomeDashboard() {
               action={<Link href="/tasks" className={cn(TILE_LINK, "text-primary hover:underline")}>Ver todas<ChevronRight className="h-3.5 w-3.5" /></Link>}
               data-testid="home-today"
             >
-              {shownToday.length === 0 ? (
+              {tasksError ? <QueryError message="No se pudieron cargar tus tareas." retry={retryTasks} /> : tasksLoading ? <p role="status" className="py-6">Cargando tareas…</p> : shownToday.length === 0 ? (
                 <p className="mt-6 text-sm text-muted-foreground">Nada vencido ni en curso. Buen momento para planificar la semana.</p>
               ) : (
                 <ul className="mt-3 divide-y divide-slate-100">
@@ -292,8 +285,8 @@ export default function HomeDashboard() {
                   })}
                 </ul>
               )}
-              {todayTasks.length > shownToday.length && (
-                <Link href="/tasks" className="mt-2 text-xs font-medium text-muted-foreground hover:text-foreground">+{todayTasks.length - shownToday.length} más</Link>
+              {todayTaskCount > shownToday.length && (
+                <Link href="/tasks" className="mt-2 text-xs font-medium text-muted-foreground hover:text-foreground">+{todayTaskCount - shownToday.length} más</Link>
               )}
             </Tile>
           )}
@@ -469,7 +462,7 @@ export default function HomeDashboard() {
         <Tile label="Mi semana" action={<Link href="/tasks" className={cn(TILE_LINK, "text-primary hover:underline")}><Calendar className="h-3.5 w-3.5" />Ir a Tareas</Link>}>
           <p className="mt-1 text-xs text-muted-foreground">Calendario de la semana actual.</p>
           <div className="mt-3">
-            <TaskCalendarView tasks={myCalendarTasks} view="current-week" showUndated={false} />
+            <TaskCalendarView personal view="current-week" showUndated={false} />
           </div>
         </Tile>
       )}

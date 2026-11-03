@@ -1,6 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { authFetchJson as fetchJson } from "@/lib/queryClient";
+import { QueryError } from "@/components/query-error";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -848,23 +851,24 @@ export default function CRMPage() {
     refetchInterval: 60000,
   });
 
-  const { data: fetchedLeads = [], isLoading: leadsLoading, refetch } = useQuery<Lead[]>({
-    queryKey: ['/api/crm/leads', stageFilter, search],
-    queryFn: async () => {
-      const params = new URLSearchParams();
+  const debouncedSearch = useDebouncedValue(search);
+  const { data: leadPages, isLoading: leadsLoading, refetch, error: leadsError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ['/api/crm/leads', stageFilter, debouncedSearch],
+    initialPageParam: null as number | null,
+    queryFn: ({ pageParam, signal }) => {
+      const params = new URLSearchParams({ limit: "100" });
       if (stageFilter !== 'all') params.set('stage', stageFilter);
-      if (search) params.set('search', search);
-      const res = await authFetch(`/api/crm/leads?${params}`);
-      return res.json();
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      if (pageParam) params.set('beforeId', String(pageParam));
+      return fetchJson<{ items: Lead[]; nextCursor: number | null }>(`/api/crm/leads?${params}`, { signal });
     },
-    refetchInterval: false,
-    refetchOnWindowFocus: false,
+    getNextPageParam: page => page.nextCursor ?? undefined,
+    staleTime: 30_000,
   });
+  const fetchedLeads = useMemo(() => leadPages?.pages.flatMap(page => page.items) ?? [], [leadPages]);
 
   useEffect(() => { setLocalLeads(null); }, [stageFilter, search]);
-  useEffect(() => {
-    if (localLeads === null && !leadsLoading) setLocalLeads(fetchedLeads);
-  }, [fetchedLeads, localLeads, leadsLoading]);
+  useEffect(() => { setLocalLeads(fetchedLeads); }, [fetchedLeads]);
 
   const columnSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -1006,7 +1010,7 @@ export default function CRMPage() {
 
   const handleLeadClick = (id: number) => navigate(`/crm/${id}`);
   const handleRefresh = () => {
-    refetch().then(r => { if (r.data) setLocalLeads(r.data); });
+    refetch().then(r => { if (r.data) setLocalLeads(r.data.pages.flatMap(page => page.items)); });
     queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] });
   };
   const handleEditStage = (id: number, label: string, color: string) => {
@@ -1163,7 +1167,7 @@ export default function CRMPage() {
       </ToolbarPanel>
 
       {/* Main content */}
-      {leadsLoading ? (
+      {leadsError ? <QueryError message="No se pudieron cargar las oportunidades." retry={refetch} /> : leadsLoading ? (
         <div className="text-center py-16 text-slate-400">Cargando leads...</div>
       ) : viewMode === 'kanban' ? (
         <DndContext sensors={columnSensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
@@ -1214,6 +1218,7 @@ export default function CRMPage() {
         <ListView leads={visibleLeads} stages={stages} onLeadClick={handleLeadClick} />
       )}
 
+      {hasNextPage && <Button variant="outline" disabled={isFetchingNextPage} onClick={() => void fetchNextPage()}>{isFetchingNextPage ? "Cargando…" : "Cargar más oportunidades"}</Button>}
       <AlertDialog open={!!stageToDelete} onOpenChange={(open) => { if (!open) setStageToDelete(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>

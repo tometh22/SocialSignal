@@ -39,7 +39,7 @@ describe("Home personal simplificada", () => {
     expect(home).toContain("{showPortfolio && (");
   });
   test("usa el resumen liviano de alertas y no descarga el endpoint legacy", () => {
-    expect(home).toContain('authFetch("/api/projects/alerts-summary")');
+    expect(home).toContain('authFetchJson("/api/projects/alerts-summary", { signal })');
     expect(home).not.toContain('authFetch("/api/active-projects")');
   });
 });

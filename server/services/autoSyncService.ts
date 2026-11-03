@@ -1,3 +1,4 @@
+import { withJobLock } from "./job-lock";
 import { storage } from '../storage';
 import { googleSheetsWorkingService } from './googleSheetsWorking';
 
@@ -23,11 +24,11 @@ export class AutoSyncService {
     this.isRunning = true;
 
     // Ejecutar sincronización inmediata
-    this.performSync();
+    void this.performSync().catch(error => console.error("Auto-sync failed", error));
 
     // Programar sincronizaciones periódicas
     this.syncInterval = setInterval(() => {
-      this.performSync();
+      void this.performSync().catch(error => console.error("Auto-sync failed", error));
     }, this.SYNC_INTERVAL_MS);
   }
 
@@ -55,6 +56,10 @@ export class AutoSyncService {
    * Realizar sincronización completa
    */
   private async performSync(): Promise<{ success: boolean; message: string; data?: any }> {
+    return await withJobLock("financial-sync", () => this.performSyncUnlocked()) ?? { success: true, message: "Ya hay una sincronización en curso" };
+  }
+
+  private async performSyncUnlocked(): Promise<{ success: boolean; message: string; data?: any }> {
     const startTime = Date.now();
     
     try {

@@ -13,9 +13,12 @@ if (!process.env.DATABASE_URL) {
 // Enhanced connection pool configuration for better stability
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: 20,
+  max: Math.max(2, Math.min(100, Number(process.env.DB_POOL_MAX) || 20)),
+  statement_timeout: Math.max(1000, Number(process.env.DB_STATEMENT_TIMEOUT_MS) || 15_000),
+  query_timeout: Math.max(1000, Number(process.env.DB_QUERY_TIMEOUT_MS) || 20_000),
+  application_name: "mind-web",
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
+  connectionTimeoutMillis: Math.max(500, Number(process.env.DB_CONNECTION_TIMEOUT_MS) || 3000),
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
 

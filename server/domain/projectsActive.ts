@@ -116,6 +116,7 @@ interface ProjectData {
 // ==================== DATA AGGREGATION ENGINE ====================
 
 export class ActiveProjectsAggregator {
+  private aliases = new Map<string, number>();
   constructor(private storage: IStorage) {}
 
   /**
@@ -466,6 +467,8 @@ export class ActiveProjectsAggregator {
    */
   private async mergeProjectData(allProjects: any[], salesData: SalesRecord[], costsData: CostRecord[]): Promise<{ projects: ProjectData[], orphanRows: number }> {
     const projectsMap = new Map<string, ProjectData>();
+    const aliasRows = await db.select().from(projectAliases).where(eq(projectAliases.isActive, true));
+    this.aliases = new Map(aliasRows.map(alias => [JSON.stringify([alias.excelClient, alias.excelProject]), alias.projectId]));
     let orphanCount = 0;
 
     console.log(`🔧 BULLETPROOF DEDUPLICATION: Starting with ${allProjects.length} catalog projects`);
@@ -588,35 +591,9 @@ export class ActiveProjectsAggregator {
     if (!projectName) return null;
     
     try {
-      // 1. FIRST: Try explicit alias lookup (bulletproof)
-      const alias = await db
-        .select()
-        .from(projectAliases)
-        .where(
-          and(
-            eq(projectAliases.excelProject, projectName),
-            eq(projectAliases.excelClient, clientName || ''),
-            eq(projectAliases.isActive, true)
-          )
-        )
-        .limit(1);
-      
-      if (alias.length > 0) {
-        const projectId = alias[0].projectId;
-        
-        // Update match statistics
-        await db
-          .update(projectAliases)
-          .set({
-            lastMatchedAt: new Date(),
-            matchCount: alias[0].matchCount + 1
-          })
-          .where(eq(projectAliases.id, alias[0].id));
-        
-        console.log(`✅ ALIAS MATCH: "${clientName}" + "${projectName}" → projectId ${projectId} (confidence: ${alias[0].confidence})`);
-        return projectId;
-      }
-      
+      const aliasProjectId = this.aliases.get(JSON.stringify([clientName || '', projectName]));
+      if (aliasProjectId != null) return aliasProjectId;
+
       // 2. FALLBACK: Fuzzy matching with canonical normalization
       const targetKey = canon(projectName);
       
@@ -628,7 +605,6 @@ export class ActiveProjectsAggregator {
           console.log(`✅ FUZZY EXACT: "${projectName}" → "${actualProjectName}" (projectId ${project.id})`);
           
           // Register successful match as alias candidate
-          await this.registerAliasCandidate(clientName, projectName, project.id, 1.0, 'exact');
           return project.id;
         }
       }
@@ -641,7 +617,6 @@ export class ActiveProjectsAggregator {
           console.log(`🔍 FUZZY PARTIAL: "${projectName}" → "${actualProjectName}" (projectId ${project.id})`);
           
           // Register successful match as alias candidate
-          await this.registerAliasCandidate(clientName, projectName, project.id, 0.8, 'partial');
           return project.id;
         }
       }
@@ -654,51 +629,6 @@ export class ActiveProjectsAggregator {
     }
   }
   
-  /**
-   * Register successful fuzzy match as alias candidate for future use
-   */
-  private async registerAliasCandidate(
-    clientName: string, 
-    projectName: string, 
-    projectId: number, 
-    confidence: number,
-    matchType: 'exact' | 'partial'
-  ): Promise<void> {
-    try {
-      // Check if alias already exists
-      const existing = await db
-        .select()
-        .from(projectAliases)
-        .where(
-          and(
-            eq(projectAliases.excelProject, projectName),
-            eq(projectAliases.excelClient, clientName || ''),
-            eq(projectAliases.projectId, projectId)
-          )
-        )
-        .limit(1);
-      
-      if (existing.length === 0) {
-        // Create new alias candidate
-        await db.insert(projectAliases).values({
-          projectId,
-          excelClient: clientName || '',
-          excelProject: projectName,
-          source: 'auto_detected',
-          confidence,
-          isActive: true,
-          notes: `Auto-detected from ${matchType} fuzzy match`,
-          matchCount: 1,
-          lastMatchedAt: new Date()
-        });
-        
-        console.log(`📝 NEW ALIAS: Created "${clientName}" + "${projectName}" → ${projectId} (${matchType}, confidence: ${confidence})`);
-      }
-    } catch (error) {
-      console.error(`❌ Error registering alias candidate:`, error);
-    }
-  }
-
   /**
    * Consulta fact_labor_month para obtener horas y valor hora real por proyecto en el período.
    * Retorna un Map keyed por projectId con asanaHours, targetHours, billingHours y avgHourlyRateARS.
@@ -744,6 +674,7 @@ export class ActiveProjectsAggregator {
     laborHoursMap: Map<number, LaborHoursData>
   ): Promise<ActiveProjectItem[]> {
     const projectItems: ActiveProjectItem[] = [];
+    const clientsById = new Map((await this.storage.getClients()).map(client => [client.id, client]));
     
     console.log(`🚀 CALCULATE METRICS: Starting with ${projectsData.length} projects`);
 
@@ -843,7 +774,7 @@ export class ActiveProjectsAggregator {
       };
 
       // Get client info
-      const client = await this.storage.getClient(projectData.clientId);
+      const client = clientsById.get(projectData.clientId);
 
       const quotationType = projectData.quotation?.projectType;
       const projectName = projectData.projectName;

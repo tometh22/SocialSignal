@@ -1,3 +1,17 @@
+import { withJobLock } from "./services/job-lock";
+import { quotationListStatsQuery } from "./domain/quotation-list-stats";
+import { objectStorageEnabled, getObject } from "./services/object-storage";
+import { pipeline } from "node:stream/promises";
+import { Readable } from "node:stream";
+import { registerSearchRoutes } from "./routes-search";
+import { ReadCache } from "./utils/read-cache";
+import { onAppEvent } from "./services/app-events";
+import { invalidateNativeDashboard } from "./services/financial-native-dashboard";
+import { publishAppEvent } from "./services/app-events";
+import { registerPerformanceRoutes } from "./middleware/performance";
+import { taskBucketSql } from "./domain/task-list";
+import { registerBiRoutes } from "./routes-bi";
+import { cursorPage, readPage, escapeLike } from "./utils/pagination";
 import { notifyQuotationApprovalRequests } from "./services/quotation-approval-notifications";
 import { buildQuotationSnapshot, persistQuotationRevision, withdrawQuotationApproval } from "./services/quotation-revisions";
 import { roleRateAveragesQuery } from "./services/role-rate-averages";
@@ -13,7 +27,7 @@ import { settlementWorkflow } from "@shared/utils/settlement-workflow";
 import { payableMonthlyHours } from "@shared/utils/payroll-hours";
 import { authenticatedJsonProjection } from "./services/authenticated-json-projection";
 import { externalStageSchema, assertExternalQuotationStage } from "@shared/utils/quotation-external-stage";
-import { personalTaskHours } from "./services/task-hour-privacy";
+import { privateTaskIds, personalTaskHours } from "./services/task-hour-privacy";
 import { setQuotationGroupArchived } from "./domain/quotation-group-archive";
 import { approvalRevisionIsCurrent } from "@shared/utils/quotation-approval";
 import { taskHourOwner, taskHourAttribution } from "@shared/utils/task-hour-owner";
@@ -1067,6 +1081,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Setup authentication with storage
   const { requireAuth, resolveUserFromSessionCookie } = setupAuth(app, storage);
+  registerBiRoutes(app, pool, requireAuth);
+  registerSearchRoutes(app, requireAuth, accessibleTaskProjectIds);
+  registerPerformanceRoutes(app, pool, requireAuth);
+  app.use((req, res, next) => {
+    if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && req.path.startsWith("/api") && !/^\/api\/(?:telemetry|notifications|reviews|status-semanal|conversations)(?:\/|$)/.test(req.path)) {
+      res.once("finish", () => {
+        if (res.statusCode >= 400) return;
+        invalidateNativeDashboard();
+        const resource = /^\/api\/tasks/.test(req.path) || req.path.startsWith("/api/time-entries") ? "tasks"
+          : /^\/api\/(?:quotations|quotation-)/.test(req.path) ? "quotations"
+          : /^\/api\/(?:crm|clients)/.test(req.path) ? "crm"
+          : /^\/api\/(?:projects|active-projects)/.test(req.path) ? "projects" : "finance";
+        void publishAppEvent({ topic: "cache", resource }).catch(error => console.error("Cache invalidation broadcast failed", error));
+      });
+    }
+    next();
+  });
   // A task-manager profile can use operational tasks and hours while all API
   // responses omit financial fields, including endpoints shared with other
   // roles. Cost calculations still run server-side for the existing ledgers.
@@ -1083,21 +1114,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(["/api/tasks", "/api/tasks-projects", "/api/tasks-personnel"], requireAuth, requirePermission("projects", "operations", "task_manager"), async (req, res, next) => {
     if (req.method !== "GET" || isOperationsRequest(req) || /\/(my-hours|hours-summary)(?:\?|$)/.test(req.originalUrl)) return next();
     try {
-      const access = await getTaskAccessContext(req);
-      const rows = access.personnelId ? await db.select({ id: tasks.id, assigneeId: tasks.assigneeId, parentTaskId: tasks.parentTaskId }).from(tasks).where(sql`${tasks.projectId} IN (SELECT project_id FROM task_project_members WHERE personnel_id=${access.personnelId})`) : [];
-      const entries = access.personnelId ? await db.select({ taskId: taskTimeEntries.taskId, hours: taskTimeEntries.hours }).from(taskTimeEntries).where(eq(taskTimeEntries.personnelId, access.personnelId)) : [];
-      const ownHours = new Map<number, number>();
-      const byId = new Map(rows.map(row => [row.id, row]));
-      for (const entry of entries) {
-        let id: number | null = entry.taskId;
-        const visited = new Set<number>();
-        while (id != null && !visited.has(id)) {
-          visited.add(id); ownHours.set(id, (ownHours.get(id) ?? 0) + entry.hours);
-          id = byId.get(id)?.parentTaskId ?? null;
-        }
-      }
       const json = res.json.bind(res);
-      res.json = ((body: unknown) => json(personalTaskHours(body, access.personnelId, ownHours, new Map(rows.map(row => [row.id, row.assigneeId]))))) as typeof res.json;
+      res.json = ((body: unknown) => {
+        const ids = privateTaskIds(body);
+        if (!ids.length) return json(body);
+        void (async () => {
+          const access = await getTaskAccessContext(req);
+          // Only traverse descendants of tasks actually included in this response.
+          const result = access.personnelId ? await db.execute(sql`
+            WITH RECURSIVE descendants(root_id, id) AS (
+              SELECT id, id FROM tasks WHERE id = ANY(${sql.param(ids)}::int[])
+              UNION
+              SELECT d.root_id, child.id FROM descendants d JOIN tasks child ON child.parent_task_id=d.id
+            ), own AS (
+              SELECT d.root_id, sum(e.hours)::float8 hours FROM descendants d
+              JOIN task_time_entries e ON e.task_id=d.id AND e.personnel_id=${access.personnelId}
+              GROUP BY d.root_id
+            ) SELECT t.id, t.assignee_id, COALESCE(own.hours,0)::float8 hours
+              FROM tasks t LEFT JOIN own ON own.root_id=t.id WHERE t.id=ANY(${sql.param(ids)}::int[])
+          `) : { rows: [] };
+          const rows = result.rows as Array<{ id: number; assignee_id: number | null; hours: number }>;
+          json(personalTaskHours(body, access.personnelId, new Map(rows.map(row => [row.id, row.hours])), new Map(rows.map(row => [row.id, row.assignee_id]))));
+        })().catch(error => {
+          console.error("Personal hours projection failed", error);
+          if (!res.headersSent) { res.status(500); json({ message: "No se pudieron cargar las horas personales" }); }
+        });
+        return res;
+      }) as typeof res.json;
       next();
     } catch (error) { next(error); }
   });
@@ -1221,6 +1264,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Uses ONLY ActiveProjectsAggregator for consistency with dual-currency support
   
   // Shared handler for both /api/projects and /api/active-projects/v2
+  const portfolioCache = new ReadCache<any>(10_000, 24);
+  onAppEvent(event => { if (event.topic === "cache") portfolioCache.clear(); });
   const handleProjectsRequest = async (req: any, res: any) => {
     console.log(`🔥 CONSOLIDATED ENDPOINT CALLED: ${req.path} Query=${JSON.stringify(req.query)}`);
     
@@ -1252,7 +1297,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const aggregator = new ActiveProjectsAggregator(storage);
 
       // Get unified data using blueprint aggregator with dual-currency support
-      const aggregatorResponse = await aggregator.getActiveProjectsUnified(timeFilter, activeOnly);
+      const load = () => aggregator.getActiveProjectsUnified(timeFilter, activeOnly);
+      const aggregatorResponse = structuredClone(fresh ? await load() : await portfolioCache.get(JSON.stringify([timeFilter, activeOnly]), load));
       
       console.log(`✅ CONSOLIDATED RESPONSE: ${aggregatorResponse?.projects?.length || 'undefined'} projects from ActiveProjectsAggregator`);
       
@@ -4080,6 +4126,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Servir archivos estáticos desde public
+  app.use('/uploads', async (req, res, next) => {
+    if (!objectStorageEnabled() || !["GET", "HEAD"].includes(req.method)) return next();
+    try {
+      const object = await getObject(`uploads${decodeURIComponent(req.path)}`);
+      res.setHeader("Content-Type", object.ContentType || "application/octet-stream");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      if (object.ContentLength != null) res.setHeader("Content-Length", String(object.ContentLength));
+      if (req.method === "HEAD") { (object.Body as Readable)?.destroy(); res.end(); return; }
+      await pipeline(object.Body as Readable, res);
+    } catch (error: any) {
+      if (error?.$metadata?.httpStatusCode === 404 || error?.name === "NoSuchKey") return next();
+      if (!res.headersSent) res.status(503).json({ message: "Archivo temporalmente no disponible" });
+    }
+  });
   app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 
   // Chat websocket server
@@ -6275,18 +6336,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Quotations routes
   app.get("/api/quotations", requireAuth, async (req, res) => {
     try {
-      const leadIdParam = req.query.leadId;
-      if (leadIdParam) {
-        const leadId = parseInt(leadIdParam as string);
-        if (isNaN(leadId)) return res.status(400).json({ message: "leadId inválido" });
-        const result = await db.select().from(quotations).where(and(eq(quotations.leadId, leadId), isNull(quotations.archivedAt))).orderBy(desc(quotations.createdAt));
-        return res.json(result);
+      const page = readPage(req.query);
+      const conditions = [isNull(quotations.archivedAt)];
+      if (req.query.leadId) {
+        const leadId = Number(req.query.leadId);
+        if (!Number.isSafeInteger(leadId) || leadId <= 0) return res.status(400).json({ message: "leadId inválido" });
+        conditions.push(eq(quotations.leadId, leadId));
       }
-      const result = await storage.getQuotations();
-      res.json(result);
+      if (typeof req.query.search === "string" && req.query.search.trim()) conditions.push(sql`${quotations.projectName} ILIKE ${`%${escapeLike(req.query.search.trim().slice(0, 200))}%`}`);
+      if (typeof req.query.status === "string" && req.query.status !== "all") conditions.push(eq(quotations.status, req.query.status));
+      if (page?.beforeId) conditions.push(lt(quotations.id, page.beforeId));
+      const query = db.select().from(quotations).where(and(...conditions)).orderBy(desc(quotations.id)).$dynamic();
+      const result = await (page ? query.limit(page.limit + 1) : query);
+      res.json(page ? cursorPage(result, page.limit) : result);
     } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Paginación inválida" });
       console.error('GET /api/quotations error:', err);
       res.status(500).json({ message: 'No se pudieron traer las cotizaciones' });
+    }
+  });
+
+  app.get("/api/quotations/stats", requireAuth, requirePermission("quotations"), async (req, res) => {
+    try {
+      let fallbackFx = z.coerce.number().finite().min(0).max(1e9).optional().parse(req.query.fallbackFx);
+      if (fallbackFx == null) {
+        const [configured] = await db.select({ value: systemConfig.configValue }).from(systemConfig).where(eq(systemConfig.configKey, "usd_exchange_rate"));
+        fallbackFx = Math.max(0, Number(configured?.value) || 0);
+      }
+      res.json((await db.execute(quotationListStatsQuery(fallbackFx))).rows[0]);
+    } catch (error) {
+      res.status(error instanceof z.ZodError ? 400 : 500).json({ message: "No se pudieron cargar las estadísticas" });
     }
   });
 
@@ -7300,6 +7379,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       isNull(quotationGroups.archivedAt),
       clientId && Number.isInteger(clientId) ? eq(quotationGroups.clientId, clientId) : undefined,
     )).orderBy(desc(quotationGroups.createdAt));
+    if (req.query.summary === "true") {
+      const ids = rows.map(row => row.id);
+      const [items, clientRows] = ids.length ? await Promise.all([
+        db.select({ groupId: quotationGroupItems.groupId, quotationId: quotations.id, projectName: quotations.projectName, status: quotations.status, currency: quotations.quotationCurrency, totalAmount: quotations.totalAmount })
+          .from(quotationGroupItems).innerJoin(quotations, eq(quotationGroupItems.quotationId, quotations.id))
+          .where(and(inArray(quotationGroupItems.groupId, ids), isNull(quotations.archivedAt))).orderBy(quotationGroupItems.position),
+        db.select({ id: clients.id, name: clients.name }).from(clients).where(inArray(clients.id, [...new Set(rows.map(row => row.clientId))])),
+      ]) : [[], []];
+      const clientsById = new Map(clientRows.map(client => [client.id, client]));
+      const itemsByGroup = new Map<number, typeof items>();
+      for (const item of items) { const list = itemsByGroup.get(item.groupId) ?? []; list.push(item); itemsByGroup.set(item.groupId, list); }
+      return res.json(rows.filter(row => itemsByGroup.has(row.id)).map(group => ({
+        group: { id: group.id, groupNumber: group.groupNumber, name: group.name, clientId: group.clientId }, client: clientsById.get(group.clientId) ?? null,
+        items: itemsByGroup.get(group.id)!, status: deriveQuotationGroupStatus(itemsByGroup.get(group.id)!.map(item => item.status)),
+      })));
+    }
     const workspaces = await Promise.all(rows.map((row) => loadQuotationGroupWorkspace(row.id)));
     res.json(workspaces.filter(workspace => workspace && workspace.items.length > 0));
   });
@@ -9684,7 +9779,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { syncResumenEjecutivoToMonthlyFinancialSummary } = await import('./etl/sot-etl.js');
       console.log('📊 [API] Triggering Resumen Ejecutivo ETL sync...');
-      const result = await syncResumenEjecutivoToMonthlyFinancialSummary();
+      const result = await withJobLock("financial-sync", () => syncResumenEjecutivoToMonthlyFinancialSummary());
+      if (!result) return res.json({ success: true, skipped: true, message: "Ya hay una sincronización en curso" });
       res.json({ success: true, result });
     } catch (error: any) {
       console.error('❌ [API] Resumen Ejecutivo ETL sync failed:', error);
@@ -22780,53 +22876,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/crm/leads", requireAuth, async (req: Request, res: Response) => {
     try {
       const { stage, search } = req.query;
-      
-      let allLeads = await db.select().from(crmLeads).orderBy(desc(crmLeads.updatedAt));
-      
-      if (stage && typeof stage === 'string' && stage !== 'all') {
-        allLeads = allLeads.filter(l => l.stage === stage);
+      const page = readPage(req.query);
+      const conditions = [];
+      if (typeof stage === "string" && stage !== "all") conditions.push(eq(crmLeads.stage, stage));
+      if (typeof search === "string" && search.trim()) {
+        const term = `%${escapeLike(search.trim().slice(0, 200))}%`;
+        conditions.push(sql`(${crmLeads.companyName} ILIKE ${term} OR ${crmLeads.opportunityName} ILIKE ${term}
+          OR EXISTS (SELECT 1 FROM crm_contacts contact WHERE contact.lead_id=${crmLeads.id} AND contact.name ILIKE ${term}))`);
       }
-
-      const allContacts = allLeads.length
-        ? await db.select().from(crmContacts)
-          .where(inArray(crmContacts.leadId, allLeads.map(lead => lead.id)))
-          .orderBy(desc(crmContacts.isPrimary))
-        : [];
-      const contactsByLead = new Map<number, typeof allContacts>();
-      for (const contact of allContacts) {
-        const contacts = contactsByLead.get(contact.leadId) ?? [];
-        contacts.push(contact);
-        contactsByLead.set(contact.leadId, contacts);
-      }
-
-      if (search && typeof search === 'string') {
-        const q = search.trim().toLowerCase();
-        allLeads = allLeads.filter(l =>
-          l.companyName.toLowerCase().includes(q) ||
-          l.opportunityName?.toLowerCase().includes(q) ||
-          contactsByLead.get(l.id)?.some(contact => contact.name.toLowerCase().includes(q))
-        );
-      }
-
-      // Enrich with primary contact and last activity
-      const enriched = await Promise.all(allLeads.map(async (lead) => {
-        const contacts = contactsByLead.get(lead.id) ?? [];
-        const activities = await db.select().from(crmActivities)
-          .where(eq(crmActivities.leadId, lead.id))
-          .orderBy(desc(crmActivities.activityDate))
-          .limit(1);
-        const reminders = await db.select().from(crmReminders)
-          .where(and(eq(crmReminders.leadId, lead.id), eq(crmReminders.completed, false)));
-        return {
-          ...lead,
-          primaryContact: contacts.find(c => c.isPrimary) || contacts[0] || null,
-          lastActivity: activities[0] || null,
-          pendingReminders: reminders.length,
-        };
-      }));
-
-      res.json(enriched);
+      if (page?.beforeId) conditions.push(lt(crmLeads.id, page.beforeId));
+      const query = db.select().from(crmLeads).where(and(...conditions)).orderBy(desc(crmLeads.id)).$dynamic();
+      const rows = await (page ? query.limit(page.limit + 1) : query);
+      const visible = page ? cursorPage(rows, page.limit) : { items: rows, nextCursor: null };
+      const ids = visible.items.map(lead => lead.id);
+      const [contacts, activities, reminders] = ids.length ? await Promise.all([
+        db.select().from(crmContacts).where(inArray(crmContacts.leadId, ids)).orderBy(desc(crmContacts.isPrimary), asc(crmContacts.id)),
+        db.selectDistinctOn([crmActivities.leadId]).from(crmActivities).where(inArray(crmActivities.leadId, ids))
+          .orderBy(crmActivities.leadId, desc(crmActivities.activityDate), desc(crmActivities.id)),
+        db.select({ leadId: crmReminders.leadId, count: sql<number>`count(*)::int` }).from(crmReminders)
+          .where(and(inArray(crmReminders.leadId, ids), eq(crmReminders.completed, false))).groupBy(crmReminders.leadId),
+      ]) : [[], [], []];
+      const contactByLead = new Map<number, typeof contacts[number]>();
+      for (const contact of contacts) if (!contactByLead.has(contact.leadId)) contactByLead.set(contact.leadId, contact);
+      const activityByLead = new Map(activities.map(activity => [activity.leadId, activity]));
+      const reminderByLead = new Map(reminders.map(reminder => [reminder.leadId, reminder.count]));
+      const enriched = visible.items.map(lead => ({ ...lead, primaryContact: contactByLead.get(lead.id) ?? null,
+        lastActivity: activityByLead.get(lead.id) ?? null, pendingReminders: reminderByLead.get(lead.id) ?? 0 }));
+      res.json(page ? { items: enriched, nextCursor: visible.nextCursor } : enriched);
     } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Paginación inválida" });
       res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
@@ -23278,6 +23356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/tasks — lista filtrable
   app.get("/api/tasks", requireAuth, async (req: Request, res: Response) => {
     try {
+      const page = readPage(req.query);
       const { assigneeId, projectId, status, dateFrom, dateTo } = req.query;
       taskDateWindowSchema.parse({ dateFrom, dateTo });
       if ([assigneeId, projectId].some(id => id !== undefined && (!Number.isSafeInteger(Number(id)) || Number(id) <= 0))) return res.status(400).json({ message: "Filtro inválido" });
@@ -23306,9 +23385,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ));
       }
 
-      const result = conditions.length > 0
-        ? await db.select().from(tasks).where(and(...conditions)).orderBy(asc(tasks.position), asc(tasks.createdAt))
-        : await db.select().from(tasks).orderBy(asc(tasks.position), asc(tasks.createdAt));
+      if (page?.beforeId) conditions.push(lt(tasks.id, page.beforeId));
+      const query = db.select({ ...getTableColumns(tasks), asanaSource: sql<Record<string, unknown> | null>`${tasks.asanaSource} - 'raw' - 'csvRaw' - 'sourceDuplicates'` })
+        .from(tasks).where(and(...conditions)).orderBy(...(page ? [desc(tasks.id)] : [asc(tasks.position), asc(tasks.createdAt)])).$dynamic();
+      const rows = await (page ? query.limit(page.limit + 1) : query);
+      const visible = page ? cursorPage(rows, page.limit) : null;
+      const result = visible?.items ?? rows;
       const taskIds = result.map((task) => task.id);
       const estimateRows = taskIds.length > 0
         ? await db.select().from(taskWeeklyEstimates)
@@ -23319,11 +23401,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estimateRows,
         currentCivilWeekRange(),
       );
-      res.json(result.map((task) => ({
+      const enriched = result.map((task) => ({
         ...task,
         estimatedHoursTotal: estimatesByTask.get(task.id) ?? 0,
         estimatedHoursForWeek: estimatesForCurrentWeek.get(task.id) ?? 0,
-      })));
+      }));
+      res.json(visible ? { items: enriched, nextCursor: visible.nextCursor } : enriched);
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Filtros inválidos", errors: error.errors });
       res.status(500).json({ message: "Error al obtener tareas" });
@@ -23333,6 +23416,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/tasks/my-tasks — tareas del usuario logueado (busca por email en personnel)
   app.get("/api/tasks/my-tasks", requireAuth, async (req: Request, res: Response) => {
     try {
+      const page = readPage(req.query);
+      const delegatedScope = req.query.scope === "delegated";
+      const bucket = z.enum(["upcoming", "in_progress", "overdue", "no_date", "done"]).optional().parse(req.query.bucket);
+      const taskBucket = taskBucketSql(civilDateInBuenosAires(new Date()));
+      let counts: Record<string, number> = {};
+      let nextCursor: number | null = null;
       const user = (req as any).user;
       const personnelRecord = user?.email
         ? await db.select().from(personnel)
@@ -23346,7 +23435,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const pid = personnelRecord[0]?.id;
         const { status, dateFrom, dateTo } = req.query;
         taskDateWindowSchema.parse({ dateFrom, dateTo });
-        const assignmentConditions = pid ? or(
+        const assignmentConditions = delegatedScope ? and(eq(tasks.assignedBy, Number(user.id)), sql`(
+          (${tasks.assigneeId} IS NOT NULL AND ${tasks.assigneeId} <> ${pid ?? 0}) OR EXISTS (
+            SELECT 1 FROM jsonb_array_elements_text(COALESCE(${tasks.collaboratorIds},'[]'::jsonb)) member_id WHERE member_id::int <> ${pid ?? 0}
+          ))`) : pid ? or(
           eq(tasks.assigneeId, pid),
           sql`COALESCE(${tasks.collaboratorIds}, '[]'::jsonb) @> ${JSON.stringify([pid])}::jsonb`,
         ) : sql`FALSE`;
@@ -23357,23 +23449,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         let conditions: any[] = [assignmentConditions, archivedProjectFilter];
         if (allowedProjectIds) conditions.push(inArray(tasks.projectId, allowedProjectIds));
-        if (status && status !== 'all') conditions.push(eq(tasks.status, status as string));
+        const statusCondition = status === "active" ? notInArray(tasks.status, ["done", "cancelled"])
+          : status && status !== "all" ? eq(tasks.status, status as string) : undefined;
         if (dateFrom || dateTo) {
           const from = dateFrom ? new Date(dateFrom as string) : new Date(0);
           const to = dateTo ? taskDateWindowEnd(dateTo as string) : new Date(8640000000000000);
           if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
             return res.status(400).json({ message: "Rango de fechas inválido" });
           }
-          conditions.push(and(
+          conditions.push(or(req.query.includeUndated === "true" ? and(isNull(tasks.startDate), isNull(tasks.dueDate)) : undefined, and(
             or(isNotNull(tasks.startDate), isNotNull(tasks.dueDate)),
             sql`COALESCE(${tasks.startDate}, ${tasks.dueDate}) <= ${to}`,
             sql`COALESCE(${tasks.dueDate}, ${tasks.startDate}) >= ${from}`,
-          ));
+          )));
         }
-        myTasks = await db.select().from(tasks).where(and(...conditions)).orderBy(asc(tasks.dueDate), asc(tasks.position));
+        if (page) {
+          const rows = await db.select({ bucket: taskBucket, status: tasks.status, count: sql<number>`count(*)::int` }).from(tasks).where(and(...conditions)).groupBy(sql`1,2`);
+          counts = { active: 0, blocked: 0 };
+          for (const row of rows) {
+            if (row.bucket) counts[row.bucket] = (counts[row.bucket] ?? 0) + row.count;
+            if (!["done", "cancelled"].includes(row.status)) counts.active += row.count;
+            if (row.status === "blocked") counts.blocked += row.count;
+          }
+        }
+        if (statusCondition) conditions.push(statusCondition);
+        if (bucket) conditions.push(sql`${taskBucket} = ${bucket}`);
+        if (page?.beforeId) conditions.push(lt(tasks.id, page.beforeId));
+        const taskQuery = db.select({ ...getTableColumns(tasks), asanaSource: sql<Record<string, unknown> | null>`${tasks.asanaSource} - 'raw' - 'csvRaw' - 'sourceDuplicates'` })
+          .from(tasks).where(and(...conditions)).orderBy(...(page ? [desc(tasks.id)] : [asc(tasks.dueDate), asc(tasks.position)])).$dynamic();
+        const taskRows = await (page ? taskQuery.limit(page.limit + 1) : taskQuery);
+        if (page) { const result = cursorPage(taskRows, page.limit); myTasks = result.items; nextCursor = result.nextCursor; }
+        else myTasks = taskRows;
         // Delegation tracking is opt-in; ordinary personal-task requests do not load it.
-        if (req.query.includeDelegated === "true") {
-          delegatedTasks = (await db.select().from(tasks)
+        if (delegatedScope) { delegatedTasks = myTasks; myTasks = []; }
+        if (req.query.includeDelegated === "true" && !delegatedScope) {
+          delegatedTasks = (await db.select({ ...getTableColumns(tasks), asanaSource: sql<Record<string, unknown> | null>`${tasks.asanaSource} - 'raw' - 'csvRaw' - 'sourceDuplicates'` }).from(tasks)
             .where(and(eq(tasks.assignedBy, Number(user.id)), ...conditions.slice(1)))
             .orderBy(asc(tasks.dueDate), asc(tasks.position)))
             .filter(task => isDelegatedToOthers(task, pid ?? null));
@@ -23381,7 +23491,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const projectMetadata = await db.select({ id: activeProjects.id, name: activeProjects.name, quotationName: quotations.projectName, clientId: activeProjects.clientId, clientName: clients.name })
-        .from(activeProjects).leftJoin(quotations, eq(activeProjects.quotationId, quotations.id)).leftJoin(clients, eq(activeProjects.clientId, clients.id));
+        .from(activeProjects).leftJoin(quotations, eq(activeProjects.quotationId, quotations.id)).leftJoin(clients, eq(activeProjects.clientId, clients.id)).where(inArray(activeProjects.id, [...new Set([...myTasks, ...delegatedTasks].map(task => task.projectId))]));
       const metadata = new Map(projectMetadata.map(p => [p.id, p]));
       const delegateIds = [...new Set(delegatedTasks.flatMap(task => [task.assigneeId, ...(task.collaboratorIds ?? [])]).filter((id): id is number => typeof id === "number"))];
       const delegateNames = delegateIds.length ? await db.select({ id: personnel.id, name: personnel.name }).from(personnel).where(inArray(personnel.id, delegateIds)) : [];
@@ -23409,9 +23519,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estimatedHoursForWeek: myEstimatesForCurrentWeek.get(task.id) ?? 0,
       }));
 
-      res.json({ tasks: myTasks, delegatedTasks, personnelId: personnelRecord[0]?.id || null });
+      res.json({ tasks: myTasks, delegatedTasks, personnelId: personnelRecord[0]?.id || null, ...(page ? { nextCursor, counts } : {}) });
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Filtros inválidos", errors: error.errors });
+      console.error("Personal task read failed", error);
       res.status(500).json({ message: "Error al obtener mis tareas" });
     }
   });
@@ -23460,8 +23571,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const result = conditions.length > 0
-        ? await db.select().from(tasks).where(and(...conditions)).orderBy(asc(sql`COALESCE(${tasks.startDate}, ${tasks.dueDate})`), asc(tasks.dueDate))
-        : await db.select().from(tasks).orderBy(asc(sql`COALESCE(${tasks.startDate}, ${tasks.dueDate})`), asc(tasks.dueDate));
+        ? await db.select({ ...getTableColumns(tasks), asanaSource: sql<Record<string, unknown> | null>`${tasks.asanaSource} - 'raw' - 'csvRaw' - 'sourceDuplicates'` }).from(tasks).where(and(...conditions)).orderBy(asc(sql`COALESCE(${tasks.startDate}, ${tasks.dueDate})`), asc(tasks.dueDate))
+        : await db.select({ ...getTableColumns(tasks), asanaSource: sql<Record<string, unknown> | null>`${tasks.asanaSource} - 'raw' - 'csvRaw' - 'sourceDuplicates'` }).from(tasks).orderBy(asc(sql`COALESCE(${tasks.startDate}, ${tasks.dueDate})`), asc(tasks.dueDate));
 
       // Enrich with assignee info
       const allPersonnel = await db.select({ id: personnel.id, name: personnel.name }).from(personnel);

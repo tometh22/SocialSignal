@@ -1,0 +1,12 @@
+# Keep historical attachments and local artifacts out of Railpack/GitHub images.
+# The app builds without attached_assets (also excluded by .railwayignore).
+.git
+.context
+node_modules
+dist
+attached_assets
+coverage
+.DS_Store
+.env
+.env.*
+!.env.example

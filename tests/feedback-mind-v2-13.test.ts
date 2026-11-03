@@ -502,8 +502,8 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     // cuenta), no un error de cálculo. Sin esto, encontrarla exigía revisar
     // las 28 una por una.
     const manageQuotes = source("client/src/pages/manage-quotes.tsx");
-    expect(manageQuotes).toContain("topValueContributor: statsSource.reduce<{ name: string; ars: number } | null>((top, q) => {");
-    expect(manageQuotes).toContain("return !top || ars > top.ars ? { name: q.projectName, ars } : top;");
+    expect(manageQuotes).toContain("topValueContributor: globalStats?.topValueContributor ?? null");
+    expect(source("server/domain/quotation-list-stats.ts")).toContain("ORDER BY COALESCE(ars,0) DESC,id LIMIT 1");
     expect(manageQuotes).toContain('detail={stats.topValueContributor ? <span');
     expect(manageQuotes).toContain('title={`Mayor: ${stats.topValueContributor.name}');
   });
