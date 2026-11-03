@@ -15,3 +15,18 @@ export function personalTaskHours(value: unknown, personnelId: number | null, ow
   }
   return out;
 }
+
+/** Collect only rows whose personal hours/estimates need projection. Comments need no SQL. */
+export function privateTaskIds(value: unknown): number[] {
+  const ids = new Set<number>();
+  const visit = (item: unknown) => {
+    if (Array.isArray(item)) { item.forEach(visit); return; }
+    if (!item || typeof item !== "object" || item instanceof Date) return;
+    const row = item as Record<string, unknown>;
+    if (typeof row.id === "number" && "assigneeId" in row && "title" in row) ids.add(row.id);
+    if (typeof row.taskId === "number" && ("hours" in row || "weekStart" in row)) ids.add(row.taskId);
+    Object.values(row).forEach(visit);
+  };
+  visit(value);
+  return [...ids];
+}

@@ -1,3 +1,5 @@
+import { escapeLike } from "./utils/pagination";
+import fs from "node:fs/promises";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { and, desc, eq, notInArray, sql } from "drizzle-orm";
 import { createHash } from "crypto";
@@ -12,6 +14,7 @@ import {
 import { requirePermission } from "./middleware/requirePermission";
 import { extractFinancialIntake, financialExtractionSchema, financialMissingFields } from "./services/financial-intake-extractor";
 import {
+  cleanupFinancialUploads,
   deleteFinancialIntakeFile,
   financialIntakeUpload,
   readFinancialIntakeFile,
@@ -44,52 +47,33 @@ function publicItem(item: typeof financialIntakeItems.$inferSelect) {
   return { ...safe, fileAvailable: Boolean(item.storageKey) };
 }
 
-async function extractAndSave(itemId: number, input: Parameters<typeof extractFinancialIntake>[0]) {
-  await db.update(financialIntakeItems).set({ status: "processing", extractionError: null, updatedAt: new Date() }).where(eq(financialIntakeItems.id, itemId));
-  try {
-    const extraction = await extractFinancialIntake(input);
-    const [updated] = await db.update(financialIntakeItems).set({
-      status: "needs_review",
-      documentKind: extraction.data.documentKind,
-      suggestedTarget: extraction.data.suggestedTarget,
-      extractedData: extraction.data,
-      fieldConfidence: extraction.data.fieldConfidence,
-      warnings: extraction.data.warnings,
-      extractorProvider: extraction.provider,
-      extractorModel: extraction.model,
-      extractorVersion: extraction.version,
-      updatedAt: new Date(),
-    }).where(eq(financialIntakeItems.id, itemId)).returning();
-    return updated;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Error de extracción";
-    await db.update(financialIntakeItems).set({ status: "failed", extractionError: message, updatedAt: new Date() }).where(eq(financialIntakeItems.id, itemId));
-    throw error;
-  }
-}
-
 export function createFinancialNativeRouter(requireAuth: any) {
   const router = Router();
   const finance = [requireAuth, requirePermission("finance")];
   const receiveFiles = (req: Request, res: Response, next: NextFunction) => {
     financialIntakeUpload.array("files", 10)(req, res, (error: unknown) => {
-      if (error) return res.status(400).json({ message: error instanceof Error ? error.message : "No se pudo leer el archivo." });
+      if (error) { void cleanupFinancialUploads(req.files as Express.Multer.File[]); return res.status(400).json({ message: error instanceof Error ? error.message : "No se pudo leer el archivo." }); }
       next();
     });
   };
 
   router.get("/intake", ...finance, async (req, res) => {
     try {
-      const page = Math.max(1, Number(req.query.page) || 1);
-      const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 30));
+      const { page, pageSize } = z.object({ page: z.coerce.number().int().positive().default(1), pageSize: z.coerce.number().int().min(1).max(100).default(30) }).parse(req.query);
       const status = typeof req.query.status === "string" ? req.query.status : null;
       const documentKind = typeof req.query.documentKind === "string" ? req.query.documentKind : null;
       const conditions: any[] = [];
       if (status === "open") conditions.push(notInArray(financialIntakeItems.status, ["posted", "rejected"]));
       else if (status && status !== "all") conditions.push(eq(financialIntakeItems.status, status));
       if (documentKind && documentKind !== "all") conditions.push(eq(financialIntakeItems.documentKind, documentKind));
+      if (typeof req.query.search === "string" && req.query.search.trim()) {
+        const term = `%${escapeLike(req.query.search.trim().slice(0, 200))}%`;
+        conditions.push(sql`(${financialIntakeItems.originalFileName} ILIKE ${term} OR ${financialIntakeItems.originalText} ILIKE ${term}
+          OR ${financialIntakeItems.extractedData}->>'description' ILIKE ${term} OR ${financialIntakeItems.extractedData}->>'counterparty' ILIKE ${term}
+          OR ${financialIntakeItems.extractedData}->>'clientName' ILIKE ${term} OR ${financialIntakeItems.extractedData}->>'projectName' ILIKE ${term})`);
+      }
       const where = conditions.length ? and(...conditions) : undefined;
-      const rows = await db.select().from(financialIntakeItems).where(where).orderBy(desc(financialIntakeItems.createdAt)).limit(pageSize).offset((page - 1) * pageSize);
+      const rows = await db.select().from(financialIntakeItems).where(where).orderBy(desc(financialIntakeItems.createdAt), desc(financialIntakeItems.id)).limit(pageSize).offset((page - 1) * pageSize);
       const countResult = await db.execute(sql`SELECT count(*)::int AS total FROM financial_intake_items ${where ? sql`WHERE ${where}` : sql``}`);
       const total = Number(((countResult as any).rows?.[0] ?? (countResult as any)[0] ?? {}).total ?? rows.length);
       res.json({ items: rows.map(publicItem), page, pageSize, total });
@@ -126,8 +110,7 @@ export function createFinancialNativeRouter(requireAuth: any) {
     try {
       const { text } = textInputSchema.parse(req.body);
       const [created] = await db.insert(financialIntakeItems).values({ inputKind: "text", originalText: text, createdBy: req.user!.id }).returning();
-      const updated = await extractAndSave(created.id, { text });
-      res.status(201).json(publicItem(updated));
+      res.status(202).json(publicItem(created));
     } catch (error) { routeError(res, error); }
   });
 
@@ -139,7 +122,8 @@ export function createFinancialNativeRouter(requireAuth: any) {
       const context = typeof req.body?.context === "string" ? req.body.context.trim().slice(0, 10_000) : null;
       const items = [];
       for (const file of files) {
-        const hash = createHash("sha256").update(file.buffer).digest("hex");
+        const buffer = await fs.readFile(file.path);
+        const hash = createHash("sha256").update(buffer).digest("hex");
         const [duplicate] = await db.select().from(financialIntakeItems).where(and(
           eq(financialIntakeItems.fileHash, hash),
           sql`${financialIntakeItems.status} <> 'rejected'`,
@@ -148,7 +132,7 @@ export function createFinancialNativeRouter(requireAuth: any) {
           items.push({ ...publicItem(duplicate), duplicate: true });
           continue;
         }
-        const stored = await storeFinancialIntakeFile(file);
+        const stored = await storeFinancialIntakeFile({ ...file, buffer });
         createdStorageKeys.push(stored.storageKey);
         const [created] = await db.insert(financialIntakeItems).values({
           inputKind: file.mimetype.startsWith("image/") ? "image" : "file",
@@ -160,14 +144,13 @@ export function createFinancialNativeRouter(requireAuth: any) {
         // conservarse incluso si la extracción falla, para poder reprocesarlo.
         const persistedIndex = createdStorageKeys.indexOf(stored.storageKey);
         if (persistedIndex >= 0) createdStorageKeys.splice(persistedIndex, 1);
-        const updated = await extractAndSave(created.id, { text: context, file: { buffer: file.buffer, mimeType: file.mimetype, fileName: file.originalname } });
-        items.push(publicItem(updated));
+        items.push(publicItem(created));
       }
-      res.status(201).json({ items });
+      res.status(202).json({ items });
     } catch (error) {
       await Promise.all(createdStorageKeys.map(deleteFinancialIntakeFile));
       routeError(res, error);
-    }
+    } finally { await cleanupFinancialUploads(req.files as Express.Multer.File[]); }
   });
 
   router.patch("/intake/:id", ...finance, async (req, res) => {
@@ -177,7 +160,7 @@ export function createFinancialNativeRouter(requireAuth: any) {
       const extractedData = { ...input.extractedData, missingFields: financialMissingFields(input.extractedData) };
       const [existing] = await db.select().from(financialIntakeItems).where(eq(financialIntakeItems.id, id)).limit(1);
       if (!existing) return res.status(404).json({ message: "La carga no existe." });
-      if (["posted", "rejected"].includes(existing.status)) return res.status(409).json({ message: "Esta carga ya no admite cambios." });
+      if (["posted", "rejected", "processing", "received"].includes(existing.status)) return res.status(409).json({ message: "Esta carga ya no admite cambios." });
       const [updated] = await db.update(financialIntakeItems).set({
         extractedData,
         documentKind: extractedData.documentKind,
@@ -201,9 +184,10 @@ export function createFinancialNativeRouter(requireAuth: any) {
       const [item] = await db.select().from(financialIntakeItems).where(eq(financialIntakeItems.id, id)).limit(1);
       if (!item) return res.status(404).json({ message: "La carga no existe." });
       if (item.status === "posted") return res.status(409).json({ message: "La carga ya fue contabilizada." });
-      const file = item.storageKey ? await readFinancialIntakeFile(item.storageKey) : null;
-      const updated = await extractAndSave(id, { text: item.originalText, file: file ? { buffer: file, mimeType: item.mimeType || "application/octet-stream", fileName: item.originalFileName || "documento" } : null });
-      res.json(publicItem(updated));
+      const [queued] = await db.update(financialIntakeItems).set({ status: "received", extractionError: null, updatedAt: new Date() })
+        .where(and(eq(financialIntakeItems.id, id), notInArray(financialIntakeItems.status, ["posted", "processing", "received"]))).returning();
+      if (!queued) return res.status(409).json({ message: "La carga ya está en proceso." });
+      res.status(202).json(publicItem(queued));
     } catch (error) { routeError(res, error); }
   });
 

@@ -25,7 +25,8 @@ export function setCurrentReviewRoomId(roomId: number | null) {
   if (_currentReviewRoomId === roomId) return;
   _currentReviewRoomId = roomId;
   // Changing room invalidates all status-semanal cache entries (they may live under different URLs now).
-  try { queryClient.invalidateQueries(); } catch {}
+  void queryClient.cancelQueries({ predicate: query => String(query.queryKey[0]).startsWith("/api/status-semanal") });
+  queryClient.removeQueries({ predicate: query => String(query.queryKey[0]).startsWith("/api/status-semanal") });
 }
 
 export function getCurrentReviewRoomId(): number | null {
@@ -104,12 +105,13 @@ export async function authFetchJson<T = any>(url: string, options: RequestInit =
 }
 
 // Default query function that will be used by react-query
-export const defaultQueryFn = async ({ queryKey }: { queryKey: readonly unknown[] }) => {
+export const defaultQueryFn = async ({ queryKey, signal }: { queryKey: readonly unknown[]; signal?: AbortSignal }) => {
   const rawUrl = Array.isArray(queryKey) ? queryKey[0] : queryKey;
   const url = rewriteReviewUrl(rawUrl as string);
 
   const response = await fetch(url as string, {
     credentials: "include",
+    signal,
     headers: {
       'Content-Type': 'application/json',
       ...getAuthHeader(),
@@ -143,12 +145,13 @@ export const queryClient = new QueryClient({
 
 // Function to get a query function with custom error handling
 export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
-  return async ({ queryKey }: { queryKey: readonly unknown[] }) => {
+  return async ({ queryKey, signal }: { queryKey: readonly unknown[]; signal?: AbortSignal }) => {
     const rawUrl = Array.isArray(queryKey) ? queryKey[0] : queryKey;
     const url = rewriteReviewUrl(rawUrl as string);
 
     const response = await fetch(url as string, {
       credentials: "include",
+      signal,
       headers: {
         'Content-Type': 'application/json',
         ...getAuthHeader(),

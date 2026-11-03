@@ -1,8 +1,9 @@
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { countTemplateTasks, type ProjectTaskTemplate } from "@shared/project-task-template";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getAuthHeader } from "@/lib/queryClient";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { authFetchJson, getAuthHeader } from "@/lib/queryClient";
 import { ApiError, getApiErrorMessage, parseApiError } from "@/lib/api-error";
 import { Link } from "wouter";
 
@@ -84,10 +85,22 @@ export default function NewProjectWithTooltips() {
   });
 
   // Fetch cotizaciones y clientes
-  const { data: quotationsData, isLoading: quotationsLoading } = useQuery({
-    queryKey: ["/api/quotations"],
+  const requestedQuotationId = Number(new URLSearchParams(window.location.search).get("quotationId"));
+  const [quotationSearch, setQuotationSearch] = useState("");
+  const debouncedQuotationSearch = useDebouncedValue(quotationSearch);
+  const { data: quotationPages, isLoading: quotationsLoading, hasNextPage, fetchNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ["/api/quotations", "project-picker", debouncedQuotationSearch], initialPageParam: null as number | null,
+    queryFn: ({ pageParam, signal }) => {
+      const params = new URLSearchParams({ status: "approved", search: debouncedQuotationSearch, limit: "50" });
+      if (pageParam) params.set("beforeId", String(pageParam));
+      return authFetchJson<{ items: any[]; nextCursor: number | null }>(`/api/quotations?${params}`, { signal });
+    },
+    getNextPageParam: page => page.nextCursor ?? undefined,
   });
-  
+  const { data: requestedQuotation } = useQuery<any>({ queryKey: [`/api/quotations/${requestedQuotationId}`], enabled: Number.isSafeInteger(requestedQuotationId) && requestedQuotationId > 0 });
+  const loadedQuotations = useMemo(() => quotationPages?.pages.flatMap(page => page.items) ?? [], [quotationPages]);
+  const quotationsData = useMemo(() => requestedQuotation && !loadedQuotations.some(item => item.id === requestedQuotation.id) ? [requestedQuotation, ...loadedQuotations] : loadedQuotations, [requestedQuotation, loadedQuotations]);
+
   const { data: clientsData, isLoading: clientsLoading } = useQuery({
     queryKey: ["/api/clients"],
   });
@@ -143,7 +156,6 @@ export default function NewProjectWithTooltips() {
   });
   
   const approvedQuotations = quotationsWithClients.filter((q: any) => q?.status === "approved");
-  const requestedQuotationId = Number(new URLSearchParams(window.location.search).get("quotationId"));
   useEffect(() => {
     const selected = approvedQuotations.find((quote: any) => quote.id === requestedQuotationId);
     if (selected && !form.getValues("quotationId")) { form.setValue("quotationId", selected.id); form.setValue("clientId", selected.clientId); }
@@ -308,6 +320,7 @@ export default function NewProjectWithTooltips() {
                           </TooltipContent>
                         </Tooltip>
                       </div>
+                      <Input aria-label="Buscar cotización aprobada" placeholder="Buscar cotización aprobada…" value={quotationSearch} onChange={event => setQuotationSearch(event.target.value)} />
                       <Select
                         onValueChange={(value) => {
                           setExistingProjectId(null);
@@ -348,6 +361,7 @@ export default function NewProjectWithTooltips() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {hasNextPage && <Button type="button" variant="ghost" disabled={isFetchingNextPage} onClick={() => void fetchNextPage()}>Cargar más cotizaciones aprobadas</Button>}
                       <FormMessage />
                     </FormItem>
                   )}

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { QueryError } from "@/components/query-error";
+import { lazy, Suspense, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authFetchJson } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -10,33 +11,34 @@ import { clientCalendarColor } from "@/lib/client-calendar-color";
 import { civilDateInBuenosAires, currentBuenosAiresWeek } from "@shared/utils/buenos-aires-week";
 import { taskDateBucket } from "@shared/utils/task-date-bucket";
 import { assignCalendarLanes } from "@shared/utils/calendar-lanes";
-import TaskDetailPanel from "@/components/tasks/TaskDetailPanel";
+const TaskDetailPanel = lazy(() => import("@/components/tasks/TaskDetailPanel"));
 
 interface CalTask {
   id: number; title: string; dueDate?: string | null; startDate?: string | null; status: string;
   parentTaskId?: number | null; clientId?: number | null; clientName?: string | null;
   projectName?: string | null; assigneeName?: string | null; blockedReason?: string | null;
 }
-interface Props { projectId?: number; view?: "month" | "current-week"; showUndated?: boolean; tasks?: CalTask[] }
+interface Props { personal?: boolean; projectId?: number; view?: "month" | "current-week"; showUndated?: boolean; tasks?: CalTask[] }
 const WEEK_DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const localDate = (value: string) => new Date(`${value.slice(0, 10)}T00:00:00`);
 const range = (task: CalTask) => [task.startDate, task.dueDate].filter((date, i, dates) => date && dates.indexOf(date) === i).map(date => format(localDate(date!), "d MMM", { locale: es })).join(" – ");
 
-export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "month", showUndated = true }: Props) {
+export default function TaskCalendarView({ personal = false, projectId, tasks: tasksProp, view = "month", showUndated = true }: Props) {
   const [currentMonth, setCurrentMonth] = useState(localDate(civilDateInBuenosAires(new Date())));
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
   const [selectedTask, setSelectedTask] = useState<number | null>(null);
-  const { data, refetch } = useQuery<{ tasks: CalTask[] }>({
-    queryKey: ["/api/tasks/project", projectId],
-    queryFn: () => authFetchJson(`/api/tasks/project/${projectId}?layout=flat`),
-    staleTime: 30_000, enabled: tasksProp === undefined && projectId !== undefined,
+  const civilWeek = currentBuenosAiresWeek();
+  const first = view === "current-week" ? localDate(civilWeek.from) : startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 });
+  const last = view === "current-week" ? localDate(civilWeek.to) : endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 1 });
+  const dates = new URLSearchParams({ dateFrom: format(first, "yyyy-MM-dd"), dateTo: format(last, "yyyy-MM-dd"), includeUndated: String(showUndated) });
+  const { data, refetch, error, isLoading } = useQuery<{ tasks: CalTask[] }>({
+    queryKey: [personal ? "/api/tasks/my-tasks" : "/api/tasks/project", projectId, dates.toString()],
+    queryFn: ({ signal }) => authFetchJson(personal ? `/api/tasks/my-tasks?${dates}` : `/api/tasks/project/${projectId}?layout=flat&${dates}`, { signal }),
+    staleTime: 30_000, enabled: tasksProp === undefined && (personal || projectId !== undefined),
   });
   const sourceTasks = Array.isArray(tasksProp) ? tasksProp : Array.isArray(data?.tasks) ? data.tasks : [];
   const dated = sourceTasks.filter(t => t.status !== "cancelled" && (t.startDate || t.dueDate));
   const undated = sourceTasks.filter(t => !t.startDate && !t.dueDate && !["done", "cancelled"].includes(t.status));
-  const civilWeek = currentBuenosAiresWeek();
-  const first = view === "current-week" ? localDate(civilWeek.from) : startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 });
-  const last = view === "current-week" ? localDate(civilWeek.to) : endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 1 });
   const weeks: Date[][] = [];
   for (let day = first; day <= last;) { const days: Date[] = []; for (let i = 0; i < 7; i++) { days.push(day); day = addDays(day, 1); } weeks.push(days); }
   const toggle = (key: string) => setExpandedWeeks(previous => { const next = new Set(previous); next.has(key) ? next.delete(key) : next.add(key); return next; });
@@ -53,6 +55,8 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "
       {task.status === "blocked" && <span className="block">{task.blockedReason || "Bloqueada"}</span>}
     </span>}
   </button>;
+  if (error) return <QueryError message="No se pudo cargar el calendario." retry={refetch} />;
+  if (isLoading && tasksProp === undefined) return <p role="status" className="p-4 text-sm">Cargando calendario…</p>;
   return <div className="min-w-0 pb-6 pt-4">
     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
       <h3 className="text-sm font-semibold capitalize">{view === "current-week" ? `${format(first, "d MMM", { locale: es })} – ${format(last, "d MMM", { locale: es })}` : format(currentMonth, "MMMM yyyy", { locale: es })}</h3>
@@ -93,6 +97,6 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "
       </div>
     </div>
     {showUndated && undated.length > 0 && <div className="mt-4 rounded-xl border p-3"><p className="mb-2 text-xs text-muted-foreground">Sin fecha ({undated.length})</p><div className="grid gap-2 sm:grid-cols-2">{undated.map(task => renderTask(task,true))}</div></div>}
-    {selectedTask != null && <TaskDetailPanel taskId={selectedTask} open onClose={() => setSelectedTask(null)} onUpdate={() => { void refetch(); }} onNavigateToTask={setSelectedTask} />}
+    {selectedTask != null && <Suspense fallback={<p role="status">Cargando tarea…</p>}><TaskDetailPanel taskId={selectedTask} open onClose={() => setSelectedTask(null)} onUpdate={() => { void refetch(); }} onNavigateToTask={setSelectedTask} /></Suspense>}
   </div>;
 }

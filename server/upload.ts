@@ -1,8 +1,31 @@
+import { objectStorageEnabled, putObject, removeObject } from "./services/object-storage";
 import multer from 'multer';
 import { Request } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { randomUUID } from 'crypto';
+
+// Preserve existing /uploads URLs while storing a shared copy for every replica.
+function sharedStorage(local: multer.StorageEngine): multer.StorageEngine {
+  return {
+    _handleFile(req, file, done) {
+      local._handleFile(req, file, (error, info) => {
+        if (error || !info?.path || !objectStorageEnabled()) return done(error, info);
+        const key = `uploads/${path.relative(path.join(process.cwd(), "public/uploads"), info.path).split(path.sep).join("/")}`;
+        void putObject(key, info.path, file.mimetype).then(() => done(null, info), failure => {
+          fs.unlink(info.path!, () => done(failure));
+        });
+      });
+    },
+    _removeFile(req, file, done) {
+      if (objectStorageEnabled() && file.path) {
+        const key = `uploads/${path.relative(path.join(process.cwd(), "public/uploads"), file.path).split(path.sep).join("/")}`;
+        void removeObject(key).catch(error => console.error("Shared upload cleanup failed", error));
+      }
+      local._removeFile(req, file, done);
+    },
+  };
+}
 
 // Configurar el directorio de destino para las cargas
 const uploadDir = path.join(process.cwd(), 'public/uploads');
@@ -38,7 +61,7 @@ const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilt
 
 // Configurar Multer con límites razonables
 export const upload = multer({
-  storage: storage,
+  storage: sharedStorage(storage),
   fileFilter: fileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB máximo
@@ -81,7 +104,7 @@ const proposalFileFilter = (req: Request, file: Express.Multer.File, cb: multer.
 };
 
 export const uploadDocument = multer({
-  storage: proposalStorage,
+  storage: sharedStorage(proposalStorage),
   fileFilter: proposalFileFilter,
   limits: { fileSize: 20 * 1024 * 1024 },
 });
@@ -121,7 +144,7 @@ const invoiceFileFilter = (req: Request, file: Express.Multer.File, cb: multer.F
 };
 
 export const uploadInvoice = multer({
-  storage: invoiceStorage,
+  storage: sharedStorage(invoiceStorage),
   fileFilter: invoiceFileFilter,
   limits: { fileSize: 20 * 1024 * 1024 },
 });
@@ -157,7 +180,7 @@ const postProposalFileFilter = (req: Request, file: Express.Multer.File, cb: mul
 };
 
 export const uploadPostProposal = multer({
-  storage: postProposalStorage,
+  storage: sharedStorage(postProposalStorage),
   fileFilter: postProposalFileFilter,
   limits: { fileSize: 25 * 1024 * 1024 }, // 25MB
 });
@@ -166,8 +189,14 @@ export const uploadPostProposal = multer({
 export const deleteOldFile = (filePath: string) => {
   if (!filePath) return;
   
-  const fullPath = path.join(process.cwd(), filePath);
+  const normalized = filePath.replace(/^\/?uploads\//, "public/uploads/");
+  const fullPath = path.resolve(process.cwd(), normalized);
+  if (!fullPath.startsWith(path.join(process.cwd(), "public/uploads") + path.sep)) return;
   
+  if (objectStorageEnabled() && fullPath.startsWith(path.join(process.cwd(), "public/uploads") + path.sep)) {
+    const key = path.relative(path.join(process.cwd(), "public"), fullPath).split(path.sep).join("/");
+    void removeObject(key).catch(error => console.error("Shared upload delete failed", error));
+  }
   // Solo eliminar si el archivo existe y está dentro del directorio uploads
   if (fs.existsSync(fullPath) && fullPath.includes('/uploads/')) {
     try {

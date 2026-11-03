@@ -1,3 +1,4 @@
+import { withJobLock } from "../services/job-lock";
 import cron from "node-cron";
 import { sql } from "drizzle-orm";
 import { db } from "../db";
@@ -6,7 +7,9 @@ import { payrollCalendar, preparePayroll } from "../services/monthly-payroll";
 import { notifySettlement } from "../services/personnel-settlement-workflow";
 import { createUserNotifications } from "../services/user-notifications";
 
-export async function runTeamPayroll(now = new Date()) {
+export async function runTeamPayroll(now = new Date()) { return withJobLock("team-payroll", () => runTeamPayrollUnlocked(now)); }
+
+async function runTeamPayrollUnlocked(now: Date) {
   const period = civilDateInBuenosAires(now).slice(0,7);
   const previous = new Date(`${period}-01T12:00:00Z`); previous.setUTCMonth(previous.getUTCMonth()-1);
   const activation = (await db.execute(sql`SELECT description FROM system_config WHERE config_key='payroll_automation_start'`)).rows[0] as any;
@@ -31,7 +34,9 @@ export function startTeamPayroll() {
   void run();
 }
 
-export async function remindTeamPayroll(now = new Date()) {
+export async function remindTeamPayroll(now = new Date()) { return withJobLock("team-payroll-reminders", () => remindTeamPayrollUnlocked(now)); }
+
+async function remindTeamPayrollUnlocked(now: Date) {
   const { personnelMonthlySettlements, personalMonthlyInvoices } = await import("@shared/schema");
   const { eq } = await import("drizzle-orm");
   const { settlementWorkflow } = await import("@shared/utils/settlement-workflow");

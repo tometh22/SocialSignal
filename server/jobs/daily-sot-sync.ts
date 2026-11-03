@@ -1,3 +1,4 @@
+import { withJobLock } from "../services/job-lock";
 /**
  * SoT Full Pipeline Sync Job
  *
@@ -42,7 +43,9 @@ async function getSystemUserId(): Promise<number | null> {
   return row?.id ?? null;
 }
 
-async function runFullPipeline() {
+async function runFullPipeline() { return withJobLock("financial-sync", runFullPipelineUnlocked); }
+
+async function runFullPipelineUnlocked() {
   if (isRunning) {
     console.log('⏳ [SoT Sync] Run ya en curso — saltando');
     return;

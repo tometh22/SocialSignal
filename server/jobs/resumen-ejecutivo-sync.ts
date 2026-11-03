@@ -1,3 +1,4 @@
+import { withJobLock } from "../services/job-lock";
 /**
  * Resumen Ejecutivo Auto-Sync Job
  * Sincroniza Resumen Ejecutivo + CashFlow + Activo desde Google Sheets cada 2 horas.
@@ -25,7 +26,9 @@ export function startResumenEjecutivoSync() {
   });
 }
 
-async function runSync() {
+async function runSync() { return withJobLock("financial-sync", runSyncUnlocked); }
+
+async function runSyncUnlocked() {
   if (isRunning) {
     console.log('⏳ [Resumen Ejecutivo Sync] Ya hay un sync en curso, saltando...');
     return;
