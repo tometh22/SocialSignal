@@ -24,6 +24,7 @@ const htmlEntities: Record<string, string> = {
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => htmlEntities[char]);
 
 const notificationCategory: Record<string, string> = {
+  quotation_approval: "Aprobación de cotización",
   mind_reply: "Conversación",
   mind_daily: "Daily de Mind",
   task_assigned: "Tarea asignada",
@@ -37,6 +38,7 @@ const notificationCategory: Record<string, string> = {
 };
 
 const discreetEmailCopy: Record<string, { subject: string; message: string }> = {
+  quotation_approval: { subject: "Hay una cotización para aprobar", message: "Una cotización requiere tu revisión. Abrí Mind para consultar los detalles." },
   mind_reply: { subject: "Nueva respuesta en una conversación", message: "Alguien respondió en una conversación de Mind. Abrí Mind para leer el mensaje." },
   mind_daily: { subject: "Hay novedades en tu Daily", message: "Hay una actualización en el Daily de Mind. Abrí Mind para verla." },
   task_assigned: { subject: "Te asignaron una tarea", message: "Tenés una nueva tarea asignada. Abrí Mind para consultar los detalles." },
@@ -54,6 +56,7 @@ export function getNotificationPreferenceCategory(type: string) {
   if (type.startsWith("task_")) return "tasks";
   if (type.startsWith("absence")) return "team";
   if (type.startsWith("crm_")) return "crm";
+  if (type.startsWith("quotation_")) return "quotations";
   return "team";
 }
 

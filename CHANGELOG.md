@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.21 — 2026-11-03
+
+- Las solicitudes de aprobación pendientes pueden retirarse con un motivo para volver a editar. Se conservan las versiones anteriores, se cancelan las aprobaciones pendientes y se exige volver a solicitar aprobación después de corregir. La acción valida autoría o permiso de aprobación y se serializa con las decisiones comerciales.
+- El cotizador muestra Aprobación y envío antes de permitir cambios sobre una versión bloqueada. El mensaje de guardado explica cómo retomar la edición.
+- Enviar una cotización a aprobación, individualmente o desde un grupo, avisa a las personas activas autorizadas, excluye a quien la solicitó y evita duplicados por revisión. La categoría Cotizaciones permite elegir email y escritorio con las preferencias existentes.
+
 ## 1.14.20 — 2026-11-02
 
 - Las notificaciones nuevas de solicitud, modificación y cancelación de ausencias abren Gestión de ausencias para Operaciones. Las conciliaciones del circuito anterior abren Cierre del equipo en el mes correspondiente; los avisos personales conservan su destino.

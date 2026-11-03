@@ -23,7 +23,7 @@ type ProductNotification = {
   readAt: string | null;
   createdAt: string;
 };
-type Category = "mind" | "daily" | "tasks" | "crm" | "team";
+type Category = "mind" | "daily" | "tasks" | "crm" | "team" | "quotations";
 type CategoryChannelPreferences = Record<string, { desktop?: boolean; email?: boolean }>;
 type NotificationPreferences = {
   desktopEnabled: boolean;
@@ -40,6 +40,7 @@ const categories: { key: Category; label: string; detail: string }[] = [
   { key: "daily", label: "Dailies", detail: "Cuando alguien completa una daily en tus espacios" },
   { key: "tasks", label: "Tareas", detail: "Asignaciones y nuevas respuestas" },
   { key: "crm", label: "CRM", detail: "Recordatorios asignados a vos" },
+  { key: "quotations", label: "Cotizaciones", detail: "Solicitudes de aprobación comercial" },
   { key: "team", label: "Equipo", detail: "Solicitudes y decisiones de ausencias" },
 ];
 
@@ -48,6 +49,7 @@ function notificationHref(item: ProductNotification) {
   if (item.type.startsWith("mind_")) return item.entityId ? `/review/${item.entityId}` : "/review";
   if (item.type.startsWith("task_")) return "/tasks/my-tasks";
   if (item.type.startsWith("crm_")) return item.entityId ? `/crm/${item.entityId}` : "/crm";
+  if (item.type.startsWith("quotation_")) return item.entityId ? `/quotations/${item.entityId}#commercial-approval` : "/manage-quotes";
   if (item.type.startsWith("absence")) return "/absences";
   return "/";
 }
@@ -56,6 +58,7 @@ function typeStyle(type: string) {
   if (type.startsWith("mind_")) return { icon: MessageCircle, iconClass: "bg-violet-100 text-violet-700", label: "Mind" };
   if (type.startsWith("task_")) return { icon: ClipboardList, iconClass: "bg-sky-100 text-sky-700", label: "Tareas" };
   if (type.startsWith("crm_")) return { icon: ArrowUpRight, iconClass: "bg-amber-100 text-amber-700", label: "CRM" };
+  if (type.startsWith("quotation_")) return { icon: ClipboardList, iconClass: "bg-indigo-100 text-indigo-700", label: "Cotizaciones" };
   if (type.startsWith("absence")) return { icon: Users, iconClass: "bg-emerald-100 text-emerald-700", label: "Equipo" };
   return { icon: Bell, iconClass: "bg-slate-100 text-slate-600", label: "Aviso" };
 }
