@@ -1,9 +1,10 @@
+import { QueryError } from "@/components/query-error";
 import OptionalDelegatedTasks from "@/components/tasks/OptionalDelegatedTasks";
 import TaskRangeCalendar from "@/components/tasks/TaskRangeCalendar";
 import TaskWorkflowControl from "@/components/tasks/TaskWorkflowControl";
 import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
 import { useState, useCallback } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { queryClient, apiRequest, authFetch, authFetchJson } from "@/lib/queryClient";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -343,9 +344,15 @@ export default function TasksHomePage() {
   const [expandedProjectClients, setExpandedProjectClients] = useState<Set<string>>(new Set());
   const [projectView, setProjectView] = useState<"folders" | "list">("folders");
 
-  const { data: myTasksResponse, refetch: refetchMyTasks } = useQuery({
-    queryKey: ["/api/tasks/my-tasks"],
-    queryFn: () => authFetchJson("/api/tasks/my-tasks"),
+  const { data: myTaskPages, error: tasksError, isLoading: tasksLoading, refetch: refetchMyTasks, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ["/api/tasks/my-tasks", "buckets", myTab],
+    initialPageParam: null as number | null,
+    queryFn: ({ pageParam, signal }) => {
+      const params = new URLSearchParams({ limit: "100", bucket: myTab });
+      if (pageParam) params.set("beforeId", String(pageParam));
+      return authFetchJson<{ tasks: Task[]; nextCursor: number | null; counts: Record<string, number> }>(`/api/tasks/my-tasks?${params}`, { signal });
+    },
+    getNextPageParam: page => page.nextCursor ?? undefined,
   });
 
   const { data: rawProjects } = useQuery({
@@ -402,17 +409,9 @@ export default function TasksHomePage() {
     dateMutation.mutate({ taskId, range });
   }, [dateMutation]);
 
-  const raw = myTasksResponse as any;
-  const myTasks: Task[] = Array.isArray(raw) ? raw : Array.isArray(raw?.tasks) ? raw.tasks : [];
+  const myTasks = myTaskPages?.pages.flatMap(page => page.tasks) ?? [];
   const projects: TaskProject[] = Array.isArray(rawProjects) ? rawProjects : [];
-
-  const taskCounts = {
-    upcoming: myTasks.filter(t => taskBucket(t) === "upcoming").length,
-    in_progress: myTasks.filter(t => taskBucket(t) === "in_progress").length,
-    overdue: myTasks.filter(t => taskBucket(t) === "overdue").length,
-    no_date: myTasks.filter(t => taskBucket(t) === "no_date").length,
-    done: myTasks.filter(task => taskBucket(task) === "done").length,
-  };
+  const taskCounts = { upcoming: 0, in_progress: 0, overdue: 0, no_date: 0, done: 0, ...myTaskPages?.pages[0]?.counts };
 
   const filteredMyTasks = myTasks.filter(t => {
     return taskBucket(t) === myTab;
@@ -543,6 +542,7 @@ export default function TasksHomePage() {
 
       <OptionalDelegatedTasks />
 
+      {hasNextPage && <Button variant="outline" disabled={isFetchingNextPage} onClick={() => { setShowAllMy(true); void fetchNextPage(); }}>{isFetchingNextPage ? "Cargando…" : "Cargar más tareas de esta categoría"}</Button>}
       {/* Top two-column widgets */}
       <SectionHeading title="Tu espacio de trabajo" description="Tareas asignadas y proyectos recientes, en contexto." />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -570,7 +570,7 @@ export default function TasksHomePage() {
           </div>
 
           <div className="flex-1 divide-y divide-border/60 min-h-[160px]">
-            {filteredMyTasks.length === 0 ? (
+            {tasksError ? <QueryError message="No se pudieron cargar tus tareas." retry={refetchMyTasks} /> : tasksLoading ? <p role="status" className="p-4">Cargando tareas…</p> : filteredMyTasks.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center px-4">
                 <div className="w-8 h-8 rounded-full border-2 border-muted-foreground/20 flex items-center justify-center mb-2">
                   <Check className="h-4 w-4 text-muted-foreground/30" />
@@ -706,7 +706,7 @@ export default function TasksHomePage() {
           </Link>
         </div>
         <div className="px-2 pb-3">
-          <TaskCalendarView tasks={myTasks as any} />
+          <TaskCalendarView personal />
         </div>
       </div>
 

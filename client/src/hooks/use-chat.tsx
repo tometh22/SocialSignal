@@ -1,7 +1,8 @@
+import { isTaskRelatedQuery } from "@shared/utils/task-cache-key";
 import { createContext, ReactNode, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient, authFetch } from "@/lib/queryClient";
+import { apiRequest, queryClient, authFetchJson, authFetch } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 // Tipos de mensajes y conversaciones
@@ -68,6 +69,7 @@ interface NewConversationPayload {
 
 // Tipo para respuestas de WebSocket
 interface WebSocketResponse {
+  resource?: string;
   type: string;
   message?: any;
   conversation?: ChatConversation;
@@ -96,6 +98,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [activeConversation, setActiveConversation] = useState<ChatConversation | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const connectedOnce = useRef(false);
+  const pendingUpdates = useRef(new Set<string>());
+  const updateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (updateTimer.current) clearTimeout(updateTimer.current); }, []);
   const webSocketRef = useRef<WebSocket | null>(null);
   const handleWebSocketMessageRef = useRef<(data: WebSocketResponse) => void>(() => {});
   const { toast } = useToast();
@@ -171,7 +177,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         // Exponential backoff: 3s, 6s, 12s, 24s, 48s — then stop
         if (retryCount < MAX_RETRIES) {
-          const delay = 3000 * Math.pow(2, retryCount);
+          const delay = 3000 * Math.pow(2, retryCount) + Math.random() * 1500;
           retryCount++;
           retryTimeout = setTimeout(() => {
             if (user && !cancelled) connectWebSocket();
@@ -199,6 +205,33 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // Manejador de mensajes WebSocket
   const handleWebSocketMessage = useCallback((data: WebSocketResponse) => {
     switch (data.type) {
+      case "data_updated":
+        pendingUpdates.current.add(data.resource || "finance");
+        if (!updateTimer.current) updateTimer.current = setTimeout(() => {
+          const changed = new Set(pendingUpdates.current); pendingUpdates.current.clear(); updateTimer.current = null;
+          void queryClient.invalidateQueries({ predicate: query => {
+            const key = String(query.queryKey[0]);
+            return changed.has("all") || (changed.has("tasks") && isTaskRelatedQuery(query.queryKey))
+              || (changed.has("projects") && /projects|project-/.test(key))
+              || (changed.has("quotations") && /quotations|quotation-/.test(key))
+              || (changed.has("crm") && /crm|clients/.test(key))
+              || ((changed.has("finance") || changed.has("tasks")) && /financial|finance|executive|dashboard|costos|rendimiento|cashflow|activo|pasivo/.test(key));
+          } });
+        }, 300);
+        break;
+      case "connected":
+      case "conversation_updated":
+        if (data.type === "connected") {
+          if (connectedOnce.current) void queryClient.invalidateQueries({ type: "active" });
+          connectedOnce.current = true;
+        }
+        void queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+        if (activeConversationId && (data.type === "connected" || data.conversationId === activeConversationId)) {
+          void authFetchJson<ChatConversation>(`/api/conversations/${activeConversationId}`).then(conversation => {
+            setActiveConversation(previous => previous?.id === activeConversationId ? conversation : previous);
+          }).catch(() => {});
+        }
+        break;
       case "new_message":
         // Actualizar la conversación con el nuevo mensaje
         queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });

@@ -109,7 +109,8 @@ describe("Feedback 5-10 · cotizaciones", () => {
   it("las cotizaciones archivadas no reaparecen en grupos ni por lead", () => {
     const routes = source("server/routes.ts");
     expect(routes).toContain("and(eq(quotationGroupItems.groupId, groupId), isNull(quotations.archivedAt))");
-    expect(routes).toContain("and(eq(quotations.leadId, leadId), isNull(quotations.archivedAt))");
+    expect(routes).toContain("const conditions = [isNull(quotations.archivedAt)]");
+    expect(routes).toContain("conditions.push(eq(quotations.leadId, leadId))");
   });
 });
 

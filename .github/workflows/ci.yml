@@ -62,3 +62,30 @@ jobs:
 
       - name: Build production bundle
         run: npm run build
+
+      - name: Check initial JavaScript budget
+        run: npm run check:bundle
+
+      - name: Prepare isolated browser database
+        env:
+          PGPASSWORD: mind_test
+          DATABASE_URL: postgres://mind_test:mind_test@127.0.0.1:5432/mind_e2e
+        run: |
+          createdb -h 127.0.0.1 -U mind_test mind_e2e
+          npx drizzle-kit push --force
+          npx tsx scripts/seed-performance-e2e.ts
+          npm run db:performance-indexes
+
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser smoke tests
+        run: npm run test:e2e
+
+      - name: Keep browser traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-traces
+          path: .context/e2e-results
+          retention-days: 7

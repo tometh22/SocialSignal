@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { authFetchJson } from "@/lib/queryClient";
 import { taskDateBucket } from "@shared/utils/task-date-bucket";
@@ -22,11 +22,19 @@ const FILTERS: { value: Filter; label: string }[] = [
 
 export default function DelegatedTasks({ full = false }: { full?: boolean }) {
   const [filter, setFilter] = useState<Filter>("active");
-  const { data, isLoading, isError, refetch } = useQuery<{ delegatedTasks: DelegatedTask[] }>({
-    queryKey: ["/api/tasks/my-tasks", "delegated"],
-    queryFn: () => authFetchJson("/api/tasks/my-tasks?includeDelegated=true"),
+  const { data, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ["/api/tasks/my-tasks", "delegated", filter],
+    initialPageParam: null as number | null,
+    queryFn: ({ pageParam, signal }) => {
+      const params = new URLSearchParams({ scope: "delegated", limit: full ? "100" : "5" });
+      if (filter === "overdue") params.set("bucket", "overdue");
+      else params.set("status", filter);
+      if (pageParam) params.set("beforeId", String(pageParam));
+      return authFetchJson<{ delegatedTasks: DelegatedTask[]; nextCursor: number | null; counts: Record<string, number> }>(`/api/tasks/my-tasks?${params}`, { signal });
+    },
+    getNextPageParam: page => page.nextCursor ?? undefined,
   });
-  const tasks = data?.delegatedTasks ?? [];
+  const tasks = data?.pages.flatMap(page => page.delegatedTasks) ?? [];
   const matches = (task: DelegatedTask, value: Filter) => value === "active"
     ? !["done", "cancelled"].includes(task.status)
     : value === "overdue" ? taskDateBucket(task) === "overdue"
@@ -45,7 +53,7 @@ export default function DelegatedTasks({ full = false }: { full?: boolean }) {
     <div className="flex flex-wrap gap-2 p-4" aria-label="Filtrar tareas delegadas">
       {FILTERS.map(({ value, label }) => <Button key={value} size="sm" variant={filter === value ? "secondary" : "ghost"}
         aria-pressed={filter === value} className="h-8 text-xs" onClick={() => setFilter(value)}>
-        {label}{!isLoading && !isError && ` · ${tasks.filter(task => matches(task, value)).length}`}
+        {label}{!isLoading && !isError && ` · ${data?.pages[0]?.counts[value] ?? 0}`}
       </Button>)}
     </div>
     {isLoading ? <p className="px-4 pb-4 text-sm text-muted-foreground" role="status">Cargando tareas delegadas…</p>
@@ -66,5 +74,6 @@ export default function DelegatedTasks({ full = false }: { full?: boolean }) {
       </ul>}
     {!full && filtered.length > visible.length && <Link href="/tasks/my-tasks?scope=delegated" className="block px-4 py-3 text-xs text-primary hover:underline">Ver las {filtered.length} tareas</Link>}
     <p className="border-t px-4 py-3 text-[11px] text-muted-foreground">Incluye tareas cuya última asignación hiciste vos. Las asignaciones anteriores a este registro no tienen autor identificado.</p>
+    {full && hasNextPage && <Button className="m-3" variant="outline" disabled={isFetchingNextPage} onClick={() => void fetchNextPage()}>Cargar más tareas delegadas</Button>}
   </section>;
 }

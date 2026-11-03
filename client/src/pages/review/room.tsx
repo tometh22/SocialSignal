@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2, AlertTriangle, FolderPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { reviewApi, reviewKeys, type ReviewRoomDetail } from "@/lib/review-api";
-import { setCurrentReviewRoomId } from "@/lib/queryClient";
+import { getCurrentReviewRoomId, setCurrentReviewRoomId } from "@/lib/queryClient";
 import { ReviewRoomContext, setLastReviewRoomId } from "@/hooks/use-review-room";
 import AddProjectDialog from "@/components/review/AddProjectDialog";
 import StatusSemanalPage from "@/pages/status-semanal";
@@ -25,7 +25,10 @@ export default function ReviewRoomPage() {
     if (!Number.isFinite(roomId)) return;
     setLastReviewRoomId(roomId);
     reviewApi.visit(roomId).catch(() => {});
-    return () => { setCurrentReviewRoomId(null); };
+    return () => {
+      // A different room may already have rendered before this cleanup runs.
+      if (getCurrentReviewRoomId() === roomId) setCurrentReviewRoomId(null);
+    };
   }, [roomId]);
 
   const { data: room, error, isLoading } = useQuery<ReviewRoomDetail>({

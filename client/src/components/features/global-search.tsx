@@ -1,3 +1,6 @@
+import { QueryError } from "@/components/query-error";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { authFetchJson } from "@/lib/queryClient";
 import { usePermissions } from "@/hooks/use-permissions";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -56,10 +59,13 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   const [activeTab, setActiveTab] = useState('all');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { data: clients = [] } = useQuery<{ id: number; name: string; [key: string]: unknown }[]>({ queryKey: ['/api/clients'], enabled:isOpen && hasPermission('crm') });
-  const { data: activeProjects = [] } = useQuery<{ id: number; quotationId?: number | null; [key: string]: unknown }[]>({ queryKey: ['/api/tasks/projects', 'search', isOperations], queryFn:async()=>{ const {authFetchJson}=await import('@/lib/queryClient'); return authFetchJson(`/api/tasks/projects?scope=${isOperations ? 'all' : 'mine'}`); }, enabled:isOpen && hasAnyPermission(['projects','operations','task_manager']) });
-  const { data: quotations = [] } = useQuery<{ id: number; projectName?: string; clientId?: number; [key: string]: unknown }[]>({ queryKey: ['/api/quotations'], enabled:isOpen && hasPermission('quotations') });
-  const { data: deliverables = [] } = useQuery<{ id: number; [key: string]: unknown }[]>({ queryKey: ['/api/deliverables'], enabled:isOpen && isOperations });
+  const debouncedSearch = useDebouncedValue(searchTerm);
+  const { data: matches = [], isFetching, error, refetch } = useQuery<SearchResult[]>({
+    queryKey: ["/api/search", debouncedSearch],
+    queryFn: ({ signal }) => authFetchJson(`/api/search?q=${encodeURIComponent(debouncedSearch)}`, { signal }),
+    enabled: isOpen && debouncedSearch.trim().length >= 2,
+    staleTime: 30_000,
+  });
 
   // Focus en el input cuando se abre
   useEffect(() => {
@@ -85,142 +91,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
     };
   }, [isOpen, onClose]);
 
-  // Generar resultados de búsqueda inteligente
-  const searchResults = useMemo(() => {
-    if (!searchTerm.trim()) return [];
-
-    const results: SearchResult[] = [];
-    const term = searchTerm.toLowerCase();
-
-    // Buscar en clientes
-    (clients as any[]).forEach(client => {
-      if (
-        client.name?.toLowerCase().includes(term) ||
-        client.contactName?.toLowerCase().includes(term) ||
-        client.contactEmail?.toLowerCase().includes(term)
-      ) {
-        results.push({
-          id: `client-${client.id}`,
-          type: 'client',
-          title: client.name,
-          subtitle: client.contactName,
-          description: client.contactEmail,
-          url: `/client-summary/${client.id}`,
-          metadata: { 
-            projects: activeProjects.filter((p: any) => {
-              const quotation = quotations.find((q: any) => q.id === p.quotationId);
-              return quotation?.clientId === client.id;
-            }).length
-          }
-        });
-      }
-    });
-
-    // Buscar en proyectos activos
-    (activeProjects as any[]).forEach(project => {
-      const quotation = quotations.find((q: any) => q.id === project.quotationId);
-      const client = clients.find((c: any) => c.id === quotation?.clientId);
-      
-      if (
-        (project.name || quotation?.projectName)?.toLowerCase().includes(term) ||
-        (project.clientName || client?.name)?.toLowerCase().includes(term) ||
-        project.id.toString().includes(term)
-      ) {
-        results.push({
-          id: `project-${project.id}`,
-          type: 'project',
-          title: project.name || quotation?.projectName || `Proyecto #${project.id}`,
-          subtitle: project.clientName || client?.name,
-          description: `Estado: ${project.status}`,
-          status: project.status,
-          date: project.startDate || project.createdAt ? new Date(project.startDate || project.createdAt) : undefined,
-          url: `/tasks/projects/${project.id}`,
-          metadata: {
-            isAlwaysOn: project.isAlwaysOnMacro,
-            budget: isOperations ? quotation?.totalAmount : undefined
-          }
-        });
-      }
-    });
-
-    // Buscar en cotizaciones
-    (quotations as any[]).forEach(quotation => {
-      const client = clients.find((c: any) => c.id === quotation.clientId);
-      
-      if (
-        quotation.projectName?.toLowerCase().includes(term) ||
-        client?.name?.toLowerCase().includes(term) ||
-        quotation.id.toString().includes(term)
-      ) {
-        results.push({
-          id: `quotation-${quotation.id}`,
-          type: 'quotation',
-          title: quotation.projectName,
-          subtitle: client?.name,
-          description: `Estado: ${quotation.status}`,
-          status: quotation.status,
-          amount: quotation.totalAmount,
-          date: new Date(quotation.createdAt),
-          url: `/quotations/${quotation.id}`,
-          metadata: {
-            analysisType: quotation.analysisType,
-            projectType: quotation.projectType
-          }
-        });
-      }
-    });
-
-    // Buscar en entregables
-    (deliverables as any[]).forEach(deliverable => {
-      const client = clients.find((c: any) => c.id === deliverable.clientId);
-      
-      if (
-        deliverable.name?.toLowerCase().includes(term) ||
-        client?.name?.toLowerCase().includes(term) ||
-        deliverable.deliveryMonth?.toLowerCase().includes(term)
-      ) {
-        results.push({
-          id: `deliverable-${deliverable.id}`,
-          type: 'deliverable',
-          title: deliverable.name,
-          subtitle: client?.name,
-          description: `Mes: ${deliverable.deliveryMonth}`,
-          status: deliverable.deliveryOnTime ? 'completed' : 'delayed',
-          priority: deliverable.deliveryOnTime ? 'low' : 'high',
-          date: deliverable.delivery_date ? new Date(deliverable.delivery_date) : undefined,
-          url: `/edit-deliverable/${deliverable.id}`,
-          metadata: {
-            qualityScore: deliverable.narrativeQuality,
-            onTime: deliverable.deliveryOnTime
-          }
-        });
-      }
-    });
-
-    // Filtrar por filtros seleccionados
-    let filteredResults = results;
-    if (selectedFilters.length > 0) {
-      filteredResults = results.filter(result => 
-        selectedFilters.includes(result.type)
-      );
-    }
-
-    // Ordenar por relevancia y fecha
-    return filteredResults.sort((a, b) => {
-      // Priorizar por relevancia (exactitud del match)
-      const aExact = a.title.toLowerCase() === term;
-      const bExact = b.title.toLowerCase() === term;
-      if (aExact && !bExact) return -1;
-      if (!aExact && bExact) return 1;
-
-      // Luego por fecha (más reciente primero)
-      if (a.date && b.date) {
-        return b.date.getTime() - a.date.getTime();
-      }
-
-      return 0;
-    });
-  }, [searchTerm, clients, activeProjects, quotations, deliverables, selectedFilters]);
+  const searchResults = useMemo(() => searchTerm.trim().length < 2 ? [] : matches.filter(result => selectedFilters.length === 0 || selectedFilters.includes(result.type)), [searchTerm, matches, selectedFilters]);
 
   // Agrupar resultados por tipo
   const groupedResults = useMemo(() => {
@@ -364,7 +235,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
               <h3 className="font-medium text-gray-600">Comienza a escribir para buscar</h3>
               <p className="text-sm">Encuentra clientes, proyectos, cotizaciones y más...</p>
             </div>
-          ) : searchResults.length === 0 ? (
+          ) : error ? <QueryError message="No se pudo completar la búsqueda." retry={refetch} /> : isFetching ? <p role="status" className="p-6">Buscando…</p> : searchResults.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <Search className="h-12 w-12 mx-auto mb-3 text-gray-300" />
               <h3 className="font-medium text-gray-600">No se encontraron resultados</h3>

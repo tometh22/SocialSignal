@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.22 — 2026-11-03
+
+- Carga por pantalla, fuentes locales, compresión y caché de recursos: el JavaScript inicial comprimido baja de 387 kB a 224 kB.
+- Tareas, CRM, cotizaciones, búsqueda y bandeja financiera usan consultas acotadas, paginación e índices; se conservan los totales globales y la privacidad de horas.
+- Extracción financiera en cola persistente, límites de archivos, coordinación de trabajos y eventos entre instancias; soporte de almacenamiento compartido y proceso worker separado.
+- Readiness, cierre ordenado, métricas protegidas, presupuesto del bundle y pruebas de navegador para escritorio, móvil y dos instancias. Acceso BI protegido con compatibilidad para BI_API_TOKEN.
+
 ## 1.14.21 — 2026-11-03
 
 - Las solicitudes de aprobación pendientes pueden retirarse con un motivo para volver a editar. Se conservan las versiones anteriores, se cancelan las aprobaciones pendientes y se exige volver a solicitar aprobación después de corregir. La acción valida autoría o permiso de aprobación y se serializa con las decisiones comerciales.

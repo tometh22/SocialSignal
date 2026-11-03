@@ -1,3 +1,4 @@
+import { withJobLock } from "../services/job-lock";
 import cron from "node-cron";
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { db } from "../db";
@@ -46,7 +47,7 @@ export async function expireCommercialQuotations(now = new Date()): Promise<numb
 export function startQuotationExpirationJob(): void {
   cron.schedule("7 * * * *", async () => {
     try {
-      const count = await expireCommercialQuotations();
+      const count = await withJobLock("quotation-expiration", () => expireCommercialQuotations()) ?? 0;
       if (count > 0) console.log(`[Quotation lifecycle] ${count} cotizaciones marcadas como vencidas`);
     } catch (error) {
       console.error("[Quotation lifecycle] Error expiring quotations:", error);

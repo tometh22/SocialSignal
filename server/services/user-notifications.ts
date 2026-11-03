@@ -380,4 +380,5 @@ export function startUserNotificationEmailWorker() {
   void dispatchUserNotificationEmails();
   const timer = setInterval(() => void dispatchUserNotificationEmails(), 15_000);
   timer.unref();
+  return () => clearInterval(timer);
 }

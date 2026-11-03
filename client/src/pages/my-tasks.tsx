@@ -1,3 +1,4 @@
+import { QueryError } from "@/components/query-error";
 import DelegatedTasks from "@/components/tasks/DelegatedTasks";
 import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
 import { taskDateBucket } from "@shared/utils/task-date-bucket";
@@ -5,8 +6,8 @@ import { clientCalendarColor } from "@/lib/client-calendar-color";
 import { taskPersonalBucket, TASK_DATE_LABELS } from "@shared/utils/task-workflow";
 import { useState } from "react";
 import { Link, useSearch } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
+import { useInfiniteQuery, useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest, authFetchJson, authFetch } from "@/lib/queryClient";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay, isToday, isWithinInterval, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -100,14 +101,28 @@ export default function MyTasksPage() {
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  const { data: myData, isLoading, refetch } = useQuery<{ tasks: Task[]; personnelId: number | null }>({
-    queryKey: ["/api/tasks/my-tasks"],
-    queryFn: () => authFetch("/api/tasks/my-tasks").then(r => r.json()),
+  const { data: taskPages, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ["/api/tasks/my-tasks", view, format(weekStart, "yyyy-MM-dd"), statusFilter],
+    initialPageParam: null as number | null,
+    queryFn: ({ pageParam, signal }) => {
+      const params = new URLSearchParams();
+      if (statusFilter === "active") params.set("status", "active");
+      else if (statusFilter !== "all") params.set("bucket", statusFilter);
+      if (view === "calendar") {
+        params.set("dateFrom", format(weekStart, "yyyy-MM-dd"));
+        params.set("dateTo", format(weekEnd, "yyyy-MM-dd"));
+      } else {
+        params.set("limit", "100");
+        if (pageParam) params.set("beforeId", String(pageParam));
+      }
+      return authFetchJson<{ tasks: Task[]; personnelId: number | null; nextCursor?: number | null }>(`/api/tasks/my-tasks?${params}`, { signal });
+    },
+    getNextPageParam: page => page.nextCursor ?? undefined,
   });
 
   const { data: allProjects = [] } = useQuery<Project[]>({
     queryKey: ["/api/tasks/projects"],
-    queryFn: () => authFetch("/api/tasks/projects").then(r => r.json()),
+    queryFn: ({ signal }) => authFetchJson("/api/tasks/projects", { signal }),
   });
 
   const toggleMutation = useMutation({
@@ -117,7 +132,7 @@ export default function MyTasksPage() {
     onSuccess: () => refetch(),
   });
 
-  const tasks = myData?.tasks || [];
+  const tasks = taskPages?.pages.flatMap(page => page.tasks) ?? [];
   const activeTasks = statusFilter === "active"
     ? tasks.filter(t => t.status !== "done" && t.status !== "cancelled")
     : tasks.filter(t => t.status !== "cancelled" && (statusFilter === "all" || taskPersonalBucket(t) === statusFilter));
@@ -182,7 +197,7 @@ export default function MyTasksPage() {
         <div className="flex flex-wrap gap-2 text-xs" aria-label="Clientes">
           {[...new Map(tasks.map(t => [t.clientId ?? null, t.clientName ?? "Sin cliente"])).entries()].map(([id, name]) => <span key={id ?? "none"} className={cn("rounded border px-2 py-1", clientCalendarColor(id))}>{name}</span>)}
         </div>
-        {isLoading ? (
+        {error ? <QueryError message="No se pudieron cargar tus tareas." retry={refetch} /> : isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
@@ -423,7 +438,8 @@ export default function MyTasksPage() {
 
         </>}
 
-        <TaskDetailPanel
+        {hasNextPage && <Button variant="outline" disabled={isFetchingNextPage} onClick={() => void fetchNextPage()}>{isFetchingNextPage ? "Cargando…" : "Cargar más tareas"}</Button>}
+      <TaskDetailPanel
           taskId={selectedTaskId}
           open={!!selectedTaskId}
           onClose={() => setSelectedTaskId(null)}

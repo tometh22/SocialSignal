@@ -1,3 +1,4 @@
+import { withJobLock } from "../services/job-lock";
 import cron from "node-cron";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../db";
@@ -160,7 +161,9 @@ function dedupeMostRecentPerPeriod(
   return Array.from(seen.values());
 }
 
-export async function syncAndDetectIpcAdjustments(): Promise<void> {
+export async function syncAndDetectIpcAdjustments(): Promise<void> { await withJobLock("ipc-adjustments", syncAndDetectIpcAdjustmentsUnlocked); }
+
+async function syncAndDetectIpcAdjustmentsUnlocked(): Promise<void> {
   const { synced } = await syncIpcIndex();
   const { created } = await detectDuePriceAdjustments();
   // `synced` es la serie completa reprocesada (upsert idempotente), no

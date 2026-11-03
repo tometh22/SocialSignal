@@ -1,3 +1,12 @@
+/* Inter (SIL OFL 1.1), served locally; license: /fonts/Inter-OFL.txt. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('./assets/inter-latin.woff2') format('woff2');
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

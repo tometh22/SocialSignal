@@ -1,3 +1,4 @@
+import { withJobLock } from "../services/job-lock";
 /**
  * Convierte recordatorios CRM próximos o vencidos en avisos de Mind.
  * La entrega por email la resuelve el worker de Resend según las preferencias
@@ -10,7 +11,9 @@ import { db } from "../db";
 import { crmLeads, crmReminders } from "@shared/schema";
 import { createUserNotifications } from "../services/user-notifications";
 
-async function enqueueDueReminderNotifications() {
+async function enqueueDueReminderNotifications() { return withJobLock("crm-reminders", enqueueDueReminderNotificationsUnlocked); }
+
+async function enqueueDueReminderNotificationsUnlocked() {
   try {
     const now = new Date();
     const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -56,6 +59,6 @@ async function enqueueDueReminderNotifications() {
 
 export function startReminderNotifications() {
   console.log("🔔 Programando avisos de recordatorios CRM (cada hora)...");
-  cron.schedule("0 * * * *", enqueueDueReminderNotifications);
-  void enqueueDueReminderNotifications();
+  cron.schedule("0 * * * *", () => enqueueDueReminderNotifications().catch(error => console.error("CRM reminders failed", error)));
+  void enqueueDueReminderNotifications().catch(error => console.error("CRM reminders failed", error));
 }

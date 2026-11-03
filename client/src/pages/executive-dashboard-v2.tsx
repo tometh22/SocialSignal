@@ -1,3 +1,4 @@
+import { QueryError } from "@/components/query-error";
 /**
  * Executive Dashboard V2 - Reads native financial snapshots from Mind.
  */
@@ -74,10 +75,10 @@ export default function ExecutiveDashboardV2() {
     ? ["/api/v2/executive/dashboard", "custom", customStartYear, customStartMonth, customEndYear, customEndMonth]
     : ["/api/v2/executive/dashboard", viewMode, selectedYear, viewMode === "month" ? selectedMonth : viewMode === "quarter" ? selectedQuarter : "ytd"];
 
-  const { data, isLoading, refetch, isFetching } = useQuery<any>({
+  const { data, isLoading, refetch, isFetching, error } = useQuery<any>({
     queryKey,
-    queryFn: () =>
-      fetch(queryUrl, { credentials: "include" }).then((r) => {
+    queryFn: ({ signal }) =>
+      fetch(queryUrl, { credentials: "include", signal }).then((r) => {
         if (!r.ok) throw new Error("Error al cargar datos");
         return r.json();
       }),
@@ -175,7 +176,7 @@ export default function ExecutiveDashboardV2() {
         </div>
       </ToolbarPanel>
 
-      {isLoading ? (
+      {error ? <QueryError message="No se pudo actualizar el resumen financiero." retry={refetch} /> : isLoading ? (
         <div className="flex items-center justify-center min-h-[40vh]">
           <div className="text-center space-y-2">
             <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />

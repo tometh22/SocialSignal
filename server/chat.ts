@@ -1,3 +1,4 @@
+import { onAppEvent, publishAppEvent } from "./services/app-events";
 import { Express, type RequestHandler } from "express";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
@@ -40,11 +41,40 @@ export class ChatManager {
   ) {
     this.wss = new WebSocketServer({
       server: httpServer,
+      maxPayload: 64 * 1024,
       path,
       handleProtocols: (protocols) => protocols.has("epical-chat") ? "epical-chat" : false,
     });
 
+    const alive = new WeakSet<WebSocket>();
+    const heartbeat = setInterval(() => {
+      for (const socket of this.wss.clients) {
+        if (!alive.has(socket)) { socket.terminate(); continue; }
+        alive.delete(socket); socket.ping();
+      }
+    }, 30_000);
+    heartbeat.unref();
+    const unsubscribe = onAppEvent(event => {
+      if (!this.connections.length) return;
+      if (event.topic === "cache") {
+        for (const userId of new Set(this.connections.map(connection => connection.userId))) this.sendToUser(userId, { type: "data_updated", resource: event.resource || "all" });
+        return;
+      }
+      void storage.getConversationParticipants(event.conversationId).then(participants => {
+        for (const participant of participants) this.sendToUser(participant.userId, { type: "conversation_updated", conversationId: event.conversationId });
+      }).catch(error => console.error("Chat event failed", error));
+    });
+    httpServer.once("drain", () => {
+      clearInterval(heartbeat); unsubscribe();
+      for (const socket of this.wss.clients) socket.close(1001, "Servidor reiniciando");
+      const force = setTimeout(() => { for (const socket of this.wss.clients) socket.terminate(); }, 1000); force.unref();
+      this.wss.close();
+    });
+    this.wss.once("close", () => { clearInterval(heartbeat); unsubscribe(); });
+
     this.wss.on("connection", async (ws, req) => {
+      alive.add(ws);
+      ws.on("pong", () => alive.add(ws));
       try {
         const origin = req.headers.origin;
         if (origin) {
@@ -106,10 +136,15 @@ export class ChatManager {
       }
     }));
 
+    let messageCount = 0;
+    let windowStart = Date.now();
     // Manejar mensajes entrantes
     ws.on("message", async (data) => {
       try {
+        if (Date.now() - windowStart > 60_000) { windowStart = Date.now(); messageCount = 0; }
+        if (++messageCount > 120) { ws.close(1008, "Demasiados mensajes"); return; }
         const payload: MessagePayload = JSON.parse(data.toString());
+        if ((payload.message?.length ?? 0) > 8000 || (payload.title?.length ?? 0) > 500 || (payload.userIds?.length ?? 0) > 100) throw new Error("Mensaje demasiado grande");
         await this.handleMessage(payload, userId);
       } catch (error) {
         console.error("Error al procesar mensaje:", error);
@@ -194,6 +229,8 @@ export class ChatManager {
         }
       });
 
+      void publishAppEvent({ topic: "chat", conversationId: payload.conversationId }).catch(error => console.error("Chat broadcast failed", error));
+
       // Enviar confirmación al remitente
       this.sendToUser(senderId, {
         type: "message_sent",
@@ -268,6 +305,8 @@ export class ChatManager {
         throw new Error("Configuración de conversación inválida");
       }
 
+      void publishAppEvent({ topic: "chat", conversationId: conversation.id }).catch(error => console.error("Chat broadcast failed", error));
+
       // Obtener detalles completos de la conversación
       const fullConversation = await storage.getChatConversationWithDetails(conversation.id);
 
@@ -321,6 +360,7 @@ export class ChatManager {
     this.connections
       .filter(conn => conn.userId === userId && conn.socket.readyState === WebSocket.OPEN)
       .forEach(conn => {
+        if (conn.socket.bufferedAmount > 1024 * 1024) { conn.socket.close(1013, "Reconectá para sincronizar mensajes"); return; }
         conn.socket.send(JSON.stringify(data));
       });
   }

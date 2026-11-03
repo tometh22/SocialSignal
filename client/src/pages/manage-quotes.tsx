@@ -1,10 +1,12 @@
+import { QueryError } from "@/components/query-error";
+import { authFetchJson as fetchJson } from "@/lib/queryClient";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { ArchiveGroupButton } from "@/components/quotation/archive-group-button";
 import { invalidateQuotationPortfolio } from "@/lib/quotation-cache";
 import { quotationApprovalGuidance } from "@shared/utils/quotation-approval";
-import { quotationPortfolioTotals } from "@shared/utils/quotation-portfolio-totals";
 import { quotationListPricing } from "@shared/utils/quotation-profitability";
 import { quotationProjectTypeLabel, quotationPriceLabel } from "@shared/utils/quotation-display";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { apiRequest, authFetch } from "@/lib/queryClient";
@@ -60,12 +62,28 @@ export default function ManageQuotes() {
   const [, navigate] = useLocation();
   const { formatCurrency: formatCurrencyWithConversion, exchangeRate } = useCurrency();
 
-  const { data: quotations, isLoading, refetch, error: quotationsError } = useQuery<Quotation[]>({
-    queryKey: ["/api/quotations"],
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnWindowFocus: true
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const debouncedSearch = useDebouncedValue(searchTerm);
+  const { data: quotationPages, isLoading, refetch, error: quotationsError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ["/api/quotations", "list", debouncedSearch, statusFilter],
+    initialPageParam: null as number | null,
+    queryFn: ({ pageParam, signal }) => {
+      const params = new URLSearchParams({ limit: "50", status: statusFilter, search: debouncedSearch });
+      if (pageParam) params.set("beforeId", String(pageParam));
+      return fetchJson<{ items: Quotation[]; nextCursor: number | null }>(`/api/quotations?${params}`, { signal });
+    },
+    getNextPageParam: page => page.nextCursor ?? undefined,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: true,
   });
+  const quotations = quotationPages?.pages.flatMap(page => page.items);
+
+  const { data: globalStats, error: statsError, refetch: retryStats } = useQuery<{
+    total: number; approved: number; pending: number; rejected: number; expired: number; inNegotiation: number;
+    totalValueARS: number; totalValueUSD: number; missingFx: number; topValueContributor: { name: string; ars: number } | null; lossReasons: Record<string, number>;
+  }>({ queryKey: ["/api/quotations/stats", exchangeRate], queryFn: ({ signal }) => fetchJson(`/api/quotations/stats?fallbackFx=${Math.max(0, exchangeRate || 0)}`, { signal }), staleTime: 30_000 });
 
   const { data: clients = [], error: clientsError } = useQuery<Client[]>({
     queryKey: ["/api/clients"]
@@ -87,7 +105,7 @@ export default function ManageQuotes() {
     client: { name: string } | null;
     status: string;
     items: Array<{ quotationId: number; projectName: string; status: string; currency: string; totalAmount: number }>;
-  }>>({ queryKey: ['/api/quotation-groups'] });
+  }>>({ queryKey: ['/api/quotation-groups'], queryFn: ({ signal }) => fetchJson('/api/quotation-groups?summary=true', { signal }) });
   const { data: funnel } = useQuery<{
     sent: number;
     won: number;
@@ -131,8 +149,6 @@ export default function ManageQuotes() {
   const { data: pendingIpcAdjustments = [] } = useQuery<PendingIpcAdjustment[]>({ queryKey: ['/api/quotation-price-adjustments/pending'] });
 
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
   const [selectedQuote, setSelectedQuote] = useState<Quotation | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -470,40 +486,16 @@ export default function ManageQuotes() {
     && new Date(quote.expiresAt) < new Date()
     && ['sent', 'viewed', 'in-negotiation'].includes(quote.status);
 
-  const statsSource = quotations || [];
-  const portfolioTotals = quotationPortfolioTotals(statsSource, exchangeRate);
+  const portfolioTotals = { ars: globalStats?.totalValueARS ?? 0, usd: globalStats?.totalValueUSD ?? 0, missingFx: globalStats?.missingFx ?? 0 };
   const stats = {
-    total: statsSource.length,
-    approved: statsSource.filter(q => q.status === 'approved').length,
-    pending: statsSource.filter(q => q.status === 'pending').length,
-    rejected: statsSource.filter(q => q.status === 'rejected').length,
-    expired: statsSource.filter(isExpired).length,
-    inNegotiation: statsSource.filter(q => q.status === 'in-negotiation').length,
-    totalValueARS: portfolioTotals.ars,
-    totalValueUSD: portfolioTotals.usd,
+    total: globalStats?.total ?? 0, approved: globalStats?.approved ?? 0, pending: globalStats?.pending ?? 0,
+    rejected: globalStats?.rejected ?? 0, expired: globalStats?.expired ?? 0, inNegotiation: globalStats?.inNegotiation ?? 0,
+    totalValueARS: portfolioTotals.ars, totalValueUSD: portfolioTotals.usd,
+    topValueContributor: globalStats?.topValueContributor ?? null,
     conversionRate: funnel?.winRate ?? 0,
-    // La suma incluye borradores, rechazadas y vencidas -- no sólo vigentes --
-    // así que un total que se ve raro casi siempre es UNA cotización con un
-    // monto mal cargado, no un error de cálculo. Se guarda la mayor
-    // contribuyente para poder señalarla en la tarjeta sin tener que salir a
-    // buscarla a mano.
-    topValueContributor: statsSource.reduce<{ name: string; ars: number } | null>((top, q) => {
-      const ars = quotationPortfolioTotals([q], exchangeRate).ars;
-      return !top || ars > top.ars ? { name: q.projectName, ars } : top;
-    }, null),
-    rejectionRate: (funnel?.sent || 0) > 0
-      ? ((funnel?.byStatus?.rejected?.count || 0) / (funnel?.sent || 1)) * 100
-      : 0,
+    rejectionRate: (funnel?.sent || 0) > 0 ? ((funnel?.byStatus?.rejected?.count || 0) / (funnel?.sent || 1)) * 100 : 0,
   };
-
-  // Win/Loss reasons breakdown
-  const lossReasonBreakdown = (quotations || [])
-    .filter(q => q.status === 'rejected' && q.lossReason)
-    .reduce((acc: Record<string, number>, q) => {
-      const key = (q.lossReason as string).split(' — ')[0];
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
+  const lossReasonBreakdown = globalStats?.lossReasons ?? {};
 
   const handleMarkAsLost = async (lossReason: string) => {
     if (!lossReasonQuote) return;
@@ -577,7 +569,10 @@ export default function ManageQuotes() {
     >
 
         <div className="relative z-10 min-w-0">
-          <MetricGrid className="mb-6" minColumnWidth="18rem">
+          {statsError && <QueryError message="No se pudieron cargar los totales de la cartera." retry={retryStats} />}
+          {clientsError && <QueryError message="No se pudieron cargar los clientes." retry={() => queryClient.invalidateQueries({ queryKey: ["/api/clients"] })} />}
+          {!globalStats && !statsError && <p role="status" className="py-4 text-sm">Cargando resumen…</p>}
+          {globalStats && <MetricGrid className="mb-6" minColumnWidth="18rem">
             <MetricCard
               label="Total"
               value={stats.total.toLocaleString("es-AR")}
@@ -625,7 +620,7 @@ export default function ManageQuotes() {
               tone="danger"
               valueLabel={`Tasa de rechazo: ${stats.rejectionRate.toFixed(1)} por ciento`}
             />
-          </MetricGrid>
+          </MetricGrid>}
 
           {professionalAnalytics?.byMotion?.length ? <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3"><div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-600"><GitBranch className="h-3.5 w-3.5" /> Conversión por modalidad comercial <span className="font-normal normal-case text-slate-500">· demos excluidas</span></div><div className="flex flex-wrap gap-2">{professionalAnalytics.byMotion.map((item) => <Badge key={item.key} variant="outline" className="bg-white px-3 py-1.5">{motionLabel(item.key)} · {item.count ? ((item.won / item.count) * 100).toFixed(0) : 0}% <span className="ml-1 text-slate-400">({item.won}/{item.count})</span></Badge>)}</div></div> : null}
 
@@ -831,7 +826,7 @@ export default function ManageQuotes() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              {isLoading ? (
+              {quotationsError ? <QueryError message="No se pudieron cargar las cotizaciones." retry={refetch} /> : isLoading ? (
                 <div className="flex justify-center py-16">
                   <Loader variant="dots" size="lg" text="Cargando cotizaciones..." />
                 </div>
@@ -1266,6 +1261,7 @@ export default function ManageQuotes() {
       </Dialog>
 
       {/* Recoverable archive dialog */}
+      {hasNextPage && <div className="flex justify-center py-4"><Button variant="outline" disabled={isFetchingNextPage} onClick={() => void fetchNextPage()}>{isFetchingNextPage ? "Cargando…" : "Cargar más cotizaciones"}</Button></div>}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="rounded-2xl border-0 shadow-2xl max-w-md">
           <AlertDialogHeader>

@@ -370,7 +370,7 @@ async function extractWithAnthropic(
     });
   }
 
-  const client = new Anthropic({ apiKey });
+  const client = new Anthropic({ apiKey, timeout: 90_000, maxRetries: 1 });
   const response = await client.messages.create({
     model,
     max_tokens: 16_000,
@@ -412,7 +412,7 @@ export async function extractFinancialIntake(input: FinancialExtractionInput): P
         content.push({ type: "input_file", filename: input.file.fileName, file_data: `data:application/pdf;base64,${input.file.buffer.toString("base64")}` });
       }
 
-      const client = new OpenAI({ apiKey });
+      const client = new OpenAI({ apiKey, timeout: 90_000, maxRetries: 1 });
       const response = await client.responses.create({
         model,
         store: false,

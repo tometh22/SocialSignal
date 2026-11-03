@@ -127,8 +127,8 @@ describe("Feedback Mind V2.7 — atribución, costos y capacidad", () => {
     expect(closure).not.toContain('SET "sublevel"');
     expect(closure).toContain("'hours_data_source', 1");
     expect(closure).toContain("'app_mode_cutover_date', 1, '2026-08'");
-    expect(server).toContain('const backgroundSyncDisabled = process.env.DISABLE_AUTO_SYNC === "true"');
-    expect(server).toContain("Sincronizaciones y jobs externos deshabilitados");
+    expect(source("server/services/background-jobs.ts")).toContain('const backgroundSyncDisabled = process.env.DISABLE_AUTO_SYNC === "true"');
+    expect(source("server/services/background-jobs.ts")).toContain("Sincronizaciones y jobs externos deshabilitados");
     expect(server).toContain("await backfillNativeLaborOnce()");
     expect(server).toContain("0035_native_task_labor_backfill");
   });

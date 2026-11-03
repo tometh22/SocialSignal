@@ -1,3 +1,7 @@
+import os from "node:os";
+import { Transform, pipeline } from "node:stream";
+import { createWriteStream } from "node:fs";
+import { objectStorageEnabled, putObject, getObject, removeObject } from "./object-storage";
 import { createHash, randomUUID } from "crypto";
 import fs from "fs/promises";
 import path from "path";
@@ -14,8 +18,29 @@ const ALLOWED_MIME_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ]);
 
+const uploadBytes = new WeakMap<object, number>();
+const boundedStorage: multer.StorageEngine = {
+  _handleFile(req, file, callback) {
+    const filename = `mind-intake-${randomUUID()}`;
+    const filePath = path.join(os.tmpdir(), filename);
+    let size = 0;
+    const counter = new Transform({ transform(chunk, _encoding, done) {
+      size += chunk.length;
+      const total = (uploadBytes.get(req) ?? 0) + chunk.length;
+      uploadBytes.set(req, total);
+      done(total > 40 * 1024 * 1024 ? new Error("El lote supera 40 MB. Subí los archivos en lotes más pequeños.") : null, chunk);
+    } });
+    const cleanup = () => { void fs.unlink(filePath).catch(() => {}); };
+    req.res?.once("close", cleanup);
+    pipeline(file.stream, counter, createWriteStream(filePath, { mode: 0o600, flags: "wx" }), error => {
+      if (error) { cleanup(); callback(error); }
+      else callback(null, { path: filePath, filename, destination: os.tmpdir(), size });
+    });
+  },
+  _removeFile(_req, file, callback) { fs.unlink(file.path).then(() => callback(null), error => callback(error)); },
+};
 export const financialIntakeUpload = multer({
-  storage: multer.memoryStorage(),
+  storage: boundedStorage,
   limits: { fileSize: MAX_FILE_SIZE, files: 10 },
   fileFilter: (_req, file, callback) => {
     if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
@@ -69,6 +94,7 @@ function assertMagicBytes(file: Express.Multer.File): void {
 }
 
 export async function storeFinancialIntakeFile(file: Express.Multer.File): Promise<StoredFinancialFile> {
+  if (!file.buffer && file.path) file = { ...file, buffer: await fs.readFile(file.path) };
   assertMagicBytes(file);
   const now = new Date();
   const segment = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -77,6 +103,11 @@ export async function storeFinancialIntakeFile(file: Express.Multer.File): Promi
   const destination = path.resolve(root, storageKey);
   if (!destination.startsWith(`${root}${path.sep}`)) {
     throw new Error("Ruta de almacenamiento inválida");
+  }
+  if (objectStorageEnabled()) {
+    const objectKey = `financial/${storageKey}`;
+    await putObject(objectKey, file.buffer, file.mimetype);
+    return { storageKey: `s3:${objectKey}`, fileHash: createHash("sha256").update(file.buffer).digest("hex"), originalFileName: path.basename(file.originalname).slice(0, 255), mimeType: file.mimetype, fileSize: file.size };
   }
   await fs.mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
   await fs.writeFile(destination, file.buffer, { mode: 0o600, flag: "wx" });
@@ -90,17 +121,32 @@ export async function storeFinancialIntakeFile(file: Express.Multer.File): Promi
 }
 
 export async function readFinancialIntakeFile(storageKey: string): Promise<Buffer> {
+  if (storageKey.startsWith("s3:financial/")) {
+    const object = await getObject(storageKey.slice(3));
+    return Buffer.from(await object.Body!.transformToByteArray());
+  }
   const root = privateRoot();
   const resolved = path.resolve(root, storageKey);
   if (!resolved.startsWith(`${root}${path.sep}`)) {
     throw Object.assign(new Error("Archivo inválido"), { statusCode: 400 });
   }
-  return fs.readFile(resolved);
+  try { return await fs.readFile(resolved); }
+  catch (error: any) {
+    if (error.code !== "ENOENT" || !objectStorageEnabled()) throw error;
+    const object = await getObject(`financial/${storageKey}`);
+    return Buffer.from(await object.Body!.transformToByteArray());
+  }
 }
 
 export async function deleteFinancialIntakeFile(storageKey: string): Promise<void> {
+  if (storageKey.startsWith("s3:financial/")) { await removeObject(storageKey.slice(3)); return; }
   const root = privateRoot();
   const resolved = path.resolve(root, storageKey);
   if (!resolved.startsWith(`${root}${path.sep}`)) return;
   await fs.unlink(resolved).catch(() => undefined);
+  if (objectStorageEnabled()) await removeObject(`financial/${storageKey}`);
+}
+
+export async function cleanupFinancialUploads(files: Express.Multer.File[] = []) {
+  await Promise.all(files.filter(file => file.path).map(file => fs.unlink(file.path).catch(() => {})));
 }
