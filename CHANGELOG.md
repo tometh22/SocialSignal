@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.23 — 2026-11-03
+
+- Las imágenes de Railway excluyen archivos históricos y artefactos locales que no usa la aplicación. Evita copiar 1,6 GB de adjuntos históricos en cada build y contenedor, sin borrar archivos del repositorio ni del almacenamiento operativo.
+- CI conserva todo el código, fixtures y documentación necesarios y evita descargar el archivo histórico mediante checkout parcial; mantiene tests, tipos, build y nueve recorridos de navegador.
+
 ## 1.14.22 — 2026-11-03
 
 - Carga por pantalla, fuentes locales, compresión y caché de recursos: el JavaScript inicial comprimido baja de 387 kB a 224 kB.
