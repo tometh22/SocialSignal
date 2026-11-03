@@ -31,6 +31,11 @@ describe("BI routes authenticate before touching financial data", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(await response.json()).toEqual([{ amount: 10 }]);
   });
+  it("accepts the existing production BI_API_TOKEN when no new token is configured", async () => {
+    vi.stubEnv("BI_ACCESS_TOKEN", "");
+    vi.stubEnv("BI_API_TOKEN", "legacy-service-credential");
+    expect((await fetch(`${base}/api/bi/cashflow`, { headers: { Authorization: "Bearer legacy-service-credential" } })).status).toBe(200);
+  });
   it("supports a service token and rejects invalid tokens even with a session", async () => {
     vi.stubEnv("BI_ACCESS_TOKEN", "test-service-credential");
     expect((await fetch(`${base}/api/bi/cashflow`, { headers: { Authorization: "Bearer incorrect", "x-test-role": "finance" } })).status).toBe(401);

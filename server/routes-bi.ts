@@ -15,7 +15,7 @@ const views = {
 
 export function registerBiRoutes(app: Express, pool: Pick<Pool, "query">, requireAuth: RequestHandler) {
   const authorize: RequestHandler = (req, res, next) => {
-    const token = process.env.BI_ACCESS_TOKEN;
+    const token = process.env.BI_ACCESS_TOKEN || process.env.BI_API_TOKEN;
     const supplied = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
     if (token && supplied) {
       const expectedBytes = Buffer.from(token);
