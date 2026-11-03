@@ -14,7 +14,7 @@ También hay un defecto de uso verificable desde el código: el inicio consulta 
 
 Se encontró además una exposición de datos financieros en rutas BI sin autenticación en la aplicación. Debe atenderse antes de ampliar el acceso.
 
-La auditoría original no modificaba la aplicación. La implementación posterior está incluida en esta rama; **no se desplegaron cambios en producción**.
+La auditoría original no modificaba la aplicación. La implementación posterior está incluida en esta rama. El estado del release se comprueba mediante CI, el SHA publicado en `/api/health` y readiness en `/api/ready`.
 
 ## Alcance y límites de la evidencia
 
@@ -332,7 +332,7 @@ Las opciones mantienen compatibilidad con una instancia existente. Para separar 
 6. Configurar almacenamiento en todas las réplicas y workers: `S3_BUCKET`, `S3_REGION`, credenciales estándar AWS; para un proveedor compatible, `S3_ENDPOINT` y, si hace falta, `S3_FORCE_PATH_STYLE=true`. El bucket debe ser privado. Activarlo sólo después de que todas las réplicas ejecuten el adaptador nuevo.
 7. Para archivos previos, montar el disco existente y revisar `npm run storage:migrate`; copiar con `npm run storage:migrate -- --apply`. Es una copia, no elimina el origen. La lectura de claves históricas busca en el objeto compartido si no existe el archivo local. Verificar upload en una réplica y lectura desde otra con los permisos correspondientes antes de retirar el disco anterior.
 8. Si se usa disco compartido para conservar chunks, definir `STATIC_ASSET_ARCHIVE_DIR` en un directorio persistente separado del build. Cada arranque incorpora los assets completos mediante publicación atómica y conserva los anteriores. Definir retención según la duración admitida de sesiones; no borrar archivos de sesiones activas. Si el CDN ya conserva versiones, aplicar allí la política equivalente.
-9. Configurar la identidad de BI con `BI_ACCESS_TOKEN` en el gestor de secretos y actualizar el conector para enviar `Authorization: Bearer …`, o utilizar una sesión con permiso financiero. Nunca enviar el token en una URL.
+9. Configurar la identidad de BI con `BI_ACCESS_TOKEN` (o el `BI_API_TOKEN` existente) en el gestor de secretos y actualizar el conector para enviar `Authorization: Bearer …`, o utilizar una sesión con permiso financiero. Nunca enviar el token en una URL.
 10. Configurar readiness con `/api/ready`; `/api/health` sigue siendo liveness y metadatos. Consultar `/api/admin/performance` con un administrador; las métricas son por proceso y deben exportarse a la observabilidad del hosting para conservar series y agregar réplicas.
 
 Las claves privadas no forman parte del repositorio. `.gitignore` excluye los directorios de archivos operativos. Un rollback debe contemplar los documentos con clave `s3:` y las extracciones encoladas: conservar el adaptador/worker compatible o completar una migración inversa y drenar la cola antes de volver a una versión anterior.
@@ -350,3 +350,12 @@ npm run check:bundle
 Para navegador, crear una base **local dedicada cuyo nombre empiece por `mind_e2e`**, definir `DATABASE_URL` al preparar schema y fixtures, y ejecutar `npx drizzle-kit push --force` y `npx tsx scripts/seed-performance-e2e.ts`. Luego definir `E2E_DATABASE_URL`, instalar Chromium con `npx playwright install chromium` y ejecutar `npm run test:e2e`. La configuración levanta una web y una segunda API aislada; CI ya incluye estos pasos. Los datos y las credenciales del fixture sólo sirven en ese entorno de ensayo.
 
 Para carga local, usar el mismo fixture con `PERFORMANCE_BASE_URL`, `PERFORMANCE_CONCURRENCY`, `PERFORMANCE_SECONDS` y `PERFORMANCE_REPORT`, y ejecutar `npm run test:load`. El script sólo acepta destinos locales y distribuye lectores sobre dos cuentas de prueba. Para evaluar usuarios reales, escrituras financieras o historia 10 veces mayor, usar staging con el modelo de carga descrito en esta auditoría.
+
+
+### Validación adicional del release — 2026-11-03
+
+- Checkout limpio en GitHub Actions: 1.111 tests aprobados, 11 omitidos; tipos, build, presupuesto de JavaScript y nueve recorridos Playwright aprobados.
+- Staging aislado en Railway, PostgreSQL 18 y build de producción, sin credenciales de correo ni integraciones reales: ocho recorridos adicionales por HTTPS aprobados.
+- Carga dentro de staging: 100 lectores simulados sobre dos cuentas sintéticas, 60 segundos, 16.019 lecturas, cero errores y p95 máximo de 64,26 ms. Son tiempos internos sin la latencia de Internet y un fixture pequeño; no certifican la capacidad con toda la historia financiera ni escrituras concurrentes.
+- Respaldo PostgreSQL 18 de producción restaurado en una base aislada; migraciones e índices aplicados correctamente sobre esa copia. Copia de archivos al bucket privado verificada con SHA-256, conservando los originales. El acceso anónimo al bucket devuelve 403.
+- Publicación 1.14.23: `.dockerignore` evita incluir los 1,6 GB de adjuntos históricos en las imágenes, y CI hace checkout parcial sin ese archivo. La versión previa de staging ya se construyó sin esa carpeta mediante `.railwayignore`; el build y las pruebas de CI vuelven a verificar esa exclusión.
