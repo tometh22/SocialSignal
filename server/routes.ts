@@ -23681,7 +23681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Browser views share a flat response so every task is transferred once.
       // Existing consumers keep the original grouped response by default.
       const flat = req.query.layout === "flat";
-      res.json({ canManageSections: await canManageTaskProject(req, parsedProjectId), canCreateSections: true, canDeleteTasks: true, tasks: enrichedTasks.map(task => ({ ...task, clientId: project?.clientId ?? null, clientName: project?.clientName ?? null })), sections: flat ? Object.fromEntries(Object.keys(sections).map(name => [name, []])) : sections, ...(flat ? { layout: "flat" } : {}) });
+      res.json({ canManageSections: await canManageTaskProject(req, parsedProjectId), canEditSections: true, canCreateSections: true, canDeleteTasks: true, tasks: enrichedTasks.map(task => ({ ...task, clientId: project?.clientId ?? null, clientName: project?.clientName ?? null })), sections: flat ? Object.fromEntries(Object.keys(sections).map(name => [name, []])) : sections, ...(flat ? { layout: "flat" } : {}) });
     } catch (error) {
       res.status(500).json({ message: "Error al obtener tareas del proyecto" });
     }
@@ -23710,7 +23710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/tasks/section/rename", requireAuth, async (req, res) => {
     try {
       const { projectId, oldName, newName } = z.object({ projectId: z.coerce.number().int().positive(), oldName: z.string().trim().min(1).max(250), newName: z.string().trim().min(1).max(250) }).strict().parse(req.body);
-      if (!(await canManageTaskProject(req, projectId))) return res.status(403).json({ message: "Solo responsables u Operaciones pueden administrar secciones" });
+      if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a este proyecto" });
       if (oldName === newName) return res.json({ message: "Sin cambios" });
       await db.transaction(async tx => {
         const names = await lockProjectSectionNames(tx, projectId);
@@ -23728,7 +23728,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tasks/section/duplicate", requireAuth, async (req, res) => {
     try {
       const input = z.object({ projectId: z.number().int().positive(), sectionName: z.string().trim().min(1).max(250), newName: z.string().trim().min(1).max(250) }).strict().parse(req.body);
-      if (!(await canManageTaskProject(req, input.projectId))) return res.status(403).json({ message: "Solo responsables del proyecto u Operaciones pueden administrar secciones" });
+      if (!(await canAccessTaskProject(req, input.projectId))) return res.status(403).json({ message: "No tenés acceso a este proyecto" });
       const created = await db.transaction(async (tx) => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(293, ${input.projectId})`);
         const names = await lockProjectSectionNames(tx, input.projectId);

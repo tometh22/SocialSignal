@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.24 — 2026-11-03
+
+- Los miembros de un proyecto pueden renombrar y duplicar sus secciones desde el menú o el nombre, también con permiso task_manager. El servidor valida la membresía del proyecto para ambas acciones.
+- El menú de sección queda visible en escritorio y móvil, incluso cuando está plegada. Se agregan nombres accesibles a los controles de sección y se evita repetir el guardado del nombre mientras está pendiente.
+- Recorridos de navegador con miembros projects/task_manager: renombrado por menú y en línea, secciones vacías, duplicado con subtareas y responsables, fechas/horas vacías en la copia, conflictos de nombre y rechazo de proyectos ajenos. La eliminación de secciones conserva sus permisos anteriores.
+
 ## 1.14.23 — 2026-11-03
 
 - Las imágenes de Railway excluyen archivos históricos y artefactos locales que no usa la aplicación. Evita copiar 1,6 GB de adjuntos históricos en cada build y contenedor, sin borrar archivos del repositorio ni del almacenamiento operativo.

@@ -9,10 +9,10 @@ try {
   const password = await hashPassword("mind-local-test-only");
   const people: Array<{ userId: number; personnelId: number }> = [];
   const [role] = await db.insert(schema.roles).values({ name: "E2E role", defaultRate: 10 }).returning();
-  for (const [index, firstName] of ["Admin", "Miembro", "Colega"].entries()) {
+  for (const [index, firstName] of ["Admin", "Miembro", "Colega", "Gestor"].entries()) {
     const email = `e2e-${index}@example.test`;
     const [user] = await db.insert(schema.users).values({ firstName, lastName: "Auditoría", email, password,
-      isAdmin: index === 0, role: index === 0 ? "admin" : "member", permissions: index === 0 ? ["admin", "operations", "finance", "crm", "quotations", "projects", "dashboard", "status"] : ["projects"] }).returning();
+      isAdmin: index === 0, role: index === 0 ? "admin" : "member", permissions: index === 0 ? ["admin", "operations", "finance", "crm", "quotations", "projects", "dashboard", "status"] : index === 3 ? ["task_manager"] : ["projects"] }).returning();
     const [person] = await db.insert(schema.personnel).values({ name: `${firstName} Auditoría`, email, roleId: role.id, hourlyRate: 10 }).returning();
     await db.insert(schema.userNotificationPreferences).values({ userId: user.id, setupCompletedAt: new Date() });
     people.push({ userId: user.id, personnelId: person.id });
@@ -39,6 +39,14 @@ try {
     { taskId: tasks[0].id, personnelId: people[1].personnelId, date: new Date(), hours: 2 },
     { taskId: tasks[0].id, personnelId: people[2].personnelId, date: new Date(), hours: 9 },
   ]);
+  // Dedicated section fixtures keep membership regressions independent of task pagination counts.
+  for (const memberIndex of [1, 3]) {
+    const [sectionProject] = await db.insert(schema.activeProjects).values({ clientId: client.id, name: `Proyecto secciones ${memberIndex}`, createdBy: people[0].userId, taskSectionNames: ["Capacitaciones", "Vacía"] }).returning();
+    await db.insert(schema.taskProjectMembers).values([memberIndex, 2].map(index => ({ projectId: sectionProject.id, personnelId: people[index].personnelId, role: "member" })));
+    const [sectionTask] = await db.insert(schema.tasks).values({ projectId: sectionProject.id, sectionName: "Capacitaciones", title: "Preparar capacitación", assigneeId: people[2].personnelId, estimatedHours: 5, dueDate: new Date("2026-01-01T12:00:00Z") }).returning();
+    await db.insert(schema.tasks).values({ projectId: sectionProject.id, sectionName: "Capacitaciones", title: "Revisar material", parentTaskId: sectionTask.id, assigneeId: people[2].personnelId });
+    await db.insert(schema.taskTimeEntries).values({ taskId: sectionTask.id, personnelId: people[memberIndex].personnelId, date: new Date(), hours: 1 });
+  }
   const leads = await db.insert(schema.crmLeads).values(Array.from({ length: 120 }, (_, index) => ({ companyName: `Oportunidad ${index}`, createdBy: people[0].userId }))).returning();
   await db.insert(schema.crmActivities).values(leads.flatMap(lead => [
     { leadId: lead.id, type: "note", content: "Anterior", activityDate: new Date("2026-01-01") },
