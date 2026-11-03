@@ -719,6 +719,7 @@ function TaskRow(props: TaskRowProps) {
 
 interface SectionBlockProps {
   canManageSections?: boolean;
+  canEditSections?: boolean;
   sectionName: string;
   tasks: Task[];
   projectId: number;
@@ -744,7 +745,7 @@ interface SectionBlockProps {
   taskOrderOverride?: number[];
 }
 
-function SectionBlock({ canManageSections = false, sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, onDuplicateSection, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, taskOrderOverride }: SectionBlockProps) {
+function SectionBlock({ canManageSections = false, canEditSections = canManageSections, sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, onDuplicateSection, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, taskOrderOverride }: SectionBlockProps) {
   const [visibleLimit, setVisibleLimit] = useState(80);
   const [collapsed, setCollapsed] = useState(false);
   const effectiveCollapsed = forceExpand ? false : collapsed;
@@ -787,6 +788,7 @@ function SectionBlock({ canManageSections = false, sectionName, tasks, projectId
 
   const handleRenameBlur = () => {
     const trimmed = newSectionName.trim();
+    if (renameMutation.isPending) return;
     if (trimmed && trimmed !== sectionName) {
       renameMutation.mutate(trimmed);
     } else {
@@ -832,12 +834,15 @@ function SectionBlock({ canManageSections = false, sectionName, tasks, projectId
         >
           <GripVertical className="h-3.5 w-3.5 text-muted-foreground/60" />
         </div>
-        <div className="w-3 flex-shrink-0 flex items-center justify-center py-3">
+        <button type="button" className="w-3 flex-shrink-0 flex items-center justify-center py-3"
+          aria-label={`${effectiveCollapsed ? "Desplegar" : "Plegar"} sección ${sectionName}`}
+          aria-expanded={!effectiveCollapsed}
+          onClick={e => { e.stopPropagation(); setCollapsed(!collapsed); }}>
           {effectiveCollapsed
             ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
             : <ChevronDown className="h-4 w-4 text-muted-foreground" />
           }
-        </div>
+        </button>
         <div className="w-5 flex-shrink-0" />
         <div className="flex-1 px-2 py-3 flex items-center gap-2">
           {renamingSection ? (
@@ -845,6 +850,7 @@ function SectionBlock({ canManageSections = false, sectionName, tasks, projectId
               autoFocus
               value={newSectionName}
               onChange={e => setNewSectionName(e.target.value)}
+              aria-label={`Nombre de sección ${sectionName}`}
               onBlur={handleRenameBlur}
               onKeyDown={e => {
                 e.stopPropagation();
@@ -855,12 +861,15 @@ function SectionBlock({ canManageSections = false, sectionName, tasks, projectId
               className="h-6 text-sm font-bold border-primary bg-background w-48 px-1.5"
             />
           ) : (
-            <span
-              className="font-semibold text-xs text-foreground uppercase tracking-wider cursor-text rounded px-0.5 hover:bg-accent/60"
-              onClick={e => { e.stopPropagation(); if (canManageSections) { setNewSectionName(sectionName); setRenamingSection(true); } }}
+            <button
+              type="button"
+              disabled={!canEditSections}
+              aria-label={`Renombrar sección ${sectionName}`}
+              className="min-w-0 truncate text-left font-semibold text-xs text-foreground uppercase tracking-wider rounded px-0.5 enabled:hover:bg-accent/60"
+              onClick={e => { e.stopPropagation(); setNewSectionName(sectionName); setRenamingSection(true); }}
             >
               {sectionName}
-            </span>
+            </button>
           )}
           {rootTasks.length > 0 && (
             <div className="flex items-center gap-1.5">
@@ -873,22 +882,22 @@ function SectionBlock({ canManageSections = false, sectionName, tasks, projectId
               </div>
             </div>
           )}
-          {!effectiveCollapsed && (
-            <div className="flex items-center gap-0.5 opacity-100 ml-1 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
-              <Button
+          <div className="flex shrink-0 items-center gap-0.5 ml-1">
+              {!effectiveCollapsed && <Button
                 variant="ghost"
                 size="sm"
                 className="h-5 w-5 p-0"
                 onClick={e => { e.stopPropagation(); setShowAdd(true); }}
               >
                 <Plus className="h-3 w-3" />
-              </Button>
-              {canManageSections && <DropdownMenu>
+              </Button>}
+              {canEditSections && <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-5 w-5 p-0"
+                    aria-label={`Opciones de sección ${sectionName}`}
                     onClick={e => e.stopPropagation()}
                   >
                     <MoreHorizontal className="h-3 w-3" />
@@ -905,18 +914,17 @@ function SectionBlock({ canManageSections = false, sectionName, tasks, projectId
                       Duplicar sección
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-red-600 focus:text-red-600"
-                    onClick={e => { e.stopPropagation(); setShowDeleteConfirm(true); }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 mr-2" />
-                    Eliminar sección
-                  </DropdownMenuItem>
+                  {canManageSections && <><DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-red-600 focus:text-red-600"
+                      onClick={e => { e.stopPropagation(); setShowDeleteConfirm(true); }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-2" />
+                      Eliminar sección
+                    </DropdownMenuItem></>}
                 </DropdownMenuContent>
               </DropdownMenu>}
             </div>
-          )}
         </div>
         <div className="w-12 px-1 flex-shrink-0 sm:w-28 sm:px-2" />
         <div className="hidden w-32 px-2 flex-shrink-0 md:block" />
@@ -1337,7 +1345,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     }
   }, [onQuickAddTrigger]);
 
-  const { data, isLoading, isError, error, refetch } = useQuery<{ canManageSections?: boolean; canCreateSections?: boolean; canDeleteTasks?: boolean; tasks: Task[]; sections: Record<string, Task[]>; layout?: string }>({
+  const { data, isLoading, isError, error, refetch } = useQuery<{ canManageSections?: boolean; canEditSections?: boolean; canCreateSections?: boolean; canDeleteTasks?: boolean; tasks: Task[]; sections: Record<string, Task[]>; layout?: string }>({
     queryKey: ["/api/tasks/project", projectId],
     queryFn: () => authFetchJson(`/api/tasks/project/${projectId}?layout=flat`),
     staleTime: 30 * 1000,
@@ -1712,6 +1720,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                   {visibleSectionNames.map((section, idx) => (
                     <SortableSectionBlock
                       canManageSections={data?.canManageSections}
+                      canEditSections={data?.canEditSections}
                       key={section}
                       sectionName={section}
                       tasks={sections[section] || []}
