@@ -1,3 +1,5 @@
+import { notifyQuotationApprovalRequests } from "./services/quotation-approval-notifications";
+import { buildQuotationSnapshot, persistQuotationRevision, withdrawQuotationApproval } from "./services/quotation-revisions";
 import { roleRateAveragesQuery } from "./services/role-rate-averages";
 import { absenceNotificationDestination, settlementReviewDestination } from "@shared/utils/notification-destinations";
 import { capacityWeekSchema } from "@shared/utils/capacity-planning";
@@ -5563,85 +5565,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return candidateHash.length === expectedHash.length && timingSafeEqual(candidateHash, expectedHash);
   };
 
-  async function buildQuotationSnapshot(executor: any, quotationId: number) {
-    const [quotation] = await executor.select().from(quotations).where(eq(quotations.id, quotationId));
-    if (!quotation) throw new Error("Quotation not found");
-    const [clientRows, billingRows, baseTeam, variants, allVariantMembers] = await Promise.all([
-      executor.select().from(clients).where(eq(clients.id, quotation.clientId)),
-      quotation.billingEntityId
-        ? executor.select().from(clientBillingEntities).where(eq(clientBillingEntities.id, quotation.billingEntityId))
-        : Promise.resolve([]),
-      executor.select({
-        id: quotationTeamMembers.id,
-        roleId: quotationTeamMembers.roleId,
-        roleName: roles.name,
-        hours: quotationTeamMembers.hours,
-        rate: quotationTeamMembers.rate,
-        cost: quotationTeamMembers.cost,
-        personnelId: quotationTeamMembers.personnelId,
-      }).from(quotationTeamMembers)
-        .leftJoin(roles, eq(roles.id, quotationTeamMembers.roleId))
-        .where(and(eq(quotationTeamMembers.quotationId, quotationId), isNull(quotationTeamMembers.variantId))),
-      executor.select().from(quotationVariants)
-        .where(eq(quotationVariants.quotationId, quotationId))
-        .orderBy(asc(quotationVariants.variantOrder)),
-      executor.select({
-        id: quotationTeamMembers.id,
-        variantId: quotationTeamMembers.variantId,
-        roleId: quotationTeamMembers.roleId,
-        roleName: roles.name,
-        hours: quotationTeamMembers.hours,
-        rate: quotationTeamMembers.rate,
-        cost: quotationTeamMembers.cost,
-        personnelId: quotationTeamMembers.personnelId,
-      }).from(quotationTeamMembers)
-        .leftJoin(roles, eq(roles.id, quotationTeamMembers.roleId))
-        .where(and(eq(quotationTeamMembers.quotationId, quotationId), isNotNull(quotationTeamMembers.variantId))),
-    ]);
-    return {
-      quotation,
-      client: clientRows[0] ?? null,
-      billingEntity: billingRows[0] ?? null,
-      team: baseTeam,
-      variants: variants.map((variant: any) => ({
-        ...variant,
-        team: allVariantMembers.filter((member: any) => member.variantId === variant.id),
-      })),
-    };
-  }
-
-  async function persistQuotationRevision(
-    executor: any,
-    quotationId: number,
-    actorUserId: number | null,
-    reason: string,
-  ) {
-    const snapshot = await buildQuotationSnapshot(executor, quotationId);
-    const serialized = stableQuotationSnapshot(snapshot);
-    const documentHash = createHash("sha256").update(serialized).digest("hex");
-    const revisionNumber = Number(snapshot.quotation.revisionNumber) || 1;
-    const [revision] = await executor.insert(quotationRevisions).values({
-      quotationId,
-      revisionNumber,
-      status: snapshot.quotation.status,
-      snapshot,
-      documentHash,
-      reason,
-      createdBy: actorUserId,
-    }).onConflictDoNothing().returning();
-    const effectiveRevision = revision ?? (await executor.select().from(quotationRevisions).where(and(
-      eq(quotationRevisions.quotationId, quotationId),
-      eq(quotationRevisions.revisionNumber, revisionNumber),
-    )))[0];
-    const effectiveDocumentHash = revision ? documentHash : effectiveRevision.documentHash;
-    await executor.update(quotations).set({ documentHash: effectiveDocumentHash }).where(eq(quotations.id, quotationId));
-    return {
-      revision: effectiveRevision,
-      snapshot: revision ? snapshot : effectiveRevision.snapshot,
-      documentHash: effectiveDocumentHash,
-    };
-  }
-
   async function recordQuotationEvent(
     executor: any,
     input: {
@@ -7616,6 +7539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await syncQuotationToCrm(tx, updated, "pending", req.user?.id ?? null);
         }
       });
+      await notifyQuotationApprovalRequests(input.quotationIds);
       res.json({ success: true, workspace: await loadQuotationGroupWorkspace(groupId) });
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Selección inválida", errors: error.errors });
@@ -7890,6 +7814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return created;
         });
 
+        if (quotation.status === "pending") await notifyQuotationApprovalRequests([quotation.id]);
         res.status(201).json(quotation);
       } catch (validationError) {
         if (validationError instanceof z.ZodError) {
@@ -7934,7 +7859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const parsedData = normalizeQuotationCommercialFields(insertQuotationSchema.parse(rawQuotation));
         if (existingQuotation.status !== "draft") {
           return res.status(409).json({
-            message: "La versión en revisión ya es inmutable. Creá una nueva revisión para modificarla.",
+            message: "La cotización no está en borrador. Si está pendiente, abrí Aprobación y envío y retirá la solicitud para editarla; en otros estados, creá una nueva revisión.",
             code: "QUOTATION_REVISION_REQUIRED",
           });
         }
@@ -8052,6 +7977,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return updated;
         });
 
+        if (updatedQuotation.status === "pending") await notifyQuotationApprovalRequests([id]);
         res.json(updatedQuotation);
       } catch (validationError) {
         if (validationError instanceof z.ZodError) {
@@ -8212,6 +8138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No se encontró la cotización" });
       }
 
+      if (status === "pending") await notifyQuotationApprovalRequests([id]);
       res.json(updatedQuotation);
     } catch (error) {
       if (error instanceof z.ZodError || error instanceof SyntaxError) {
@@ -8241,7 +8168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const quotation = await storage.getQuotation(id);
     if (!quotation) return res.status(404).json({ message: "Cotización no encontrada" });
     const variants = await db.select({ id: quotationVariants.id, name: quotationVariants.variantName, totalAmount: quotationVariants.totalAmount }).from(quotationVariants).where(eq(quotationVariants.quotationId,id));
-    res.json({ revisions, events, approvals, deliveries, quotation: { lockVersion: quotation.lockVersion, revisionNumber: quotation.revisionNumber }, variants });
+    res.json({ revisions, events, approvals, deliveries, quotation: { lockVersion: quotation.lockVersion, revisionNumber: quotation.revisionNumber, createdBy: quotation.createdBy }, variants });
   });
 
   // Record a commercial fact that already happened outside Mind. Never sends an email.
@@ -8294,6 +8221,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({message:"Revisá los datos de la etapa",errors:error.errors});
       res.status(error.statusCode || 500).json({message:error.statusCode ? error.message : "No se pudo registrar la etapa"});
+    }
+  });
+
+  app.post("/api/quotations/:id/withdraw-approval", requireAuth, async (req, res) => {
+    try {
+      const id = z.coerce.number().int().positive().parse(req.params.id);
+      const input = z.object({ reason: z.string().trim().min(3).max(1000), expectedLockVersion: z.number().int().positive() }).parse(req.body);
+      const updated = await db.transaction(tx => withdrawQuotationApproval(tx, id, input.expectedLockVersion, req.user!, input.reason));
+      res.json(updated);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Indicá el motivo y actualizá la cotización antes de continuar", errors: error.errors });
+      res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : "No se pudo retirar la solicitud" });
     }
   });
 
@@ -27395,7 +27334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       desktopEnabled: z.boolean(),
       emailEnabled: z.boolean(),
       discreetMode: z.boolean().optional(),
-      categoryPreferences: z.record(z.enum(["mind", "daily", "tasks", "crm", "team"]), z.object({ desktop: z.boolean().optional(), email: z.boolean().optional() }).strict()).optional(),
+      categoryPreferences: z.record(z.enum(["mind", "daily", "tasks", "crm", "team", "quotations"]), z.object({ desktop: z.boolean().optional(), email: z.boolean().optional() }).strict()).optional(),
       setupCompleted: z.boolean().optional(),
     }).strict().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Preferencias inválidas" });

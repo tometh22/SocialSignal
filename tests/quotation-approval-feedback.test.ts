@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approvalRevisionIsCurrent, canDecideQuotationApproval, quotationApprovalGuidance } from "../shared/utils/quotation-approval";
+import { approvalRevisionIsCurrent, canDecideQuotationApproval, canWithdrawQuotationApproval, quotationApprovalGuidance } from "../shared/utils/quotation-approval";
 
 describe("commercial approval preserves existing approval gates", () => {
   it("permits existing approvers and administrators, with no self approval", () => {
@@ -12,6 +12,14 @@ describe("commercial approval preserves existing approval gates", () => {
     }
     expect(canDecideQuotationApproval({ id: 2, permissions: ["quotations", "task_manager"] }, 1)).toBe(false);
     expect(canDecideQuotationApproval(null, 1)).toBe(false);
+  });
+  it("lets the creator, current requester and approvers withdraw without allowing self approval", () => {
+    expect(canWithdrawQuotationApproval({ id: 1 }, 1)).toBe(true);
+    expect(canWithdrawQuotationApproval({ id: 2 }, 1, [2])).toBe(true);
+    expect(canWithdrawQuotationApproval({ id: 3, permissions: ["operations"] }, 1)).toBe(true);
+    expect(canWithdrawQuotationApproval({ id: 4, permissions: ["quotations"] }, 1, [2])).toBe(false);
+    expect(canWithdrawQuotationApproval(null, 1, [2])).toBe(false);
+    expect(canDecideQuotationApproval({ id: 1, isAdmin: true }, 1)).toBe(false);
   });
   it("rejects requests belonging to older or missing revisions", () => {
     expect(approvalRevisionIsCurrent({ revisionId: 10 }, { id: 11 })).toBe(false);

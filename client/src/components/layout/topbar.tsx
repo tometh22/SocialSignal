@@ -58,6 +58,7 @@ function notificationHref(notification: ProductNotification) {
   if (notification.type.startsWith("mind_")) return notification.entityId ? `/review/${notification.entityId}` : "/review";
   if (notification.type.startsWith("task_")) return "/tasks/my-tasks";
   if (notification.type.startsWith("crm_")) return notification.entityId ? `/crm/${notification.entityId}` : "/crm";
+  if (notification.type.startsWith("quotation_")) return notification.entityId ? `/quotations/${notification.entityId}#commercial-approval` : "/manage-quotes";
   if (notification.type.startsWith("absence")) return "/absences";
   return "/";
 }
@@ -66,6 +67,7 @@ function notificationIconClass(type: string) {
   if (type.startsWith("mind_")) return "bg-violet-100 text-violet-700";
   if (type.startsWith("task_")) return "bg-sky-100 text-sky-700";
   if (type.startsWith("crm_")) return "bg-amber-100 text-amber-700";
+  if (type.startsWith("quotation_")) return "bg-indigo-100 text-indigo-700";
   if (type.startsWith("absence")) return "bg-emerald-100 text-emerald-700";
   return "bg-slate-100 text-slate-600";
 }

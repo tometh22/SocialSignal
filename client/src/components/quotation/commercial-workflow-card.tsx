@@ -3,7 +3,7 @@ import { invalidateQuotationPortfolio } from "@/lib/quotation-cache";
 import { externalQuotationStages } from "@shared/utils/quotation-external-stage";
 import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { canDecideQuotationApproval, quotationApprovalGuidance } from "@shared/utils/quotation-approval";
+import { canDecideQuotationApproval, canWithdrawQuotationApproval, quotationApprovalGuidance } from "@shared/utils/quotation-approval";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { statusLabel } from "@/lib/status-labels";
 
 type CommercialHistory = {
-  quotation: { lockVersion: number; revisionNumber: number };
+  quotation: { lockVersion: number; revisionNumber: number; createdBy?: number | null };
   variants: Array<{id:number; name:string; totalAmount:number}>;
   revisions: Array<{ id: number; revisionNumber: number; status: string; reason?: string; documentHash: string; createdAt: string }>;
   approvals: Array<{ id: number; revisionId: number; ruleLabel: string; status: string; requestedBy?: number; decisionReason?: string }>;
@@ -49,6 +49,8 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
   const [sendOpen, setSendOpen] = useState(false);
   const [sendEmail, setSendEmail] = useState(recipientEmail || '');
   const [sendMessage, setSendMessage] = useState('Adjuntamos nuestra propuesta comercial. Puede revisarla y responder desde el enlace seguro.');
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawReason, setWithdrawReason] = useState('');
   const [revisionOpen, setRevisionOpen] = useState(false);
   const [revisionReason, setRevisionReason] = useState('');
   const [externalStage, setExternalStage] = useState("");
@@ -123,6 +125,20 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
     } finally { setBusy(false); }
   };
 
+  const withdraw = async () => {
+    if (!data?.quotation || withdrawReason.trim().length < 3) return;
+    setBusy(true);
+    try {
+      await apiRequest(`/api/quotations/${quotationId}/withdraw-approval`, 'POST', { reason: withdrawReason, expectedLockVersion: data.quotation.lockVersion });
+      setWithdrawOpen(false); setWithdrawReason('');
+      await refresh();
+      toast({ title: 'Solicitud retirada', description: 'La cotización volvió a borrador. Podés editarla y volver a solicitar aprobación.' });
+    } catch (error) {
+      await refresh();
+      toast({ title: 'No se pudo retirar la solicitud', description: getApiErrorMessage(error), variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
   const recordExternal = async () => {
     if (!data?.quotation) return;
     setBusy(true);
@@ -161,6 +177,7 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
         {isError && <div role="alert" className="text-sm text-red-700">No se pudo cargar el historial de aprobación. <Button variant="link" onClick={() => refetch()}>Reintentar</Button></div>}
         {isLoading && <p role="status" className="text-sm text-muted-foreground">Cargando aprobaciones…</p>}
         <div className="flex flex-wrap gap-2">
+          {status === "pending" && data && canWithdrawQuotationApproval(user, data.quotation.createdBy, pendingApprovals.map(approval => approval.requestedBy ?? null)) && <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setWithdrawOpen(true)}><GitBranch className="mr-1.5 h-3.5 w-3.5" />Retirar solicitud y editar</Button>}
           {status === "draft" && <Button type="button" size="sm" disabled={busy} onClick={requestApproval}><ShieldCheck className="mr-1.5 h-3.5 w-3.5" />Solicitar aprobación interna</Button>}
           <Button type="button" variant="outline" size="sm" onClick={() => window.open(`/api/quotations/${quotationId}/document.pdf`, '_blank')}><FileDown className="mr-1.5 h-3.5 w-3.5" /> PDF verificable</Button>
           {status === 'internally-approved' && <Button type="button" size="sm" onClick={() => setSendOpen(true)}><Send className="mr-1.5 h-3.5 w-3.5" /> Enviar al cliente</Button>}
@@ -179,7 +196,7 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
           </div>
         )}
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-xl border border-slate-200 p-3"><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500"><History className="h-3.5 w-3.5" /> Últimos eventos</div>{(data?.events || []).slice(0, 5).map((event) => <div key={event.id} className="flex justify-between py-1 text-xs text-slate-600"><span>{event.eventType === 'external-stage-recorded' ? 'Etapa registrada fuera de Mind' : event.eventType === 'margin_alert_dismissed' ? 'alerta de margen desestimada' : event.eventType === 'margin_alert_reactivated' ? 'alerta de margen reactivada' : event.eventType}</span><span>{new Date(event.createdAt).toLocaleString('es-AR')}</span></div>)}</div>
+          <div className="rounded-xl border border-slate-200 p-3"><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500"><History className="h-3.5 w-3.5" /> Últimos eventos</div>{(data?.events || []).slice(0, 5).map((event) => <div key={event.id} className="flex justify-between py-1 text-xs text-slate-600"><span>{event.eventType === 'approval-withdrawn' ? 'Solicitud retirada para editar' : event.eventType === 'external-stage-recorded' ? 'Etapa registrada fuera de Mind' : event.eventType === 'margin_alert_dismissed' ? 'alerta de margen desestimada' : event.eventType === 'margin_alert_reactivated' ? 'alerta de margen reactivada' : event.eventType}</span><span>{new Date(event.createdAt).toLocaleString('es-AR')}</span></div>)}</div>
           <div className="rounded-xl border border-slate-200 p-3"><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500"><Mail className="h-3.5 w-3.5" /> Entregas</div>{data?.deliveries.length ? data.deliveries.slice(0, 5).map((delivery) => <div key={delivery.id} className="flex justify-between py-1 text-xs text-slate-600"><span className="truncate">{delivery.recipientEmail}</span><Badge variant="outline" className="text-[10px]">{statusLabel(delivery.status)}</Badge></div>) : <p className="text-xs text-slate-400">Todavía no fue enviada.</p>}</div>
         </div>
       </CardContent>
@@ -194,6 +211,7 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
       </Dialog>
       <Dialog open={Boolean(decision)} onOpenChange={(open) => !open && setDecision(null)}><DialogContent><DialogHeader><DialogTitle>{decision?.value === 'approved' ? 'Aprobar regla comercial' : 'Rechazar y devolver a borrador'}</DialogTitle><DialogDescription>La decisión queda asociada a tu usuario y a esta revisión.</DialogDescription></DialogHeader><div className="space-y-2"><Label htmlFor="approval-reason">Fundamento</Label><Textarea id="approval-reason" value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} /></div><DialogFooter><Button variant="outline" onClick={() => setDecision(null)}>Cancelar</Button><Button disabled={busy || decisionReason.trim().length < 3} onClick={decide}>Confirmar</Button></DialogFooter></DialogContent></Dialog>
       <Dialog open={sendOpen} onOpenChange={setSendOpen}><DialogContent><DialogHeader><DialogTitle>Enviar propuesta aprobada</DialogTitle><DialogDescription>Se adjuntará el PDF de la revisión y un enlace seguro para aceptar, rechazar o negociar.</DialogDescription></DialogHeader><div className="space-y-3"><div className="space-y-2"><Label htmlFor="send-recipient">Destinatario</Label><Input id="send-recipient" type="email" value={sendEmail} onChange={(event) => setSendEmail(event.target.value)} /></div><div className="space-y-2"><Label htmlFor="send-message">Mensaje</Label><Textarea id="send-message" rows={5} value={sendMessage} onChange={(event) => setSendMessage(event.target.value)} /></div></div><DialogFooter><Button variant="outline" onClick={() => setSendOpen(false)}>Cancelar</Button><Button disabled={busy || !sendEmail.includes('@')} onClick={send}><Send className="mr-1.5 h-4 w-4" /> Enviar</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={withdrawOpen} onOpenChange={open => { if (!busy) setWithdrawOpen(open); }}><DialogContent><DialogHeader><DialogTitle>Retirar solicitud y editar</DialogTitle><DialogDescription>La cotización vuelve a borrador y las aprobaciones pendientes se cancelan. Se conserva la versión enviada. Después de editar, deberás solicitar aprobación nuevamente.</DialogDescription></DialogHeader><div className="space-y-2"><Label htmlFor="withdraw-reason">Motivo del cambio</Label><Textarea id="withdraw-reason" value={withdrawReason} onChange={event => setWithdrawReason(event.target.value)} /></div><DialogFooter><Button variant="outline" disabled={busy} onClick={() => setWithdrawOpen(false)}>Cancelar</Button><Button disabled={busy || withdrawReason.trim().length < 3} onClick={withdraw}>Retirar y volver a borrador</Button></DialogFooter></DialogContent></Dialog>
       <Dialog open={revisionOpen} onOpenChange={setRevisionOpen}><DialogContent><DialogHeader><DialogTitle>Crear nueva revisión</DialogTitle><DialogDescription>La versión enviada o aceptada permanece inmutable y verificable por su hash.</DialogDescription></DialogHeader><div className="space-y-2"><Label htmlFor="revision-reason">Motivo del cambio</Label><Textarea id="revision-reason" value={revisionReason} onChange={(event) => setRevisionReason(event.target.value)} /></div><DialogFooter><Button variant="outline" onClick={() => setRevisionOpen(false)}>Cancelar</Button><Button disabled={busy || revisionReason.trim().length < 3} onClick={revise}><GitBranch className="mr-1.5 h-4 w-4" /> Crear revisión</Button></DialogFooter></DialogContent></Dialog>
     </Card>
   );

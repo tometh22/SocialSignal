@@ -1,3 +1,4 @@
+import { CommercialWorkflowCard } from "@/components/quotation/commercial-workflow-card";
 import type { QuotationVariantPreview } from "@shared/utils/quotation-variant-preview";
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useRoute } from 'wouter';
@@ -99,6 +100,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
   const [leadOrigin, setLeadOrigin] = useState<{ leadId: number; leadName?: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [variantPreview, setVariantPreview] = useState<QuotationVariantPreview | null>(null);
   const [highestVisitedPhase, setHighestVisitedPhase] = useState(1);
   const [validationIssues, setValidationIssues] = useState<QuotationValidationIssue[]>([]);
@@ -161,12 +163,14 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   useEffect(() => {
     if (!effectiveQuotationId || isRequote) return;
     setIsSaving(true);
+    setLoadFailed(false);
     loadQuotation(effectiveQuotationId)
       .then(() => {
         goToStep(1);
         setHighestVisitedPhase(6);
       })
       .catch((error) => {
+        setLoadFailed(true);
         toast({
           title: 'No pudimos cargar la cotización',
           description: getApiErrorMessage(error, `No se encontró la cotización ${effectiveQuotationId}.`),
@@ -372,6 +376,17 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       setIsSaving(false);
     }
   };
+
+  if (isEditing && !isRequote && (quotationData.id !== effectiveQuotationId || !quotationData.status)) {
+    return loadFailed ? <div className="space-y-4 p-6"><Alert variant="destructive"><AlertTitle>No pudimos cargar la cotización</AlertTitle><AlertDescription>Volvé a abrirla desde el listado para reintentar.</AlertDescription></Alert><Button variant="outline" onClick={() => setLocation('/manage-quotes')}>Volver a cotizaciones</Button></div> : <div role="status" className="p-6">Cargando cotización…</div>;
+  }
+  if (isEditing && !isRequote && quotationData.status !== 'draft') {
+    return <div className="mx-auto max-w-4xl space-y-4 p-6">
+      <Button variant="outline" onClick={() => setLocation('/manage-quotes')}><ArrowLeft className="mr-2 h-4 w-4" />Volver a cotizaciones</Button>
+      <Alert><AlertTitle>Esta cotización está bloqueada para edición</AlertTitle><AlertDescription>Para modificarla, retirá la solicitud pendiente o creá una nueva revisión desde Aprobación y envío.</AlertDescription></Alert>
+      <CommercialWorkflowCard quotationId={effectiveQuotationId!} status={quotationData.status!} quotationNumber={quotationData.quotationNumber} onChanged={() => { void loadQuotation(effectiveQuotationId!); }} />
+    </div>;
+  }
 
   return (
     <div className="min-h-full">
