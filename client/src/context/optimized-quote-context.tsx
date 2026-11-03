@@ -79,6 +79,7 @@ interface QuotationFinancials {
 }
 
 export interface QuotationData {
+  status?: string;
   id?: number; // Para rastrear cotización existente al editar
   client: Client | null;
   project: ProjectData;
@@ -496,7 +497,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     const hasMeaningfulData = Boolean(
       quotationData.project.name || quotationData.teamMembers.length > 0 || quotationData.client,
     );
-    if (!hasMeaningfulData) return;
+    if (!hasMeaningfulData || (quotationData.status && quotationData.status !== "draft")) return;
 
     setAutosaveStatus('pending');
     setHasUnsavedChanges(true);
@@ -952,6 +953,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       }
 
       const loadedQuotationData = {
+        status: quotation.status,
         id: quotation.id, // Importante: establecer el ID para indicar que estamos editando
         quotationNumber: quotation.quotationNumber,
         revisionNumber: quotation.revisionNumber,
@@ -1210,6 +1212,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       setQuotationData((previous) => ({
         ...previous,
         id: savedQuotation.id,
+        status: savedQuotation.status,
         quotationNumber: savedQuotation.quotationNumber ?? previous.quotationNumber,
         revisionNumber: savedQuotation.revisionNumber ?? previous.revisionNumber,
         lockVersion: savedQuotation.lockVersion ?? previous.lockVersion,
