@@ -308,7 +308,10 @@ async function processEmailBatch(batch: { batch_key: string; user_id: number; pa
   }
   try {
     const { ids: _ids, discreet: _discreet, ...body } = payload;
-    const [response] = await sendTransactionalEmail(body,batch.batch_key);
+    // Keep the provider identity used by the pre-upgrade worker for individual
+    // notifications. A recovered lease must not become a second email request.
+    const deliveryKey = batch.batch_key.startsWith("digest:") ? batch.batch_key : `${eligible[0].n.eventKey}:${batch.user_id}`;
+    const [response] = await sendTransactionalEmail(body,deliveryKey);
     const result = { id:response.headers["x-message-id"] };
     await db.transaction(async tx => {
       await tx.update(userNotificationEmailDeliveries).set({ status: "sent", deliveryStatus: "accepted", deliveryProvider:getTransactionalEmailConfig()!.provider,sentAt: new Date(), resendEmailId: result.id!, lastError: null, lockedAt: null, updatedAt: new Date() }).where(inArray(userNotificationEmailDeliveries.id, ids));

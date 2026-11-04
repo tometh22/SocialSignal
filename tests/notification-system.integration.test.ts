@@ -16,7 +16,8 @@ import { setupAuth, hashPassword } from "../server/auth";
 import type { IStorage } from "../server/storage";
 import { getTableConfig, PgDialect } from "drizzle-orm/pg-core";
 import { SQL, sql } from "drizzle-orm";
-import { createHmac, generateKeyPairSync, sign } from "node:crypto";
+import { createHmac,
+  createHash, generateKeyPairSync, sign } from "node:crypto";
 import * as schema from "../shared/schema";
 import { notificationReliabilityMigrationSql } from "../server/migrations/notification-reliability";
 const fixture = vi.hoisted(() => ({
@@ -444,6 +445,7 @@ describe.skipIf(!fixture.url)(
       await dispatchUserNotificationEmails();
       expect(await statuses()).toEqual(["sent"]);
       expect(fetch).toHaveBeenCalledTimes(1);
+      expect((vi.mocked(fetch).mock.calls[0][1]!.headers as Record<string,string>)["Idempotency-Key"]).toBe(createHash("sha256").update(`${input.eventKey}:1`).digest("hex"));
     });
     it("recovers stale mail leases and stops retrying ambiguous deliveries outside the provider window", async () => {
       await createUserNotifications([1], input);
