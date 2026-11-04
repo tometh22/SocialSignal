@@ -9,6 +9,7 @@ import { queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getFirstAllowedRouteForUser } from "@/lib/first-allowed-route";
 import { getAuthReturnPath } from "@/lib/auth-return";
+import { disableWebPush } from "@/lib/notification-push";
 
 type AuthContextType = {
   user: AuthUser | null;
@@ -128,6 +129,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation<void, Error, void>({
     mutationFn: async () => {
+      // The server also revokes the current device as a fallback. Clear any
+      // notification already displayed by this browser before leaving it.
+      try {
+        await disableWebPush();
+        const registration = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration("/") : undefined;
+        const displayed = await registration?.getNotifications();
+        displayed?.forEach(notification => notification.close());
+      } catch { /* The authenticated server-side device revocation still runs. */ }
       const response = await fetch("/api/logout", {
         method: "POST",
         credentials: "include",

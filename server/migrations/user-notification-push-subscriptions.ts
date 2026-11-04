@@ -19,6 +19,9 @@ SET desktop_enabled = FALSE,
     setup_completed_at = NULL,
     updated_at = NOW()
 WHERE preferences.desktop_enabled = TRUE
+  -- The device-aware notification system preserves a person's global choice
+  -- even when they disconnect every browser. This repair is legacy-only.
+  AND to_regclass('user_notification_push_deliveries') IS NULL
   AND NOT EXISTS (
     SELECT 1 FROM user_notification_push_subscriptions AS subscriptions
     WHERE subscriptions.user_id = preferences.user_id

@@ -2018,7 +2018,12 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
     onError: (err: Error) => toast({ title: 'Error al editar comentario', description: err.message, variant: 'destructive' }),
   });
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [timeline.length]);
+  useEffect(() => {
+    const noteId = new URLSearchParams(window.location.search).get('noteId');
+    const target = noteId ? document.getElementById(`mind-note-${noteId}`) : null;
+    if (target) target.scrollIntoView({ behavior:'smooth',block:'center' });
+    else bottomRef.current?.scrollIntoView({ behavior:'smooth' });
+  }, [timeline.length]);
 
   return (
     <div className="flex flex-col h-full">
@@ -2044,7 +2049,7 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
           if (entry.type === 'note' || entry.type === 'update') {
             const isOwn = entry.authorId === currentUserId;
             return (
-              <div key={`${entry.type}_${entry.id}`} data-testid={`activity-${entry.type}-${entry.id}`} className="group flex gap-2 py-1">
+              <div id={entry.type === "note" ? `mind-note-${entry.id}` : undefined} key={`${entry.type}_${entry.id}`} data-testid={`activity-${entry.type}-${entry.id}`} className={cn("group flex gap-2 py-1 rounded-lg", typeof window !== "undefined" && new URLSearchParams(window.location.search).get("noteId") === String(entry.id) && entry.type === "note" && "bg-indigo-50 ring-2 ring-indigo-200")}>
                 <div className={cn("h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5", isOwn ? "bg-indigo-100 text-indigo-700" : "bg-teal-100 text-teal-700")}>
                   {initials(entry.authorName)}
                 </div>
@@ -2162,7 +2167,7 @@ function StatusFocusDetail({ item, users, currentUserId, roomId, onUpdate, onRes
   item: Item; users: AppUser[]; currentUserId: number | null; roomId?: number;
   onUpdate: (data: Record<string, any>) => void; onResolve: () => void; onRemove: () => void;
 }) {
-  const [tab, setTab] = useState<'overview' | 'activity'>('overview');
+  const [tab, setTab] = useState<'overview' | 'activity'>(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).has('noteId') ? 'activity' : 'overview');
   const { hasUnread, markAsRead } = useUnreadComments(item, roomId);
   useEffect(() => { if (tab === 'activity' && hasUnread) markAsRead(); }, [tab, hasUnread, markAsRead]);
   return <div className="flex flex-col flex-1 min-h-0" data-testid="status-focus-detail">

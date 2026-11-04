@@ -18,10 +18,10 @@ async function runTeamPayrollUnlocked(now: Date) {
     const calendar = await payrollCalendar(candidate);
     const state = (await db.execute(sql`SELECT state FROM payroll_periods WHERE period=${candidate}`)).rows[0] as any;
     // An explicitly reopened period stays open until Operations cuts it again.
-    if (now >= calendar.cutoffAt && !state) {
-      const result = await preparePayroll(candidate, null, {cut:true,now});
-      const recipients = (await db.execute(sql`SELECT id FROM users WHERE is_active=true AND (is_admin=true OR 'operations'=ANY(permissions))`)).rows as any[];
-      await createUserNotifications(recipients.map(r=>r.id), { eventKey:`payroll-cut:${candidate}`,type:"monthly_settlement",title:"Corte de horas preparado",message:`${candidate}: ${result.created} borradores preparados. ${result.issues.length} pendientes para revisar.`,actionUrl:`/operations/monthly-closing?period=${candidate}` });
+    if (now >= calendar.cutoffAt && (!state || state.state === "cut")) {
+      if (!state) await preparePayroll(candidate, null, {cut:true,now});
+      const recipients = (await db.execute(sql`SELECT id FROM users WHERE is_active=true AND (is_admin=true OR role='admin' OR 'operations'=ANY(permissions))`)).rows as any[];
+      await createUserNotifications(recipients.map(r=>r.id), { eventKey:`payroll-cut:${candidate}`,type:"monthly_settlement",title:"Corte de horas preparado",message:`${candidate}: el corte de horas está preparado. Revisá los borradores y pendientes del período.`,actionUrl:`/operations/monthly-closing?period=${candidate}` });
     }
   }
 }

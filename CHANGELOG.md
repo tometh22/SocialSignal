@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.14.25 — 2026-11-04
+
+- Las notificaciones verifican permisos, membresías y titularidad al crearse, mostrarse y enviarse, también en MCP. Se separan las audiencias de tareas, salas, aprobaciones, ausencias y liquidaciones.
+- Colas persistentes para email y push, recuperación tras caídas, reintentos e idempotencia; transporte compartido para notificaciones, CRM, propuestas y avisos IPC. Webhooks firmados de Resend y SendGrid registran entrega, rebote y queja.
+- Resumen diario, horarios silenciosos, silenciamiento por hilo, enlaces al comentario, agrupado histórico corregido, preferencias sin sobrescrituras concurrentes y configuración inicial opcional. Administración dispone de métricas y reintentos.
+- Los dispositivos se comprueban individualmente y se desvinculan al cerrar sesión o cambiar de cuenta. La migración 0093 retira suscripciones antiguas sin vinculación revocable; requieren una reconexión del navegador.
+- CI ejecuta las pruebas de permisos y recuperación con PostgreSQL aislado. El esquema declarativo incluye todas las colas y registros de entrega para los entornos creados desde cero.
+
 ## 1.14.24 — 2026-11-03
 
 - Los miembros de un proyecto pueden renombrar y duplicar sus secciones desde el menú o el nombre, también con permiso task_manager. El servidor valida la membresía del proyecto para ambas acciones.

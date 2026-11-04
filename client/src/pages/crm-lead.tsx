@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
@@ -247,12 +247,17 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
     onSuccess: () => invalidate(),
   });
 
+  const emailRequestRef = useRef<{signature:string;key:string}|null>(null);
   const sendEmail = useMutation({
-    mutationFn: (data: { to: string; subject: string; body: string }) =>
-      apiRequest(`/api/crm/leads/${leadId}/send-email`, 'POST', data),
+    mutationFn: (data: { to: string; subject: string; body: string }) => {
+      const signature=JSON.stringify(data);
+      if(emailRequestRef.current?.signature!==signature) emailRequestRef.current={signature,key:crypto.randomUUID()};
+      return apiRequest(`/api/crm/leads/${leadId}/send-email`, 'POST', {...data,idempotencyKey:emailRequestRef.current.key});
+    },
     onSuccess: () => {
       invalidate();
       setEmailOpen(false);
+      emailRequestRef.current=null;
       setEmailSubject('');
       setEmailBody('');
       toast({ title: 'Email enviado correctamente' });

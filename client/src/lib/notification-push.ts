@@ -14,6 +14,17 @@ export function supportsWebPush() {
     && "PushManager" in window;
 }
 
+export async function getWebPushState() {
+  if (!supportsWebPush()) return { connected: false, supported: false, permission: "unsupported" };
+  const registration = await navigator.serviceWorker.getRegistration("/");
+  const subscription = await registration?.pushManager.getSubscription();
+  if (!subscription || Notification.permission !== "granted") return { connected: false, supported: true, permission: Notification.permission };
+  const response = await authFetch("/api/notifications/push/status", { method: "POST", body: JSON.stringify({ endpoint: subscription.endpoint }) });
+  if (!response.ok) throw new Error("No pudimos comprobar este dispositivo.");
+  const result = await response.json() as { connected: boolean };
+  return { ...result, supported: true, permission: Notification.permission };
+}
+
 export async function enableWebPush(): Promise<void> {
   if (!supportsWebPush()) throw new Error("Este navegador no admite notificaciones en segundo plano.");
 
@@ -51,9 +62,10 @@ export async function disableWebPush(): Promise<void> {
   const registration = await navigator.serviceWorker.getRegistration("/");
   const subscription = await registration?.pushManager.getSubscription();
   if (!subscription) return;
-  await authFetch("/api/notifications/push/subscribe", {
+  const response = await authFetch("/api/notifications/push/subscribe", {
     method: "DELETE",
     body: JSON.stringify({ endpoint: subscription.endpoint }),
   });
+  if (!response.ok) throw new Error("No pudimos desconectar este dispositivo.");
   await subscription.unsubscribe();
 }

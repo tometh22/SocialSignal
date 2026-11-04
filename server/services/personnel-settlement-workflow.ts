@@ -13,17 +13,19 @@ export async function lockSettlementPeriod(tx: any, period: string) {
   if (close?.status === "PRE_CLOSE") await tx.update(financialClosePeriods).set({ status: "OPEN", updatedAt: new Date() }).where(eq(financialClosePeriods.periodKey, period));
 }
 
-export async function notifySettlement(row: any, audience: "person" | "operations" | "finance", title: string) {
-  const [person] = await db.select().from(personnel).where(eq(personnel.id, row.personnelId));
-  const recipients = await db.select({ id: users.id }).from(users).where(audience === "person"
+export async function notifySettlement(row: any, audience: "person" | "operations" | "finance", title: string, transaction?: Parameters<Parameters<typeof db.transaction>[0]>[0]): Promise<void> {
+  if (!transaction) return db.transaction(tx => notifySettlement(row,audience,title,tx));
+  const tx = transaction;
+  const [person] = await tx.select().from(personnel).where(eq(personnel.id, row.personnelId));
+  const recipients = await tx.select({ id: users.id }).from(users).where(audience === "person"
     ? sql`lower(trim(${users.email}))=lower(trim(${person?.email ?? ""})) AND ${users.isActive}=true`
-    : sql`${users.isActive}=true AND (${users.isAdmin}=true OR ${audience}=ANY(${users.permissions}))`);
+    : sql`${users.isActive}=true AND (${users.isAdmin}=true OR ${users.role}='admin' OR ${audience}=ANY(${users.permissions}))`);
   await createUserNotifications(recipients.map(r => r.id), {
     eventKey: `team-settlement:${row.id}:${row.workflow?.version ?? 0}:${audience}:${title}`,
     type: "monthly_settlement", title,
     message: `${audience !== "person" ? person?.name + ": " : ""}${row.period}. Abrí el cierre para ver el siguiente paso.`,
     entityId: row.id, actionUrl: audience === "person" ? `/my-invoices?period=${row.period}` : audience === "finance" ? `/finance/facturas-equipo?period=${row.period}` : `/operations/liquidaciones-equipo?period=${row.period}`,
-  });
+  }, tx);
 }
 
 export async function changeSettlement(id: number, actorId: number, operations: boolean, input: any) {
@@ -93,13 +95,13 @@ export async function changeSettlement(id: number, actorId: number, operations: 
     flow.events = [...(flow.events ?? []), { action: `${action}_${phase}`, actorId, at: now, amount: flow[phase].amount, reason: flow[phase].reason }];
     const [result] = await tx.update(personnelMonthlySettlements).set({ ...updates, workflow: flow, updatedAt: new Date() }).where(eq(personnelMonthlySettlements.id, id)).returning();
 
+    const withoutInvoice = result.workflow.requiresInvoice === false;
+    const title = !operations ? "Importe pendiente de autorización" : input.action === "approve"
+      ? withoutInvoice ? "Liquidación autorizada sin factura" : "Importe autorizado para facturar"
+      : withoutInvoice ? "Revisá los datos de tu liquidación" : "Revisá tu importe antes de facturar";
+    await notifySettlement(result, operations ? "person" : "operations", title,tx);
     return result;
   });
-  const withoutInvoice = saved.workflow.requiresInvoice === false;
-  const title = !operations ? "Importe pendiente de autorización" : input.action === "approve"
-    ? withoutInvoice ? "Liquidación autorizada sin factura" : "Importe autorizado para facturar"
-    : withoutInvoice ? "Revisá los datos de tu liquidación" : "Revisá tu importe antes de facturar";
-  await notifySettlement(saved, operations ? "person" : "operations", title).catch(console.error);
   return saved;
 }
 

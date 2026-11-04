@@ -155,7 +155,7 @@ describe("Feedback Mind V2-9 integration contracts", () => {
   it("versions absence events and notifications per real transition", () => {
     const routes = source("server/routes.ts");
     expect(routes).toContain('eventKey: `${input.action}:${absenceId}:${new Date(current.updatedAt).toISOString()}`');
-    expect(routes).toContain('eventKey: `absence-cancellation-requested:${absenceId}:${new Date(updated.updatedAt).toISOString()}`');
+    expect(routes).toContain('eventKey: `absence-cancellation-requested:${absenceId}:${new Date(row.updatedAt).toISOString()}`');
   });
 
   it("keeps financial portfolio separate from the Asana-style operational surface", () => {

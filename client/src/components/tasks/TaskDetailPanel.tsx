@@ -182,6 +182,11 @@ function CommentsSection({ taskId, allPersonnel }: { taskId: number; allPersonne
     }, 0);
   };
 
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("commentId");
+    if (id) document.getElementById(`task-comment-${id}`)?.scrollIntoView({behavior:"smooth",block:"center"});
+  },[comments.length]);
+
   const filteredPersonnel = mentionQuery !== null
     ? allPersonnel.filter(p => p.name.toLowerCase().includes(mentionQuery))
     : [];
@@ -216,7 +221,7 @@ function CommentsSection({ taskId, allPersonnel }: { taskId: number; allPersonne
           <p className="text-xs text-muted-foreground italic px-3 py-2">Sin comentarios aún</p>
         )}
         {comments.map((c: any) => (
-          <div key={c.id} className="flex items-start gap-2 px-3 py-2 hover:bg-accent/20 group text-xs">
+          <div id={`task-comment-${c.id}`} key={c.id} className={cn("flex items-start gap-2 px-3 py-2 hover:bg-accent/20 group text-xs", typeof window !== "undefined" && new URLSearchParams(window.location.search).get("commentId") === String(c.id) && "bg-indigo-50 ring-2 ring-inset ring-indigo-200")}>
             <Avatar className="h-5 w-5 flex-shrink-0 mt-0.5">
               <AvatarFallback className="text-[8px] bg-primary/20 text-primary">
                 {c.author_name ? c.author_name.charAt(0) : "?"}

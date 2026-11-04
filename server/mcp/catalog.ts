@@ -1,5 +1,11 @@
 // Explicit business-data allowlist. Review permissions and fields before adding resources.
 export const excludedMindTables = {
+  "notification_email_batches": "Contenido privado de la cola de correo",
+  "notification_email_events": "Eventos técnicos de entrega del proveedor",
+  "notification_email_suppressions": "Bloqueos privados de direcciones de correo",
+  "transactional_email_deliveries": "Registro técnico de envíos; se consulta desde administración de notificaciones",
+  "user_notification_push_deliveries": "Cola técnica de dispositivos; visible solo mediante administración de notificaciones",
+  "user_notification_thread_mutes": "Preferencias privadas de cada conversación",
   "capacity_group_estimates": "Planificación semanal por persona; se consulta en Capacidad con validación de titularidad",
   "mcp_oauth_grants": "Credenciales OAuth",
   "password_reset_tokens": "Tokens de recuperación",

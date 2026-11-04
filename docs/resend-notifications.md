@@ -1,21 +1,89 @@
-# Configurar Resend para notificaciones
+# Notificaciones y correo
 
-La app usa Resend para emails de notificaciones. El entorno productivo está en Railway → proyecto **Mind** → **production** → servicio `mind-epical-web` (`https://mind.epical.digital`). Variables necesarias:
+La configuración productiva se administra en Railway → proyecto **Mind** → **production** → servicio `mind-epical-web` (`https://mind.epical.digital`). Nunca guardar claves en el repositorio.
 
-| Variable | Valor |
+## Proveedor compartido
+
+Notificaciones, CRM, ajustes IPC y propuestas usan `server/services/email-transport.ts`. Por defecto se elige Resend si existe `RESEND_API_KEY`; sin esa clave se conserva compatibilidad con SendGrid. `MAIL_PROVIDER=resend|sendgrid` fija explícitamente el proveedor. La selección es única para todos los flujos y no cambia automáticamente de proveedor ante un fallo.
+
+| Variable | Uso |
 | --- | --- |
-| `RESEND_API_KEY` | Clave de producción limitada a permisos de envío y al dominio verificado `epical.digital`. Guardarla como variable sensible. |
-| `RESEND_FROM_EMAIL` | Configurada como `Mind <notificaciones@epical.digital>`; Resend informa `epical.digital` verificado. |
-| `APP_URL` | Ya está configurada en producción. Se usa para los enlaces de los emails. |
+| `RESEND_API_KEY` | Clave de envío restringida al dominio verificado. |
+| `RESEND_FROM_EMAIL` | Remitente verificado; configuración existente: `Mind <notificaciones@epical.digital>`. |
+| `APP_URL` o `PUBLIC_APP_URL` | Origen HTTPS público para enlaces y marca del correo. |
+| `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL` | Alternativa cuando se elige SendGrid. |
+| `RESEND_WEBHOOK_SECRET` | Secreto de firma del webhook de Resend, independiente de la API key. |
+| `SENDGRID_WEBHOOK_PUBLIC_KEY` | Clave pública de verificación del webhook de SendGrid (base64 DER o PEM). |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push; la clave privada queda en el servidor. |
 
-No guardes la API key en el repositorio ni en archivos `.env` versionados. Cada persona activa **Email** desde el menú de la campana y puede elegir categorías. La vista privada viene activada para que los asuntos y cuerpos de los correos no muestren detalles sensibles en la bandeja de entrada.
+Las propuestas y correos manuales conservan sus aprobaciones y confirmación explícita. Las preferencias personales de notificaciones no modifican esos envíos comerciales.
 
-Los emails se guardan en una cola persistente junto con la notificación. Los fallos de red, HTTP 429 y respuestas 5xx se reintentan hasta seis veces (desde 15 segundos hasta 3 horas); los errores definitivos quedan en estado `failed`. El proceso recupera automáticamente envíos que hayan quedado bloqueados por una caída.
+## Destinatarios y permisos
 
-La clave anterior con acceso completo fue revocada después de activar la clave restringida. Los cambios recientes de UX y las migraciones `0081`–`0082` se deben incluir en el despliegue para que aparezcan en producción.
+La política común está en `server/services/notification-access.ts`. Se comprueba al crear el aviso, al consultar la bandeja —incluidas las consultas de MCP— y antes de cada intento de email o push. Ser administrador no agrega automáticamente a una persona a los destinatarios.
 
-La migración `0077` prepara las preferencias existentes. La migración `0080` vuelve a mostrar la configuración a quienes tienen escritorio y email apagados. Las cuentas nuevas eligen al menos un canal en el primer ingreso para continuar; el permiso de escritorio siempre se pide después de una acción explícita en el navegador.
+| Tipo | Relevancia y acceso exigidos |
+| --- | --- |
+| Respuesta en Mind | Participación previa en ese hilo, permiso `status` y membresía vigente en la sala no archivada. |
+| Daily | Membresía de la sala y permiso `status`; se excluye a quien la completó. |
+| Asignación de tarea | Nueva persona responsable o colaboradora, permiso de tareas y acceso vigente al proyecto. |
+| Respuesta de tarea | Responsable, colaboradores y participantes previos, con acceso vigente al proyecto y al módulo. |
+| CRM | Creador del recordatorio o responsable del lead, con permiso `crm`. |
+| Cotización | Acceso a cotizaciones y capacidad real de aprobación; se excluye al solicitante. La revisión debe seguir pendiente y ser la vigente. |
+| Ausencias | Operaciones recibe solicitudes/cancelaciones; la persona titular recibe los avisos y decisiones sobre su ausencia. |
+| Liquidaciones | La audiencia es la persona titular, Operaciones o Finanzas según el paso y la pantalla de destino. |
 
-Los avisos de escritorio usan Web Push: cada navegador registra este dispositivo con un service worker y el servidor los puede entregar aunque Mind esté cerrado. La persona da permiso desde el botón **Activar**; la suscripción se asocia a su cuenta y se puede retirar desde Preferencias. El modo privado también oculta título y contenido del aviso. Para producción, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` se guardan como variables sensibles del servicio. La clave pública se entrega al navegador mediante un endpoint autenticado; la privada queda solo en el servidor. La migración `0082` crea la tabla de dispositivos. La bandeja in-app conserva el historial, filtros, agrupación, marcado de lectura y paginación.
+No se crean avisos para cuentas inactivas ni tipos desconocidos. Una pérdida de acceso oculta el aviso y cancela los envíos pendientes al procesarlos. Las preferencias de categorías también se muestran según los accesos disponibles.
 
-Un administrador puede revisar contadores y los últimos envíos pendientes o fallidos con `GET /api/admin/notification-email-deliveries`. Los correos fallidos se pueden reencolar con `POST /api/admin/notification-email-deliveries/:id/retry`. Ambos endpoints requieren autenticación de administrador.
+## Frecuencia, privacidad y dispositivos
+
+El primer ingreso permite **Configurar después** y continuar solo con la bandeja. No exige activar email o escritorio.
+
+Por defecto, las nuevas preferencias agrupan los mails de conversaciones y dailies en un resumen diario a las 09:00 de Buenos Aires. Cada persona puede elegir envío inmediato, resumen o apagar esos mails, cambiar la hora/zona y establecer un horario silencioso. Asignaciones, aprobaciones y recordatorios se envían en el momento, respetando el horario silencioso y los canales elegidos. La programación usa instantes con zona horaria y contempla cambios de día y horario de verano.
+
+El horario silencioso demora email y push; no oculta la bandeja. Los avisos ya leídos, los hilos silenciados y los accesos revocados se excluyen al entregar. Apagar un canal o categoría, o silenciar un hilo, cancela su trabajo pendiente: reactivarlo no dispara ese backlog. La nueva frecuencia y hora de resumen se aplican al crear los siguientes avisos; el horario silencioso se vuelve a comprobar al entregar.
+
+La vista privada oculta detalles en el asunto, cuerpo y push. Los correos incluyen un enlace a Preferencias. Las respuestas tienen enlaces al tema y comentario concreto; el agrupado usa la identidad del hilo y la distancia entre eventos.
+
+La preferencia de escritorio es global; la conexión se comprueba por navegador. Se puede conectar o desconectar el navegador actual y revocar otros dispositivos. El logout elimina la suscripción de ese navegador mediante una cookie HttpOnly y cierra avisos ya mostrados. Iniciar otra cuenta también revoca la vinculación anterior. El service worker comprueba la cuenta vigente antes de mostrar un push personal que haya quedado en tránsito.
+
+La migración nueva retira suscripciones antiguas que no tienen vinculación revocable por cookie. Esas personas deben conectar el navegador una vez después del despliegue; la interfaz muestra el estado real.
+
+## Persistencia y recuperación
+
+Comentarios, dailies, asignaciones, solicitudes/decisiones de ausencias y cambios/publicaciones de liquidaciones guardan el aviso y sus colas en la misma transacción de la acción. Los pedidos de aprobación de cotizaciones pendientes se reconcilian cada minuto para recuperar un fallo entre su commit y el encolado. Los recordatorios CRM conservan el marcador de éxito solo después de persistir el aviso y se ejecutan aunque se desactive la sincronización financiera.
+
+Email y push tienen colas persistentes, reclamo exclusivo con `FOR UPDATE SKIP LOCKED`, recuperación de trabajo abandonado después de cinco minutos y hasta seis reintentos transitorios. Los push vencidos o leídos se cancelan; las suscripciones que devuelven 404/410 se retiran. Un servidor sin configuración de correo conserva el trabajo pendiente.
+
+Cada resumen congela su contenido en el primer intento y reutiliza la misma clave de idempotencia. Si cambian el destinatario, el acceso o la privacidad durante un reintento, se cancela ese contenido anterior. El historial continúa disponible en la aplicación.
+
+El transporte compartido conserva un registro de aceptación. Repetir una solicitud ya aceptada devuelve el resultado guardado. Los reintentos de contenido distinto con la misma clave se rechazan. Una entrega incierta de SendGrid requiere revisión; no se reenvía automáticamente. Los reintentos de Resend que superan 23 horas desde el primer intento también requieren revisión, para no superar su [ventana de idempotencia de 24 horas](https://resend.com/docs/dashboard/emails/idempotency-keys).
+
+## Confirmaciones de entrega
+
+Configurar el webhook del proveedor elegido para distinguir aceptación de entrega:
+
+- **Resend:** `POST https://mind.epical.digital/api/webhooks/resend`, con `RESEND_WEBHOOK_SECRET`. Seleccionar `email.sent`, `email.delivery_delayed`, `email.delivered`, `email.failed`, `email.bounced`, `email.complained` y `email.suppressed`.
+- **SendGrid:** `POST https://mind.epical.digital/api/webhooks/sendgrid`, habilitando firma y guardando su clave pública en `SENDGRID_WEBHOOK_PUBLIC_KEY`. Seleccionar processed, deferred, delivered, bounce, dropped y spamreport.
+
+Se verifican las firmas sobre los bytes originales y la antigüedad del timestamp antes de guardar eventos. Los eventos se deduplican y los estados terminales prevalecen aunque lleguen fuera de orden. También se concilian eventos recibidos antes de guardar la respuesta de envío. Rebotes, quejas y supresiones impiden nuevos mails automáticos a esa dirección; Administración debe corregirla y revisar el bloqueo en el proveedor.
+
+Las verificaciones siguen la documentación de [Svix](https://docs.svix.com/receiving/verifying-payloads/how-manual), [eventos de Resend](https://resend.com/docs/webhooks/event-types) y [firmas de SendGrid](https://www.twilio.com/docs/sendgrid/for-developers/tracking-events/getting-started-event-webhook-security-features).
+
+## Administración y validación
+
+Administradores pueden consultar **Estado de los envíos** en Notificaciones: configuración, pendientes/fallos, entregas/rebotes, contadores push y últimos envíos del transporte comercial.
+
+- `GET /api/admin/notification-email-deliveries`: métricas y últimos envíos que requieren atención.
+- `POST /api/admin/notification-email-deliveries/:id/retry`: reencola un lote fallido con la misma identidad y contenido. Nunca reenvía uno aceptado.
+- `POST /api/admin/notification-email-suppressions/release`, con `{ "email": "persona@dominio" }`: levanta el bloqueo local después de que Administración resuelva el rebote o la queja en el proveedor. También está disponible en los últimos envíos de la pantalla. No reenvía el backlog cancelado.
+
+`sent` en la cola significa aceptado por el proveedor. `delivery_status=delivered` confirma llegada al servidor del destinatario; no acredita lectura. Sin webhook configurado se muestra aceptación, sin inventar confirmación de entrega.
+
+Pruebas locales con PostgreSQL aislado y proveedores simulados:
+
+```sh
+NOTIFICATION_TEST_DATABASE_URL=postgresql://localhost/postgres npx vitest run tests/notification-policy.test.ts tests/notification-system.integration.test.ts tests/notification-service-worker.test.ts --maxWorkers=1
+```
+
+La suite exige una base local, crea un esquema propio y lo elimina al terminar. No envía emails ni push reales. El despliegue debe aplicar `0093 notification relevance and reliable delivery` y configurar el webhook en el proveedor; los cambios de código por sí solos no habilitan esa configuración externa.
