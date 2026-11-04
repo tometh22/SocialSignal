@@ -1,3 +1,4 @@
+import { safeNotificationPath } from "@shared/utils/notification-policy";
 import GlobalTimerWidget from "@/components/tasks/GlobalTimerWidget";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -33,7 +34,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import { apiRequest, authFetch, queryClient } from "@/lib/queryClient";
-import { disableWebPush, enableWebPush } from "@/lib/notification-push";
+import { disableWebPush, enableWebPush, getWebPushState } from "@/lib/notification-push";
 import { reviewApi, reviewKeys, type ReviewRoomSummary } from "@/lib/review-api";
 import { GlobalSearch } from "@/components/features/global-search";
 import { MessagesPopup } from "@/components/features/messages-popup";
@@ -50,18 +51,10 @@ type ProductNotification = {
   readAt: string | null;
   createdAt: string;
 };
-type NotificationPreferences = { desktopEnabled: boolean; emailEnabled: boolean; setupCompletedAt: string | null; discreetMode?: boolean; categoryPreferences?: Record<string, { desktop?: boolean; email?: boolean }> };
+type NotificationPreferences = { availableCategories?: string[]; desktopEnabled: boolean; emailEnabled: boolean; setupCompletedAt: string | null; discreetMode?: boolean; categoryPreferences?: Record<string, { desktop?: boolean; email?: boolean }> };
 type NotificationResponse = { items: ProductNotification[]; unreadCount: number; hasMore: boolean; nextCursor: number | null };
 
-function notificationHref(notification: ProductNotification) {
-  if (notification.actionUrl?.startsWith("/") && !notification.actionUrl.startsWith("//")) return notification.actionUrl;
-  if (notification.type.startsWith("mind_")) return notification.entityId ? `/review/${notification.entityId}` : "/review";
-  if (notification.type.startsWith("task_")) return "/tasks/my-tasks";
-  if (notification.type.startsWith("crm_")) return notification.entityId ? `/crm/${notification.entityId}` : "/crm";
-  if (notification.type.startsWith("quotation_")) return notification.entityId ? `/quotations/${notification.entityId}#commercial-approval` : "/manage-quotes";
-  if (notification.type.startsWith("absence")) return "/absences";
-  return "/";
-}
+function notificationHref(notification: ProductNotification) { return safeNotificationPath(notification.actionUrl); }
 
 function notificationIconClass(type: string) {
   if (type.startsWith("mind_")) return "bg-violet-100 text-violet-700";
@@ -164,6 +157,7 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
     },
     staleTime: 30_000,
     refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
     enabled: Boolean(user),
   });
   const notifications = notificationData?.items ?? [];
@@ -176,54 +170,56 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
     },
     enabled: Boolean(user),
   });
-  const saveNotificationPreferences = async (next: NotificationPreferences) => {
-    await apiRequest("/api/notifications/preferences", "PUT", { desktopEnabled: next.desktopEnabled, emailEnabled: next.emailEnabled, categoryPreferences: next.categoryPreferences ?? {}, discreetMode: next.discreetMode ?? true });
-    await refetchNotificationPreferences();
+  const deviceQuery = useQuery({ queryKey:["notification-device",user?.id],queryFn:getWebPushState,enabled:Boolean(user),staleTime:0,refetchOnWindowFocus:true });
+  const saveNotificationPreferences = async (next: Partial<NotificationPreferences>) => {
+    await apiRequest("/api/notifications/preferences", "PUT", next);
+    await queryClient.invalidateQueries({queryKey:["/api/notifications/preferences"]});
+    await deviceQuery.refetch();
   };
   const toggleDesktopNotifications = async () => {
-    if (!notificationPreferences) return;
-    let enabled = !notificationPreferences.desktopEnabled;
+    if (!notificationPreferences || notificationSetupSaving) return;
+    setNotificationSetupSaving(true);
+    const enabled = !deviceQuery.data?.connected || !notificationPreferences.desktopEnabled;
     setNotificationSetupError("");
     try {
       if (enabled) await enableWebPush();
       else await disableWebPush();
-      await saveNotificationPreferences({ ...notificationPreferences, desktopEnabled: enabled });
+      if (enabled) await saveNotificationPreferences({ desktopEnabled: true });
+      await deviceQuery.refetch();
     } catch (error) {
       setNotificationSetupError(error instanceof Error ? error.message : "No pudimos guardar la preferencia. Volvé a intentarlo.");
-    }
+    } finally { setNotificationSetupSaving(false); }
   };
   const enableDesktopDuringSetup = async () => {
-    if (!notificationPreferences) return;
+    if (!notificationPreferences || notificationSetupSaving) return;
+    setNotificationSetupSaving(true);
     setNotificationSetupError("");
     try {
       await enableWebPush();
-      await saveNotificationPreferences({ ...notificationPreferences, desktopEnabled: true });
+      await saveNotificationPreferences({ desktopEnabled: true });
     } catch (error) {
       setNotificationSetupError(error instanceof Error ? error.message : "No pudimos guardar la preferencia de escritorio. Volvé a intentarlo.");
-    }
+    } finally { setNotificationSetupSaving(false); }
   };
   const enableEmailDuringSetup = async () => {
-    if (!notificationPreferences) return;
+    if (!notificationPreferences || notificationSetupSaving) return;
+    setNotificationSetupSaving(true);
     setNotificationSetupError("");
     try {
-      await saveNotificationPreferences({ ...notificationPreferences, emailEnabled: true });
+      await saveNotificationPreferences({ emailEnabled: true });
     } catch {
       setNotificationSetupError("No pudimos guardar la preferencia de email. Volvé a intentarlo.");
-    }
+    } finally { setNotificationSetupSaving(false); }
   };
   const completeNotificationSetup = async () => {
-    if (!notificationPreferences || (!notificationPreferences.desktopEnabled && !notificationPreferences.emailEnabled)) return;
+    if (!notificationPreferences) return;
     setNotificationSetupSaving(true);
     setNotificationSetupError("");
     try {
       await apiRequest("/api/notifications/preferences", "PUT", {
-        desktopEnabled: notificationPreferences.desktopEnabled,
-        emailEnabled: notificationPreferences.emailEnabled,
-        categoryPreferences: notificationPreferences.categoryPreferences ?? {},
-        discreetMode: notificationPreferences.discreetMode ?? true,
         setupCompleted: true,
       });
-      await refetchNotificationPreferences();
+      await queryClient.invalidateQueries({queryKey:["/api/notifications/preferences"]});
     } catch {
       setNotificationSetupError("No pudimos guardar la configuración. Volvé a intentarlo.");
     } finally {
@@ -421,13 +417,13 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
                   <DropdownMenuSeparator className="m-0" />
                   <div className="space-y-1.5 px-4 py-3">
                     <p className="text-[11px] font-semibold text-muted-foreground">Avisarme también por</p>
-                    <button type="button" aria-pressed={notificationPreferences.desktopEnabled} className="flex w-full items-center justify-between text-xs" onClick={() => void toggleDesktopNotifications()}>
+                    <button type="button" disabled={notificationSetupSaving || deviceQuery.isPending} aria-pressed={Boolean(deviceQuery.data?.connected && notificationPreferences.desktopEnabled)} className="flex w-full items-center justify-between text-xs" onClick={() => void toggleDesktopNotifications()}>
                       <span>Escritorio</span>
-                      <span className={cn("rounded-full px-2 py-0.5 text-[10px]", notificationPreferences.desktopEnabled ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500")}>
-                        {notificationPreferences.desktopEnabled ? "Activado" : "Desactivado"}
+                      <span className={cn("rounded-full px-2 py-0.5 text-[10px]", deviceQuery.data?.connected && notificationPreferences.desktopEnabled ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500")}>
+                        {deviceQuery.data?.connected ? notificationPreferences.desktopEnabled ? "Conectado" : "Pausado" : "Sin conectar"}
                       </span>
                     </button>
-                    <button type="button" aria-pressed={notificationPreferences.emailEnabled} className="flex w-full items-center justify-between text-xs" onClick={() => void saveNotificationPreferences({ ...notificationPreferences, emailEnabled: !notificationPreferences.emailEnabled })}>
+                    <button type="button" aria-pressed={notificationPreferences.emailEnabled} className="flex w-full items-center justify-between text-xs" onClick={() => {setNotificationSetupError("");void saveNotificationPreferences({ emailEnabled: !notificationPreferences.emailEnabled }).catch(()=>setNotificationSetupError("No pudimos guardar la preferencia de email."));}}>
                       <span>Email</span>
                       <span className={cn("rounded-full px-2 py-0.5 text-[10px]", notificationPreferences.emailEnabled ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500")}>
                         {notificationPreferences.emailEnabled ? "Activado" : "Desactivado"}
@@ -512,10 +508,10 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
 
       <GlobalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
 
-      <Dialog open={Boolean(user && notificationPreferences && !notificationPreferences.setupCompletedAt)} onOpenChange={() => {}}>
+      <Dialog open={Boolean(user && notificationPreferences?.availableCategories?.length && !notificationPreferences.setupCompletedAt)} onOpenChange={() => {}}>
         <DialogContent
           className="max-w-lg overflow-hidden rounded-[1.75rem] border-0 bg-white p-0 shadow-2xl [&>button:first-of-type]:hidden"
-          onEscapeKeyDown={(event) => event.preventDefault()}
+          onEscapeKeyDown={(event) => {event.preventDefault();if(!notificationSetupSaving) void completeNotificationSetup();}}
           onPointerDownOutside={(event) => event.preventDefault()}
           onInteractOutside={(event) => event.preventDefault()}
         >
@@ -525,12 +521,12 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
             <div className="relative mb-2 inline-flex w-fit items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.08] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-300"><Sparkles className="h-3 w-3 text-sky-300" /> Mind te mantiene al tanto</div>
             <DialogTitle className="relative text-2xl font-semibold tracking-tight text-white">No te pierdas lo importante</DialogTitle>
             <DialogDescription className="relative max-w-md text-sm leading-6 text-slate-300">
-              Elegí cómo querés enterarte cuando respondan en Mind, se complete una daily o te asignen una tarea.
+              Elegí cómo querés recibir avisos relevantes para tus permisos y responsabilidades. También podés usar solo la bandeja de Mind.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 px-6 pt-5 sm:px-8">
-            <div className={cn("flex items-center justify-between gap-3 rounded-2xl border p-4 transition-colors", notificationPreferences?.desktopEnabled ? "border-indigo-200 bg-indigo-50/70" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/70")}>
+            <div className={cn("flex items-center justify-between gap-3 rounded-2xl border p-4 transition-colors", deviceQuery.data?.connected && notificationPreferences?.desktopEnabled ? "border-indigo-200 bg-indigo-50/70" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/70")}>
               <div className="flex items-start gap-3">
                 <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><Monitor className="h-4 w-4" /></div>
                 <div>
@@ -538,8 +534,8 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
                   <p className="mt-0.5 text-xs leading-5 text-muted-foreground">Avisos del navegador incluso con Mind cerrado.</p>
                 </div>
               </div>
-              <Button size="sm" className="shrink-0 rounded-lg" variant={notificationPreferences?.desktopEnabled ? "secondary" : "outline"} disabled={!notificationPreferences || notificationPreferences.desktopEnabled || notificationSetupSaving} onClick={() => void enableDesktopDuringSetup()}>
-                {notificationPreferences?.desktopEnabled ? <><CheckCheck className="mr-1.5 h-3.5 w-3.5" />Activado</> : "Activar"}
+              <Button size="sm" className="shrink-0 rounded-lg" variant={deviceQuery.data?.connected && notificationPreferences?.desktopEnabled ? "secondary" : "outline"} disabled={!notificationPreferences || Boolean(deviceQuery.data?.connected && notificationPreferences.desktopEnabled) || notificationSetupSaving} onClick={() => void enableDesktopDuringSetup()}>
+                {deviceQuery.data?.connected && notificationPreferences?.desktopEnabled ? <><CheckCheck className="mr-1.5 h-3.5 w-3.5" />Activado</> : "Activar"}
               </Button>
             </div>
             <div className={cn("flex items-center justify-between gap-3 rounded-2xl border p-4 transition-colors", notificationPreferences?.emailEnabled ? "border-indigo-200 bg-indigo-50/70" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/70")}>
@@ -559,11 +555,11 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
           {notificationSetupError && <p role="alert" className="mx-6 mt-3 text-sm text-destructive sm:mx-8">{notificationSetupError}</p>}
 
           <DialogFooter className="mt-5 border-t border-slate-100 bg-slate-50/80 px-6 py-5 sm:flex-col sm:px-8">
-            <Button className="h-11 w-full rounded-xl bg-slate-900 font-semibold text-white shadow-sm hover:bg-indigo-700" disabled={!notificationPreferences?.desktopEnabled && !notificationPreferences?.emailEnabled || notificationSetupSaving} onClick={() => void completeNotificationSetup()}>
+            <Button className="h-11 w-full rounded-xl bg-slate-900 font-semibold text-white shadow-sm hover:bg-indigo-700" disabled={notificationSetupSaving} onClick={() => void completeNotificationSetup()}>
               {notificationSetupSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Continuar a Mind <ChevronRight className="ml-1 h-4 w-4" />
+              {!notificationPreferences?.desktopEnabled && !notificationPreferences?.emailEnabled ? "Configurar después" : "Continuar a Mind"} <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
-            <p className="w-full text-center text-xs leading-5 text-muted-foreground">Tus notificaciones se pueden pausar o ajustar por categoría desde Preferencias.</p>
+            <p className="w-full text-center text-xs leading-5 text-muted-foreground">La bandeja de notificaciones está disponible aunque no actives escritorio o email.</p>
           </DialogFooter>
         </DialogContent>
       </Dialog>

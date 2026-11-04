@@ -18,6 +18,14 @@ self.addEventListener("push", (event) => {
   const testId = typeof payload.testId === "string" ? payload.testId : null;
   event.waitUntil((async () => {
     try {
+      // A queued push can arrive after logout or an account switch. Confirm the
+      // current account before displaying any personal content on this device.
+      if (typeof payload.userId === "number") {
+        const response = await fetch("/api/current-user", { credentials:"include",cache:"no-store",signal:AbortSignal.timeout(5000) });
+        if (!response.ok) return;
+        const user = await response.json();
+        if (user.id !== payload.userId) return;
+      }
       await self.registration.showNotification(title, options);
       if (testId) {
         const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });

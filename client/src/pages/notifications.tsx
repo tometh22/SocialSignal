@@ -1,3 +1,4 @@
+import { groupNotifications, defaultNotificationSettings, safeNotificationPath, type NotificationSettings } from "@shared/utils/notification-policy";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { authFetch, apiRequest } from "@/lib/queryClient";
-import { disableWebPush, enableWebPush } from "@/lib/notification-push";
+import { disableWebPush, enableWebPush, getWebPushState } from "@/lib/notification-push";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -22,10 +23,15 @@ type ProductNotification = {
   actionUrl: string | null;
   readAt: string | null;
   createdAt: string;
+  threadKey?: string | null;
+  muted?: boolean;
 };
 type Category = "mind" | "daily" | "tasks" | "crm" | "team" | "quotations";
 type CategoryChannelPreferences = Record<string, { desktop?: boolean; email?: boolean }>;
 type NotificationPreferences = {
+  emailSuppressed?: boolean;
+  settings?: NotificationSettings;
+  availableCategories?: Category[];
   desktopEnabled: boolean;
   emailEnabled: boolean;
   discreetMode?: boolean;
@@ -44,14 +50,10 @@ const categories: { key: Category; label: string; detail: string }[] = [
   { key: "team", label: "Equipo", detail: "Solicitudes y decisiones de ausencias" },
 ];
 
-function notificationHref(item: ProductNotification) {
-  if (item.actionUrl?.startsWith("/") && !item.actionUrl.startsWith("//")) return item.actionUrl;
-  if (item.type.startsWith("mind_")) return item.entityId ? `/review/${item.entityId}` : "/review";
-  if (item.type.startsWith("task_")) return "/tasks/my-tasks";
-  if (item.type.startsWith("crm_")) return item.entityId ? `/crm/${item.entityId}` : "/crm";
-  if (item.type.startsWith("quotation_")) return item.entityId ? `/quotations/${item.entityId}#commercial-approval` : "/manage-quotes";
-  if (item.type.startsWith("absence")) return "/absences";
-  return "/";
+function notificationHref(item: ProductNotification) { return safeNotificationPath(item.actionUrl); }
+
+function deliveryStatusLabel(status:string) {
+  return ({pending:"Pendiente",processing:"En proceso",sent:"Aceptado",accepted:"Aceptado",failed:"Fallido",cancelled:"Cancelado",delivered:"Entregado",delivery_delayed:"Demorado",bounced:"Rebotó",complained:"Marcado como spam",suppressed:"Bloqueado",uncertain:"Revisar proveedor"} as Record<string,string>)[status]??status;
 }
 
 function typeStyle(type: string) {
@@ -75,30 +77,8 @@ function dayGroup(dateValue: string) {
 }
 
 function formatTime(dateValue: string) {
-  return new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit" }).format(new Date(dateValue));
-}
-
-function groupNotifications(items: ProductNotification[]): NotificationGroup[] {
-  const groups: NotificationGroup[] = [];
-  const activeGroups = new Map<string, NotificationGroup>();
-  for (const item of items) {
-    const groupable = ["mind_reply", "mind_daily", "task_reply"].includes(item.type);
-    const itemDate = new Date(item.createdAt);
-    const date = `${itemDate.getFullYear()}-${itemDate.getMonth() + 1}-${itemDate.getDate()}`;
-    const destination = item.actionUrl || `${item.entityType ?? "notice"}:${item.entityId ?? item.id}`;
-    const baseKey = groupable ? `${date}:${item.type}:${destination}` : `item:${item.id}`;
-    const current = activeGroups.get(baseKey);
-    const withinWindow = current && Date.now() - new Date(current.latest.createdAt).getTime() <= (item.type === "mind_daily" ? 24 : 4) * 60 * 60 * 1000;
-    if (current && withinWindow) {
-      current.items.push(item);
-      if (!item.readAt) current.unreadIds.push(item.id);
-    } else {
-      const group = { key: `${baseKey}:${item.id}`, items: [item], latest: item, unreadIds: item.readAt ? [] : [item.id] };
-      groups.push(group);
-      if (groupable) activeGroups.set(baseKey, group);
-    }
-  }
-  return groups;
+  const date=new Date(dateValue);
+  return new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit",...(dayGroup(dateValue)==="Hoy"?{}:{day:"2-digit",month:"2-digit",...(date.getFullYear()!==new Date().getFullYear()?{year:"numeric"}:{})}) } as Intl.DateTimeFormatOptions).format(date);
 }
 
 export default function NotificationsPage() {
@@ -106,6 +86,9 @@ export default function NotificationsPage() {
   const { user } = useAuth();
   const userId = (user as any)?.id;
   const [desktopStatus, setDesktopStatus] = useState("");
+  const [deviceBusy, setDeviceBusy] = useState(false);
+  const deviceQuery = useQuery({ queryKey:["notification-device",userId],queryFn:getWebPushState,enabled:Boolean(userId),refetchOnWindowFocus:true,staleTime:0 });
+  const devicesQuery = useQuery<{ id:number; userAgent:string|null; current:boolean }[]>({ queryKey:["notification-devices",userId],queryFn:async()=>{const r=await authFetch("/api/notifications/push/devices"); if(!r.ok) throw new Error("No se pudieron cargar los dispositivos"); return r.json();},enabled:Boolean(userId) });
   const [unreadOnly, setUnreadOnly] = useState(false);
   const preferencesQuery = useQuery<NotificationPreferences>({
     queryKey: ["/api/notifications/preferences", userId],
@@ -128,6 +111,8 @@ export default function NotificationsPage() {
     },
     getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor : undefined,
     enabled: Boolean(userId),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
   const items = useMemo(() => notificationQuery.data?.pages.flatMap((page) => page.items) ?? [], [notificationQuery.data]);
   const groups = useMemo(() => groupNotifications(items), [items]);
@@ -143,9 +128,11 @@ export default function NotificationsPage() {
   }, [pushTestCooldown]);
 
   const markOneMutation = useMutation({
-    mutationFn: (ids: number[]) => ids.length === 1
-      ? apiRequest(`/api/notifications/${ids[0]}/read`, "PATCH")
-      : apiRequest("/api/notifications/read-many", "PATCH", { ids }),
+    mutationFn: async (ids: number[]) => {
+      for (let offset=0;offset<ids.length;offset+=100) {
+        await apiRequest("/api/notifications/read-many","PATCH",{ids:ids.slice(offset,offset+100)});
+      }
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
     },
@@ -155,13 +142,8 @@ export default function NotificationsPage() {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["/api/notifications"] }),
   });
   const savePreferencesMutation = useMutation({
-    mutationFn: (next: NotificationPreferences) => apiRequest("/api/notifications/preferences", "PUT", {
-      desktopEnabled: next.desktopEnabled,
-      emailEnabled: next.emailEnabled,
-      categoryPreferences: next.categoryPreferences ?? {},
-      discreetMode: next.discreetMode ?? true,
-    }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["/api/notifications/preferences"] }),
+    mutationFn: (next: Partial<NotificationPreferences>) => apiRequest("/api/notifications/preferences", "PUT", next),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/notifications/preferences"] }),
   });
   const testPushMutation = useMutation({
     mutationFn: async () => {
@@ -211,8 +193,8 @@ export default function NotificationsPage() {
     onSuccess: ({ shown }) => {
       setPushTestCooldown(30);
       setPushTestStatus(shown
-        ? { kind: "success", message: "Chrome recibió la prueba y creó la notificación. Si no viste el aviso en pantalla, revisá el Centro de notificaciones de macOS." }
-        : { kind: "warning", message: "El servicio aceptó el envío, pero Chrome no confirmó que lo haya recibido. Revisá que Mind esté abierto en este mismo perfil de Chrome y volvé a activar las notificaciones." });
+        ? { kind: "success", message: "El navegador recibió la prueba y creó la notificación. Si no viste el aviso en pantalla, revisá el centro de notificaciones del sistema." }
+        : { kind: "warning", message: "El servicio aceptó el envío, pero el navegador no confirmó que lo haya recibido. Revisá que Mind esté abierto en este mismo perfil del navegador y volvé a activar las notificaciones." });
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : "No pudimos enviar el aviso de prueba.";
@@ -228,11 +210,25 @@ export default function NotificationsPage() {
     if (!preferences) return;
     const current = preferences.categoryPreferences ?? {};
     void savePreferencesMutation.mutate({
-      ...preferences,
-      categoryPreferences: { ...current, [category]: { ...current[category], [channel]: enabled } },
+      categoryPreferences: { [category]: { [channel]: enabled } },
     });
   };
 
+  type DeliveryOverview={configured:boolean;provider:string|null;webhookConfigured:boolean;counts:Record<string,number>;deliveryCounts:Record<string,number>;pushCounts:Record<string,number>;attention:{id:number;status:string;lastError:string|null;title:string}[];providerLogs:{idempotency_key:string;provider:string;recipient:string;status:string;delivery_status:string|null;last_error:string|null}[]};
+  const isAdmin=Boolean(user?.isAdmin || user?.role === "admin");
+  const deliveryQuery=useQuery<DeliveryOverview>({queryKey:["notification-delivery-overview",userId],queryFn:async()=>{const r=await authFetch("/api/admin/notification-email-deliveries");if(!r.ok)throw new Error("No se pudieron cargar los envíos");return r.json();},enabled:isAdmin,refetchInterval:30_000});
+  const retryDelivery=useMutation({mutationFn:(id:number)=>apiRequest(`/api/admin/notification-email-deliveries/${id}/retry`,"POST"),onSuccess:()=>deliveryQuery.refetch()});
+  const releaseSuppression=useMutation({mutationFn:(email:string)=>apiRequest("/api/admin/notification-email-suppressions/release","POST",{email}),onSuccess:()=>queryClient.invalidateQueries({queryKey:["/api/notifications/preferences"]})});
+  const muteMutation = useMutation({ mutationFn:({id,muted}:{id:number;muted:boolean})=>apiRequest(`/api/notifications/${id}/mute`,"POST",{muted}),onSuccess:()=>queryClient.invalidateQueries({queryKey:["/api/notifications"]}) });
+  const removeDevice = useMutation({mutationFn:(id:number)=>apiRequest(`/api/notifications/push/devices/${id}`,"DELETE"),onSuccess:async()=>{await Promise.all([deviceQuery.refetch(),devicesQuery.refetch()]);}});
+  const settings = preferences?.settings ?? defaultNotificationSettings;
+  const updateSettings = (patch: Partial<NotificationSettings>) => savePreferencesMutation.mutate({settings:{...settings,...patch}});
+  const connectDevice = async () => {
+    setDeviceBusy(true); setDesktopStatus("");
+    try { await enableWebPush(); await savePreferencesMutation.mutateAsync({desktopEnabled:true}); await Promise.all([deviceQuery.refetch(),devicesQuery.refetch()]);setDesktopStatus("Este navegador está conectado."); }
+    catch(error) { setDesktopStatus(error instanceof Error ? error.message : "No pudimos conectar el navegador."); }
+    finally {setDeviceBusy(false);}
+  };
   const sections = useMemo(() => {
     const byDay = new Map<string, NotificationGroup[]>();
     for (const group of groups) {
@@ -276,9 +272,10 @@ export default function NotificationsPage() {
       </header>
 
       {markAllMutation.isError && <p role="alert" className="text-sm text-destructive">No pudimos actualizar los avisos. Volvé a intentarlo.</p>}
+      {muteMutation.isError && <p role="alert" className="text-sm text-destructive">No pudimos cambiar los avisos de esta conversación.</p>}
       {markOneMutation.isError && <p role="alert" className="text-sm text-destructive">No pudimos marcar el aviso como leído. Volvé a intentarlo.</p>}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <section aria-label="Historial de notificaciones" className="min-w-0 rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
             <div>
@@ -320,7 +317,7 @@ export default function NotificationsPage() {
                       const Icon = style.icon;
                       const isUnread = group.unreadIds.length > 0;
                       const displayTitle = group.items.length > 1
-                        ? item.type === "mind_daily" ? `${group.items.length} dailies completadas` : `${group.items.length} respuestas nuevas`
+                        ? item.type === "mind_daily" ? `${group.items.length} dailies completadas` : `${group.unreadIds.length || group.items.length} respuestas${group.unreadIds.length ? " nuevas" : ""}`
                         : item.title;
                       const markGroupRead = () => group.unreadIds.length && markOneMutation.mutate(group.unreadIds);
                       return (
@@ -347,6 +344,7 @@ export default function NotificationsPage() {
                                   <Check className="h-3.5 w-3.5" /> Marcar leído
                                 </button>
                               )}
+                              {item.threadKey && <button type="button" disabled={muteMutation.isPending} className="text-xs text-slate-500 hover:underline" onClick={()=>muteMutation.mutate({id:item.id,muted:!item.muted})}>{item.muted ? "Volver a avisar" : "Silenciar avisos"}</button>}
                               <time className="ml-auto text-[11px] tabular-nums text-slate-400" dateTime={item.createdAt}>{formatTime(item.createdAt)}</time>
                             </div>
                           </div>
@@ -374,26 +372,23 @@ export default function NotificationsPage() {
               <div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700"><Settings2 className="h-5 w-5" /></div>
               <div><h2 className="font-semibold text-slate-900">Cómo querés recibirlas</h2><p className="mt-1 text-xs leading-5 text-slate-500">Elegí tus canales y ajustá cada tipo de aviso.</p></div>
             </div>
+            {preferencesQuery.isPending && <p role="status" className="mt-4 text-xs text-slate-500">Cargando preferencias…</p>}
+            {preferencesQuery.isError && <p role="alert" className="mt-4 text-xs text-destructive">No pudimos cargar tus preferencias. <button className="underline" onClick={()=>void preferencesQuery.refetch()}>Reintentar</button></p>}
             {preferences && (
               <div className="mt-5 space-y-3">
                   <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-3.5 py-3">
-                  <div className="flex items-center gap-2.5"><Monitor className="h-4 w-4 text-slate-500" /><div><p className="text-sm font-medium text-slate-800">Escritorio</p><p className="text-[10px] text-slate-500">Incluso con Mind cerrado</p></div></div>
-                  <Switch checked={preferences.desktopEnabled} aria-label="Activar notificaciones de escritorio" onCheckedChange={(checked) => {
-                    setDesktopStatus("");
-                    const request = async () => {
-                      try {
-                        if (checked) await enableWebPush();
-                        else await disableWebPush();
-                        setDesktopStatus(checked ? "Este dispositivo ya puede recibir avisos aunque Mind esté cerrado." : "Se desactivaron los avisos en este dispositivo.");
-                        savePreferencesMutation.mutate({ ...preferences, desktopEnabled: checked });
-                      } catch {
-                        setDesktopStatus("No pudimos conectar este dispositivo. Revisá el permiso del navegador y volvé a intentar.");
-                      }
-                    };
-                    void request();
-                  }} />
+                  <div className="flex items-center gap-2.5"><Monitor className="h-4 w-4 text-slate-500" /><div><p className="text-sm font-medium text-slate-800">Escritorio</p><p className="text-[10px] text-slate-500">Preferencia para todos tus dispositivos</p></div></div>
+                  <Switch checked={preferences.desktopEnabled} disabled={savePreferencesMutation.isPending} aria-label="Activar avisos de escritorio en todos los dispositivos" onCheckedChange={checked=>savePreferencesMutation.mutate({desktopEnabled:checked})} />
                 </div>
-                {preferences.desktopEnabled && (
+                <div className="rounded-2xl border border-slate-200 p-3.5 space-y-2">
+                  <p className="text-xs font-semibold">Este navegador</p>
+                  <p role="status" className="text-xs text-slate-500">{deviceQuery.isError ? "No pudimos comprobar la conexión." : deviceQuery.isPending ? "Comprobando…" : !deviceQuery.data?.supported ? "No admite Web Push. Podés usar email o la bandeja." : deviceQuery.data.connected ? preferences.desktopEnabled ? "Conectado" : "Conectado · avisos pausados" : deviceQuery.data.permission === "denied" ? "Permiso bloqueado. Habilitalo desde los ajustes del sitio." : "Sin conectar"}</p>
+                  {!deviceQuery.data?.connected && deviceQuery.data?.supported && <Button size="sm" variant="outline" disabled={deviceBusy} onClick={()=>void connectDevice()}>{deviceBusy?"Conectando…":"Conectar este navegador"}</Button>}
+                  {deviceQuery.data?.connected && <Button size="sm" variant="outline" disabled={deviceBusy} onClick={async()=>{setDeviceBusy(true);try{await disableWebPush();await Promise.all([deviceQuery.refetch(),devicesQuery.refetch()]);}catch{setDesktopStatus("No pudimos desconectar el navegador.");}finally{setDeviceBusy(false);}}}>Desconectar este navegador</Button>}
+                  {devicesQuery.data?.filter(d=>!d.current).map(d=><div key={d.id} className="flex items-center justify-between gap-2 text-xs"><span className="truncate" title={d.userAgent??""}>{d.userAgent?.includes("Edg/")?"Edge":d.userAgent?.includes("Firefox/")?"Firefox":d.userAgent?.includes("Chrome/")?"Chrome":"Otro navegador"} · dispositivo {d.id}</span><button className="underline" disabled={removeDevice.isPending} onClick={()=>removeDevice.mutate(d.id)}>Desconectar</button></div>)}
+                  {(devicesQuery.isError || removeDevice.isError) && <p role="alert" className="text-xs text-destructive">No pudimos actualizar tus dispositivos.</p>}
+                </div>
+                {preferences.desktopEnabled && deviceQuery.data?.connected && (
                   <>
                   <div className="flex items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/50 px-3.5 py-3">
                     <div className="min-w-0"><p className="text-xs font-medium text-slate-800">Comprobá este dispositivo</p><p className="text-[10px] text-slate-500">Te enviamos un aviso de prueba.</p></div>
@@ -418,15 +413,28 @@ export default function NotificationsPage() {
                 )}
                 <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-3.5 py-3">
                   <div className="flex items-center gap-2.5"><Mail className="h-4 w-4 text-slate-500" /><div><p className="text-sm font-medium text-slate-800">Email</p><p className="text-[10px] text-slate-500">A tu correo de Mind</p></div></div>
-                  <Switch checked={preferences.emailEnabled} aria-label="Activar notificaciones por email" onCheckedChange={(checked) => void savePreferencesMutation.mutate({ ...preferences, emailEnabled: checked })} />
+                  <Switch checked={preferences.emailEnabled} aria-label="Activar notificaciones por email" disabled={savePreferencesMutation.isPending} onCheckedChange={(checked) => void savePreferencesMutation.mutate({ emailEnabled: checked })} />
                 </div>
+                {preferences.emailSuppressed && <p role="alert" className="text-xs text-destructive">El proveedor bloqueó los envíos a tu dirección por un rebote o una queja. Administración debe revisar tu correo antes de reactivarlos.</p>}
                 <div className="flex items-center justify-between rounded-2xl border border-indigo-100 bg-indigo-50/60 px-3.5 py-3">
                   <div className="pr-3"><p className="text-sm font-medium text-slate-800">Vista privada</p><p className="text-[10px] leading-4 text-slate-500">Oculta los detalles en pantalla y correo.</p></div>
-                  <Switch checked={preferences.discreetMode !== false} aria-label="Ocultar detalles sensibles en notificaciones" onCheckedChange={(checked) => void savePreferencesMutation.mutate({ ...preferences, discreetMode: checked })} />
+                  <Switch checked={preferences.discreetMode !== false} aria-label="Ocultar detalles sensibles en notificaciones" disabled={savePreferencesMutation.isPending} onCheckedChange={(checked) => void savePreferencesMutation.mutate({ discreetMode: checked })} />
                 </div>
             <p className="px-1 text-[11px] leading-5 text-slate-500">{desktopStatus || "Los avisos de escritorio requieren permiso en cada navegador y dispositivo."} Podés cambiar la configuración cuando quieras.</p>
               </div>
             )}
+            {preferences && <fieldset disabled={savePreferencesMutation.isPending} className="mt-5 space-y-3 border-t pt-4">
+              <legend className="text-sm font-semibold">Frecuencia y descanso</legend>
+              <label className="block text-xs">Mails de conversaciones y dailies
+                <select className="mt-1 w-full rounded-lg border p-2 bg-white" value={settings.activityEmailMode} onChange={e=>updateSettings({activityEmailMode:e.target.value as NotificationSettings["activityEmailMode"]})}><option value="daily">Resumen diario</option><option value="immediate">En el momento</option><option value="off">Solo en la bandeja y escritorio</option></select>
+              </label>
+              <p className="text-xs text-slate-500">Las asignaciones, aprobaciones y recordatorios se envían en el momento, respetando tus horarios.</p>
+              {settings.activityEmailMode === "daily" && <label className="block text-xs">Hora del resumen<select className="ml-2 rounded border p-1" value={settings.digestHour} onChange={e=>updateSettings({digestHour:Number(e.target.value)})}>{Array.from({length:24},(_,h)=><option key={h} value={h}>{String(h).padStart(2,"0")}:00</option>)}</select></label>}
+              <label className="flex items-center justify-between text-xs">Horario silencioso<Switch checked={settings.quietHours.enabled} onCheckedChange={enabled=>updateSettings({quietHours:{...settings.quietHours,enabled}})} /></label>
+              {settings.quietHours.enabled && <div className="flex gap-3 text-xs">{(["start","end"] as const).map(key=><label key={key}>{key==="start"?"Desde":"Hasta"}<select className="ml-2 rounded border p-1" value={settings.quietHours[key]} onChange={e=>updateSettings({quietHours:{...settings.quietHours,[key]:Number(e.target.value)}})}>{Array.from({length:24},(_,h)=><option key={h} value={h}>{String(h).padStart(2,"0")}:00</option>)}</select></label>)}</div>}
+              <label className="block text-xs">Zona horaria<select className="mt-1 w-full rounded border p-2 bg-white" value={settings.timeZone} onChange={e=>updateSettings({timeZone:e.target.value})}>{[...new Set([settings.timeZone,Intl.DateTimeFormat().resolvedOptions().timeZone,"America/Argentina/Buenos_Aires","America/Mexico_City","America/Bogota","America/Santiago","Europe/Madrid","UTC"])].map(zone=><option key={zone} value={zone}>{zone}</option>)}</select></label>
+              <p className="text-xs text-slate-500">El horario silencioso demora mails y push. La bandeja sigue disponible.</p>
+            </fieldset>}
             {savePreferencesMutation.isError && <p role="alert" className="mt-3 text-xs text-destructive">No pudimos guardar tus preferencias. Probá otra vez.</p>}
           </section>
 
@@ -434,7 +442,7 @@ export default function NotificationsPage() {
             <div className="mb-4"><h2 className="font-semibold text-slate-900">Elegí qué te llega</h2><p className="mt-1 text-xs leading-5 text-slate-500">Ajustá escritorio y email por categoría.</p></div>
             <div className="space-y-1">
               <div className="grid grid-cols-[minmax(0,1fr)_44px_44px] items-center px-2 pb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400"><span>Tipo de aviso</span><span className="text-center">PC</span><span className="text-center">Mail</span></div>
-              {categories.map((category) => {
+              {categories.filter(category=>preferences?.availableCategories?.includes(category.key)).map((category) => {
                 const saved = preferences?.categoryPreferences?.[category.key] ?? {};
                 return (
                   <div key={category.key} className="grid grid-cols-[minmax(0,1fr)_44px_44px] items-center gap-1 rounded-xl px-2 py-2.5 hover:bg-slate-50">
@@ -447,6 +455,21 @@ export default function NotificationsPage() {
             </div>
             <div className="mt-4 flex items-start gap-2 rounded-2xl bg-indigo-50 px-3.5 py-3 text-xs leading-5 text-indigo-900"><Circle className="mt-1 h-2 w-2 shrink-0 fill-indigo-500 text-indigo-500" /><p>El centro de notificaciones conserva tu historial aunque pauses los avisos por escritorio o email.</p></div>
           </section>
+          {isAdmin && <section className="rounded-3xl border border-slate-200 bg-white p-5 space-y-3">
+            <h2 className="font-semibold">Estado de los envíos</h2>
+            {deliveryQuery.isPending && <p role="status" className="text-xs">Cargando envíos…</p>}
+            {deliveryQuery.isError && <p role="alert" className="text-xs text-destructive">No pudimos consultar los envíos.</p>}
+            {deliveryQuery.data && <>
+              <p className="text-xs">Email: {deliveryQuery.data.configured ? deliveryQuery.data.provider : "sin configurar"} · Confirmación de entrega: {deliveryQuery.data.webhookConfigured ? "configurada" : "sin configurar"}</p>
+              <dl className="grid grid-cols-2 gap-2 text-xs">{[["Mails pendientes",deliveryQuery.data.counts.pending??0],["Mails fallidos",deliveryQuery.data.counts.failed??0],["Entregados",deliveryQuery.data.deliveryCounts.delivered??0],["Rebotes",deliveryQuery.data.deliveryCounts.bounced??0],["Push pendientes",deliveryQuery.data.pushCounts.pending??0],["Push fallidos",deliveryQuery.data.pushCounts.failed??0]].map(([label,value])=><div key={label} className="rounded-lg bg-slate-50 p-2"><dt>{label}</dt><dd className="font-semibold">{value}</dd></div>)}</dl>
+              <p className="text-xs text-slate-500">Aceptado significa que el proveedor recibió el pedido. Entregado confirma llegada al servidor del destinatario.</p>
+              {deliveryQuery.data.attention.slice(0,8).map(d=><div key={d.id} className="border-t pt-2 text-xs"><p>{d.title} · {deliveryStatusLabel(d.status)}</p>{d.lastError&&<p className="mt-1 text-slate-500">{d.lastError}</p>}{d.status==="failed"&&<button className="mt-1 underline" disabled={retryDelivery.isPending} onClick={()=>retryDelivery.mutate(d.id)}>Reintentar envío</button>}</div>)}
+              {!!deliveryQuery.data.providerLogs.length && <details className="text-xs"><summary className="cursor-pointer font-medium">Todos los correos · últimos envíos</summary>{deliveryQuery.data.providerLogs.map(d=><div key={d.idempotency_key} className="border-t mt-2 pt-2 break-all"><p>{d.recipient}</p><p>{d.provider} · {deliveryStatusLabel(d.delivery_status??d.status)}</p>{d.last_error&&<p className="text-destructive">{d.last_error}</p>}{["bounced","complained","suppressed"].includes(d.delivery_status??"")&&<div className="mt-1"><p className="text-slate-500">Corregí la dirección o resolvé el bloqueo en el proveedor antes de habilitar nuevos avisos.</p><button className="mt-1 underline" disabled={releaseSuppression.isPending} onClick={()=>releaseSuppression.mutate(d.recipient)}>Habilitar avisos tras revisión</button></div>}</div>)}</details>}
+            </>}
+            {releaseSuppression.isSuccess&&<p role="status" className="text-xs">Se habilitaron los nuevos avisos para la dirección revisada.</p>}
+            {releaseSuppression.isError&&<p role="alert" className="text-xs text-destructive">No pudimos habilitar esa dirección.</p>}
+            {retryDelivery.isError && <p role="alert" className="text-xs text-destructive">No pudimos reencolar el envío.</p>}
+          </section>}
         </aside>
       </div>
     </div>

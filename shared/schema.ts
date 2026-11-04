@@ -1538,6 +1538,7 @@ export const userNotifications = pgTable("user_notifications", {
   entityType: text("entity_type"),
   entityId: integer("entity_id"),
   actionUrl: text("action_url"),
+  threadKey: text("thread_key"),
   readAt: timestamp("read_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
@@ -1552,6 +1553,7 @@ export const userNotificationPreferences = pgTable("user_notification_preference
   categoryPreferences: jsonb("category_preferences").$type<Record<string, { desktop?: boolean; email?: boolean }>>().notNull().default({}),
   discreetMode: boolean("discreet_mode").notNull().default(true),
   setupCompletedAt: timestamp("setup_completed_at"),
+  settings: jsonb("settings").$type<import("./utils/notification-policy").NotificationSettings>().notNull().default({ activityEmailMode: "daily", digestHour: 9, timeZone: "America/Argentina/Buenos_Aires", quietHours: { enabled: false, start: 20, end: 9 } }),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
@@ -1562,6 +1564,7 @@ export const userNotificationPushSubscriptions = pgTable("user_notification_push
   p256dh: text("p256dh").notNull(),
   auth: text("auth").notNull(),
   userAgent: text("user_agent"),
+  deviceToken: text("device_token"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({ byUser: index("user_notification_push_subscriptions_user_idx").on(table.userId) }));
@@ -1572,17 +1575,72 @@ export const userNotificationEmailDeliveries = pgTable("user_notification_email_
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   status: text("status").notNull().default("pending"),
   attempts: integer("attempts").notNull().default(0),
-  nextAttemptAt: timestamp("next_attempt_at").notNull().defaultNow(),
-  lockedAt: timestamp("locked_at"),
-  sentAt: timestamp("sent_at"),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+  lockedAt: timestamp("locked_at", { withTimezone: true }),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
   resendEmailId: text("resend_email_id"),
+  batchKey: text("batch_key"),
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+  deliveryStatus: text("delivery_status"),
+  deliveryProvider: text("delivery_provider").notNull().default("resend"),
   lastError: text("last_error"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   dueEmails: index("user_notification_email_due_idx").on(table.status, table.nextAttemptAt),
 }));
 export type UserNotificationPreferences = typeof userNotificationPreferences.$inferSelect;
+
+export const userNotificationPushDeliveries = pgTable("user_notification_push_deliveries", {
+  id: serial("id").primaryKey(),
+  notificationId: integer("notification_id").notNull().references(() => userNotifications.id, { onDelete: "cascade" }),
+  subscriptionId: integer("subscription_id").notNull().references(() => userNotificationPushSubscriptions.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+  lockedAt: timestamp("locked_at", { withTimezone: true }),
+  lastError: text("last_error"),
+}, t => ({ once: unique().on(t.notificationId, t.subscriptionId), due: index("notification_push_due_idx").on(t.status, t.nextAttemptAt) }));
+
+export const userNotificationThreadMutes = pgTable("user_notification_thread_mutes", {
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  threadKey: text("thread_key").notNull(),
+}, t => ({ pk: primaryKey({ columns: [t.userId, t.threadKey] }) }));
+
+export const notificationEmailBatches = pgTable("notification_email_batches", {
+  batchKey: text("batch_key").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  payload: jsonb("payload"),
+  providerId: text("provider_id"),
+  status: text("status").notNull().default("pending"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const notificationEmailEvents = pgTable("notification_email_events", {
+  eventId: text("event_id").primaryKey(),
+  providerId: text("provider_id").notNull(),
+  provider: text("provider").notNull().default("resend"),
+  type: text("type").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+}, t => ({ byProvider: index("notification_email_events_provider_idx").on(t.providerId) }));
+
+export const notificationEmailSuppressions = pgTable("notification_email_suppressions", {
+  email: text("email").primaryKey(),
+  reason: text("reason").notNull(),
+});
+
+export const transactionalEmailDeliveries = pgTable("transactional_email_deliveries", {
+  idempotencyKey: text("idempotency_key").primaryKey(),
+  payloadHash: text("payload_hash").notNull(),
+  provider: text("provider").notNull(),
+  providerId: text("provider_id"),
+  recipient: text("recipient").notNull(),
+  status: text("status").notNull().default("processing"),
+  deliveryStatus: text("delivery_status"),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => ({ byProvider: index("transactional_email_provider_idx").on(t.providerId) }));
 
 export type AbsenceAllowance = typeof absenceAllowances.$inferSelect;
 export type AbsenceEvent = typeof absenceEvents.$inferSelect;

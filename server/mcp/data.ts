@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { mindResources } from "./catalog";
+import { notificationInboxRowPolicy } from "../services/notification-access";
 
 type Field = { type: string; sqlType: string };
 type Resource = { name: string; table: string; module: string; description: string; permissions: readonly string[];
@@ -66,7 +67,8 @@ function rowPolicy(u: User, r: Resource): string {
     return policy;
   }
   if (r.module === "chat") return `EXISTS (SELECT 1 FROM chat_conversation_participants cp WHERE cp.conversation_id=${r.table === "chat_conversations" ? "t.id" : "t.conversation_id"} AND cp.user_id=$1)`;
-  if (["user_notifications", "user_notification_preferences", "personal_fx_overrides"].includes(r.table)) return "t.user_id=$1";
+  if(r.table === "user_notifications") return `t.user_id=$1 AND ${notificationInboxRowPolicy}`;
+  if (["user_notification_preferences", "personal_fx_overrides"].includes(r.table)) return "t.user_id=$1";
   if (["personnel_absences", "absence_allowances"].includes(r.table)) return has(u, "operations") ? "TRUE" : `t.personnel_id IN (${ownPerson})`;
   if (r.table === "absence_events") return has(u, "operations") ? "TRUE" : `EXISTS (SELECT 1 FROM personnel_absences a WHERE a.id=t.absence_id AND a.personnel_id IN (${ownPerson}))`;
   if (r.table === "personal_monthly_invoices") return has(u, "finance") ? "TRUE" : "t.user_id=$1";

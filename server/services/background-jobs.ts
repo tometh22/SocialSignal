@@ -29,11 +29,6 @@ export async function startBackgroundJobs() {
     startDailySoTSync();
     console.log("📅 [SoT Sync] Pipeline completo programado cada 6 horas");
 
-    // Start CRM reminder notifications job
-    const { startReminderNotifications } = await import("../jobs/reminder-notifications");
-    startReminderNotifications();
-    console.log("🔔 Job de notificaciones de recordatorios CRM iniciado");
-
     // IPC sync (API pública ArgentinaDatos) + detección de ajustes de
     // precio vencidos para contratos recurrentes en ARS. Sólo deja
     // propuestas "pending_approval" — nunca cambia un precio ni manda un
@@ -42,6 +37,11 @@ export async function startBackgroundJobs() {
     startIpcPriceAdjustmentsJob();
     console.log("📈 Job de ajuste de precio por IPC iniciado (diario)");
   }
+
+  // Start CRM reminder notifications job
+  const { startReminderNotifications } = await import("../jobs/reminder-notifications");
+  startReminderNotifications();
+  console.log("🔔 Job de notificaciones de recordatorios CRM iniciado");
 
   if (process.env.DISABLE_TEAM_PAYROLL !== "true") {
     const { startTeamPayroll } = await import("../jobs/team-payroll");

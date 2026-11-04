@@ -339,34 +339,36 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
           }))
         : [];
 
-      const [row] = await db.insert(reviewDailySessions).values({
-        roomId,
-        userId,
-        startedAt: started,
-        finishedAt: finished,
-        durationSeconds,
-        reviewedCount: Number.isFinite(reviewedCount) ? Math.max(0, Math.trunc(reviewedCount)) : 0,
-        changedCount: Number.isFinite(changedCount) ? Math.max(0, Math.trunc(changedCount)) : 0,
-        summary: cleanSummary,
-      }).returning();
+      const row = await db.transaction(async tx => {
+        const [row] = await tx.insert(reviewDailySessions).values({
+          roomId,
+          userId,
+          startedAt: started,
+          finishedAt: finished,
+          durationSeconds,
+          reviewedCount: Number.isFinite(reviewedCount) ? Math.max(0, Math.trunc(reviewedCount)) : 0,
+          changedCount: Number.isFinite(changedCount) ? Math.max(0, Math.trunc(changedCount)) : 0,
+          summary: cleanSummary,
+        }).returning();
 
-      // Hacer la daily cuenta como visita al room.
-      await db.update(reviewRoomMembers).set({ lastVisitedAt: finished })
-        .where(and(eq(reviewRoomMembers.roomId, roomId), eq(reviewRoomMembers.userId, userId)));
+        // Hacer la daily cuenta como visita al room.
+        await tx.update(reviewRoomMembers).set({ lastVisitedAt: finished })
+          .where(and(eq(reviewRoomMembers.roomId, roomId), eq(reviewRoomMembers.userId, userId)));
 
-      const members = await db.select({ userId: reviewRoomMembers.userId }).from(reviewRoomMembers)
-        .where(eq(reviewRoomMembers.roomId, roomId));
-      const [room] = await db.select({ name: reviewRooms.name }).from(reviewRooms).where(eq(reviewRooms.id, roomId)).limit(1);
-      await createUserNotifications(members.map((member) => member.userId).filter((id) => id !== userId), {
-        eventKey: `mind-daily:${row.id}`,
-        type: "mind_daily",
-        title: "Daily completada",
-        message: `${(req.user as any)?.firstName || "Alguien"} completó la daily de ${room?.name || "Mind"}.`,
-        entityType: "review_room",
-        entityId: roomId,
-        actionUrl: `/review/${roomId}`,
+        const members = await tx.select({ userId: reviewRoomMembers.userId }).from(reviewRoomMembers)
+          .where(eq(reviewRoomMembers.roomId, roomId));
+        const [room] = await tx.select({ name: reviewRooms.name }).from(reviewRooms).where(eq(reviewRooms.id, roomId)).limit(1);
+        await createUserNotifications(members.map((member) => member.userId).filter((id) => id !== userId), {
+          eventKey: `mind-daily:${row.id}`,
+          type: "mind_daily",
+          title: "Daily completada",
+          message: `${(req.user as any)?.firstName || "Alguien"} completó la daily de ${room?.name || "Mind"}.`,
+          entityType: "review_room",
+          entityId: roomId,
+          actionUrl: `/review/${roomId}`,
+        }, tx);
+        return row;
       });
-
       res.status(201).json(row);
     } catch (error) {
       console.error('POST daily-sessions error:', error);
@@ -1096,18 +1098,21 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       const projectId = parseInt(req.params.projectId, 10);
       const { content } = req.body ?? {};
       if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
-      const [note] = await db.insert(projectReviewNotes)
-        .values({ roomId, projectId, content: content.trim(), authorId, noteDate: new Date() })
-        .returning();
-      const previous = await db.select({ authorId: projectReviewNotes.authorId }).from(projectReviewNotes)
-        .where(and(eq(projectReviewNotes.roomId, roomId), eq(projectReviewNotes.projectId, projectId), sql`${projectReviewNotes.id} <> ${note.id}`));
-      const [project] = await db.select({ name: sql<string>`COALESCE(${activeProjects.name}, ${quotations.projectName})` })
-        .from(activeProjects).leftJoin(quotations, eq(quotations.id, activeProjects.quotationId)).where(eq(activeProjects.id, projectId)).limit(1);
-      const [author] = await db.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, authorId)).limit(1);
-      await createUserNotifications(previous.map((row) => row.authorId).filter((id): id is number => id != null && id !== authorId), {
-        eventKey: `mind-reply:${note.id}`, type: "mind_reply", title: "Nueva respuesta en Mind",
-        message: `${author ? `${author.firstName} ${author.lastName}` : "Alguien"} respondió en ${project?.name || "un proyecto"}.`,
-        entityType: "review_room", entityId: roomId, actionUrl: `/review/${roomId}`,
+      const note = await db.transaction(async tx => {
+        const [note] = await tx.insert(projectReviewNotes)
+          .values({ roomId, projectId, content: content.trim(), authorId, noteDate: new Date() })
+          .returning();
+        const previous = await tx.select({ authorId: projectReviewNotes.authorId }).from(projectReviewNotes)
+          .where(and(eq(projectReviewNotes.roomId, roomId), eq(projectReviewNotes.projectId, projectId), sql`${projectReviewNotes.id} <> ${note.id}`));
+        const [project] = await tx.select({ name: sql<string>`COALESCE(${activeProjects.name}, ${quotations.projectName})` })
+          .from(activeProjects).leftJoin(quotations, eq(quotations.id, activeProjects.quotationId)).where(eq(activeProjects.id, projectId)).limit(1);
+        const [author] = await tx.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, authorId)).limit(1);
+        await createUserNotifications(previous.map((row) => row.authorId).filter((id): id is number => id != null && id !== authorId), {
+          eventKey: `mind-reply:${note.id}`, type: "mind_reply", title: "Nueva respuesta en Mind",
+          message: `${author ? `${author.firstName} ${author.lastName}` : "Alguien"} respondió en ${project?.name || "un proyecto"}.`,
+          entityType: "review_room", entityId: roomId, threadKey: `mind:${roomId}:p_${projectId}`, actionUrl: `/review/${roomId}?item=p_${projectId}&noteId=${note.id}`,
+        }, tx);
+        return note;
       });
       res.status(201).json(note);
     } catch (error) {
@@ -1148,17 +1153,20 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       const itemId = parseInt(req.params.itemId, 10);
       const { content } = req.body ?? {};
       if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
-      const [note] = await db.insert(projectReviewNotes)
-        .values({ roomId, weeklyStatusItemId: itemId, content: content.trim(), authorId, noteDate: new Date() })
-        .returning();
-      const previous = await db.select({ authorId: projectReviewNotes.authorId }).from(projectReviewNotes)
-        .where(and(eq(projectReviewNotes.roomId, roomId), eq(projectReviewNotes.weeklyStatusItemId, itemId), sql`${projectReviewNotes.id} <> ${note.id}`));
-      const [item] = await db.select({ title: weeklyStatusItems.title }).from(weeklyStatusItems).where(eq(weeklyStatusItems.id, itemId)).limit(1);
-      const [author] = await db.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, authorId)).limit(1);
-      await createUserNotifications(previous.map((row) => row.authorId).filter((id): id is number => id != null && id !== authorId), {
-        eventKey: `mind-reply:${note.id}`, type: "mind_reply", title: "Nueva respuesta en Mind",
-        message: `${author ? `${author.firstName} ${author.lastName}` : "Alguien"} respondió en “${item?.title || "un ítem"}”.`,
-        entityType: "review_room", entityId: roomId, actionUrl: `/review/${roomId}`,
+      const note = await db.transaction(async tx => {
+        const [note] = await tx.insert(projectReviewNotes)
+          .values({ roomId, weeklyStatusItemId: itemId, content: content.trim(), authorId, noteDate: new Date() })
+          .returning();
+        const previous = await tx.select({ authorId: projectReviewNotes.authorId }).from(projectReviewNotes)
+          .where(and(eq(projectReviewNotes.roomId, roomId), eq(projectReviewNotes.weeklyStatusItemId, itemId), sql`${projectReviewNotes.id} <> ${note.id}`));
+        const [item] = await tx.select({ title: weeklyStatusItems.title }).from(weeklyStatusItems).where(eq(weeklyStatusItems.id, itemId)).limit(1);
+        const [author] = await tx.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, authorId)).limit(1);
+        await createUserNotifications(previous.map((row) => row.authorId).filter((id): id is number => id != null && id !== authorId), {
+          eventKey: `mind-reply:${note.id}`, type: "mind_reply", title: "Nueva respuesta en Mind",
+          message: `${author ? `${author.firstName} ${author.lastName}` : "Alguien"} respondió en “${item?.title || "un ítem"}”.`,
+          entityType: "review_room", entityId: roomId, threadKey: `mind:${roomId}:c_${itemId}`, actionUrl: `/review/${roomId}?item=c_${itemId}&noteId=${note.id}`,
+        }, tx);
+        return note;
       });
       res.status(201).json(note);
     } catch (error) {

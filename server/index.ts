@@ -3,6 +3,8 @@ import { payrollDocumentModesMigrationSql } from "./migrations/payroll-document-
 import { capacityPlanningMigrationSql } from "./migrations/capacity-planning";
 import { teamSettlementWorkflowMigrationSql } from "./migrations/team-settlement-workflow";
 import express, { type Request, Response, NextFunction } from "express";
+import { notificationReliabilityMigrationSql } from "./migrations/notification-reliability";
+import { verifyNotificationWebhook, recordNotificationEmailEvent,verifySendgridWebhook,recordSendgridEvents } from "./services/notification-email-events";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./init-data";
@@ -917,6 +919,7 @@ async function applyPendingMigrations() {
     await run('0080 prompt existing users without notification channels', userNotificationSetupExistingOptInMigrationSql);
     await run('0081 notification category preferences', userNotificationCategoryPreferencesMigrationSql);
     await run('0082 notification push subscriptions', userNotificationPushSubscriptionsMigrationSql);
+    await run('0093 notification relevance and reliable delivery', notificationReliabilityMigrationSql);
     // Install payroll guards before serving requests; financial cutover stays independent.
     await client.query("BEGIN");
     try {
@@ -1111,6 +1114,25 @@ app.use((req, res, next) => {
 });
 
 // Middleware
+// Signature verification requires the original bytes, before express.json().
+app.post("/api/webhooks/resend", express.raw({ type: "application/json", limit: "256kb" }), async (req, res) => {
+  const secret = process.env.RESEND_WEBHOOK_SECRET;
+  if (!secret) return res.status(503).json({ message: "Webhook no configurado" });
+  let event;
+  try {
+    event = verifyNotificationWebhook(req.body, { id: req.get("svix-id"), timestamp: req.get("svix-timestamp"), signature: req.get("svix-signature") }, secret);
+  } catch { return res.status(400).json({ message: "Evento o firma inválidos" }); }
+  try { await recordNotificationEmailEvent(req.get("svix-id")!,event); res.json({ received: true }); }
+  catch { res.status(500).json({ message: "No se pudo guardar el evento" }); }
+});
+app.post("/api/webhooks/sendgrid",express.raw({type:"application/json",limit:"256kb"}),async(req,res)=>{
+  const key=process.env.SENDGRID_WEBHOOK_PUBLIC_KEY;
+  if(!key) return res.status(503).json({message:"Webhook no configurado"});
+  let events;
+  try {events=verifySendgridWebhook(req.body,{timestamp:req.get("x-twilio-email-event-webhook-timestamp"),signature:req.get("x-twilio-email-event-webhook-signature")},key);}
+  catch {return res.status(400).json({message:"Evento o firma inválidos"});}
+  try {await recordSendgridEvents(events);res.json({received:true});}catch{res.status(500).json({message:"No se pudo guardar el evento"});}
+});
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // CORS configuration

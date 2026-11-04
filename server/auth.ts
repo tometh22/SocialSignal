@@ -1,3 +1,7 @@
+import { db } from "./db";
+import { userNotificationPushSubscriptions } from "@shared/schema";
+import { and, eq, sql } from "drizzle-orm";
+import { readPushDeviceToken } from "./services/notification-device";
 import { Express, Request, Response } from "express";
 import session from "express-session";
 import { createHmac, scrypt, randomBytes, timingSafeEqual } from "crypto";
@@ -197,6 +201,12 @@ export function setupAuth(app: Express, storage: IStorage) {
         return res.status(403).json({ message: "Tu cuenta está desactivada. Contactá al administrador." });
       }
 
+      // An expired session can be followed by a different account in this same
+      // browser. Revoke the previous owner's endpoint before signing in.
+      const deviceToken=readPushDeviceToken(req.headers.cookie);
+      if (deviceToken) await db.delete(userNotificationPushSubscriptions).where(and(
+        eq(userNotificationPushSubscriptions.deviceToken,deviceToken),
+        sql`${userNotificationPushSubscriptions.userId} <> ${user.id}`));
       req.session.userId = user.id;
       // Never write the session identifier to logs: it is a bearer credential.
       console.log(`✅ Session established for user ID: ${user.id}`);
@@ -227,7 +237,14 @@ export function setupAuth(app: Express, storage: IStorage) {
     }
   });
 
-  app.post("/api/logout", (req, res) => {
+  app.post("/api/logout", async (req, res) => {
+    // Revoke only this browser, even if the client could not unsubscribe.
+    try {
+      const deviceToken=readPushDeviceToken(req.headers.cookie);
+      if (req.session.userId && deviceToken) await db.delete(userNotificationPushSubscriptions).where(and(
+        eq(userNotificationPushSubscriptions.userId,req.session.userId),eq(userNotificationPushSubscriptions.deviceToken,deviceToken)));
+    } catch { return res.status(503).json({ message: "No se pudo desconectar el dispositivo. Volvé a intentar." }); }
+    res.clearCookie("mind_push_device", { path:"/" });
     console.log('🚪 Logout request received');
 
     req.session.destroy((err) => {

@@ -1,3 +1,5 @@
+import { registerNotificationRoutes } from "./routes-notifications";
+import { getTransactionalEmailConfig, sendTransactionalEmail } from "./services/email-transport";
 import { withJobLock } from "./services/job-lock";
 import { quotationListStatsQuery } from "./domain/quotation-list-stats";
 import { objectStorageEnabled, getObject } from "./services/object-storage";
@@ -202,10 +204,6 @@ import {
   insertPersonnelAbsenceSchema,
   absenceAllowances,
   absenceEvents,
-  userNotifications,
-  userNotificationEmailDeliveries,
-  userNotificationPushSubscriptions,
-  userNotificationPreferences,
   quotationTeamMembers,
   quotationPriceAdjustments,
   quotationAlertDismissals,
@@ -242,7 +240,7 @@ import { registerProposalStudioRoutes } from "./routes-proposal-studio";
 import { runDocumentQa } from "./routes-proposal-studio";
 import { blueprintDefinitionSchema, estimateBlueprintWorkload, isDeliverableSold, proposalDocumentSchema } from "@shared/quotation-professional";
 import { renderProposalPdf } from "./services/proposal-studio";
-import { createUserNotifications as persistUserNotifications, getWebPushPublicKey, retryUserNotificationEmailDelivery, sendUserWebPushTest } from "./services/user-notifications";
+import { createUserNotifications as persistUserNotifications } from "./services/user-notifications";
 import { reviewRooms, reviewRoomMembers, capacityOverrides } from "@shared/schema";
 import path from 'path';
 import PDFDocument from "pdfkit";
@@ -469,19 +467,20 @@ async function getAbsenceAccessContext(req: Request): Promise<AbsenceAccessConte
   };
 }
 
-async function operationsNotificationUserIds(): Promise<number[]> {
-  const rows = await db.select({ id: users.id, isAdmin: users.isAdmin, permissions: users.permissions })
+async function operationsNotificationUserIds(executor: Pick<typeof db, "select"> = db): Promise<number[]> {
+  const rows = await executor.select({ id: users.id, isAdmin: users.isAdmin, role:users.role,permissions: users.permissions })
     .from(users).where(eq(users.isActive, true));
   return rows
-    .filter((user) => user.isAdmin || (user.permissions || []).includes("operations"))
+    .filter((user) => user.isAdmin || user.role === "admin" || (user.permissions || []).includes("operations"))
     .map((user) => user.id);
 }
 
 async function createUserNotifications(
   userIds: number[],
   notification: { eventKey: string; type: string; title: string; message: string; entityId?: number; actionUrl?: string },
+  tx?: Parameters<Parameters<typeof db.transaction>[0]>[0],
 ) {
-  await persistUserNotifications(userIds, { ...notification, entityType: notification.type === "monthly_settlement" ? "monthly_settlement" : "absence", actionUrl: notification.actionUrl ?? "/absences" });
+  await persistUserNotifications(userIds, { ...notification, entityType: notification.type === "monthly_settlement" ? "monthly_settlement" : "absence", actionUrl: notification.actionUrl ?? "/absences" }, tx);
 }
 
 async function canAccessTaskProject(req: Request, projectId: number): Promise<boolean> {
@@ -6860,15 +6859,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const [client] = await db.select({ contactEmail: clients.contactEmail }).from(clients)
         .where(eq(clients.id, result.updatedQuotation.clientId));
-      const sgApiKey = process.env.SENDGRID_API_KEY;
-      const sender = process.env.SENDGRID_FROM_EMAIL;
+      const sgApiKey = getTransactionalEmailConfig()?.apiKey;
+      const sender = getTransactionalEmailConfig()?.from;
       if (!client?.contactEmail) {
         emailError = "El cliente no tiene un email de contacto cargado; avisale a mano.";
       } else if (!sgApiKey || !sender) {
-        emailError = "SendGrid no está configurado; avisale a mano.";
+        emailError = "El proveedor de email no está configurado; revisá el envío.";
       } else {
-        const sgMail = await import("@sendgrid/mail");
-        sgMail.default.setApiKey(sgApiKey);
         const percentage = result.updatedAdjustment.ipcAccumulatedPercentage.toFixed(2);
         const newAmount = result.updatedAdjustment.proposedTotalAmount.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const body = [
@@ -6883,13 +6880,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "Saludos,",
           "Epical",
         ].join("\n");
-        await sgMail.default.send({
+        await sendTransactionalEmail({
           to: client.contactEmail,
           from: sender,
           subject: `Actualización de precio por IPC · ${result.updatedQuotation.projectName}`,
           text: body,
           html: escapeHtml(body).replace(/\n/g, "<br>"),
-        });
+        }, `ipc-adjustment:${id}`);
         emailSent = true;
         await db.update(quotationPriceAdjustments).set({ emailSentAt: new Date() }).where(eq(quotationPriceAdjustments.id, id));
       }
@@ -7735,8 +7732,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           prepared.push({ quotation, revision, document: document ?? null });
         }
         if (blockers.length) return res.status(409).json({ message: "Hay propuestas que todavía no están listas", blockers });
-        const sender = process.env.SENDGRID_FROM_EMAIL;
-        const apiKey = process.env.SENDGRID_API_KEY;
+        const sender = getTransactionalEmailConfig()?.from;
+        const apiKey = getTransactionalEmailConfig()?.apiKey;
         if (!sender || !apiKey) return res.status(503).json({ message: "El proveedor de email no está configurado; no se marcó ninguna propuesta como enviada" });
         const publicToken = randomBytes(32).toString("base64url");
         const tokenExpiresAt = prepared.reduce<Date | null>((earliest, row) => {
@@ -7764,16 +7761,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const appUrl = process.env.PUBLIC_APP_URL || process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
         const publicUrl = `${appUrl}/proposal-group/${publicToken}`;
         const cards = prepared.map(({ quotation }) => `<li><strong>${escapeHtml(quotation.projectName)}</strong> · ${escapeHtml(quotation.quotationNumber || "")}</li>`).join("");
-        const sgMail = await import("@sendgrid/mail");
-        sgMail.default.setApiKey(apiKey);
         try {
-          const [providerResponse] = await sgMail.default.send({
+          const [providerResponse] = await sendTransactionalEmail({
             to: input.recipientEmail,
             from: sender,
             subject,
             text: `${input.message || "Preparamos propuestas independientes para que puedan evaluar cada alcance por separado."}\n\nRevisar propuestas: ${publicUrl}`,
             html: `<p>${escapeHtml(input.message || "Preparamos propuestas independientes para que puedan evaluar cada alcance por separado.").replace(/\n/g, "<br>")}</p><ul>${cards}</ul><p><a href="${publicUrl}">Revisar y responder las propuestas</a></p>`,
-          });
+          }, `quotation-group:${delivery.id}`);
           const now = new Date();
           await db.transaction(async (tx) => {
             await tx.update(quotationGroupDeliveries).set({
@@ -8562,8 +8557,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? await renderProposalPdf(proposalDocumentSchema.parse(proposalDocument.content), { title: quotation.projectName, quotationNumber: quotation.quotationNumber })
           : await renderQuotationPdf(projection);
         const subject = input.subject || `Propuesta ${quotation.quotationNumber}: ${quotation.projectName}`;
-        const sender = process.env.SENDGRID_FROM_EMAIL;
-        const apiKey = process.env.SENDGRID_API_KEY;
+        const sender = getTransactionalEmailConfig()?.from;
+        const apiKey = getTransactionalEmailConfig()?.apiKey;
         if (!sender || !apiKey) {
           return res.status(503).json({ message: "El proveedor de email no está configurado; no se marcó la cotización como enviada" });
         }
@@ -8594,10 +8589,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return queued;
         });
         if (!delivery) return res.json({ success: true, idempotentReplay: true });
-        const sgMail = await import("@sendgrid/mail");
-        sgMail.default.setApiKey(apiKey);
         try {
-          const [providerResponse] = await sgMail.default.send({
+          const [providerResponse] = await sendTransactionalEmail({
             to: input.recipientEmail,
             from: sender,
             subject,
@@ -8609,7 +8602,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               type: "application/pdf",
               disposition: "attachment",
             }],
-          });
+          }, `quotation:${delivery.id}`);
           const now = new Date();
           const result = await db.transaction(async (tx) => {
             await tx.update(quotationDeliveries).set({
@@ -13972,7 +13965,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/finance/personnel-settlements/:personnelId", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const saved = await savePersonnelSettlement(Number(req.params.personnelId), req.user!.id, req.body);
-      if (saved.status === "published") await notifySettlement(saved, "person", "Tu cierre está listo: completá el siguiente paso").catch(console.error);
       res.json(saved);
     } catch (error: any) {
       if (!error?.statusCode) console.error("Error guardando liquidación mensual", { code: error?.code ?? error?.cause?.code, column: error?.column ?? error?.cause?.column, constraint: error?.constraint ?? error?.cause?.constraint });
@@ -23265,7 +23257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/leads/:id/send-email — enviar email via SendGrid y registrar actividad
-  app.post("/api/crm/leads/:id/send-email", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/crm/leads/:id/send-email", requireAuth, requirePermission("crm"), async (req: Request, res: Response) => {
     try {
       const leadId = parseInt(req.params.id);
       if (isNaN(leadId)) return res.status(400).json({ error: 'ID de lead inválido' });
@@ -23273,8 +23265,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [existingLead] = await db.select({ id: crmLeads.id }).from(crmLeads).where(eq(crmLeads.id, leadId));
       if (!existingLead) return res.status(404).json({ error: 'Lead no encontrado' });
 
-      const { to, subject, body, contactId } = req.body;
-      const userId = (req.session as any)?.userId;
+      const input = z.object({ to:z.string().email().max(255), subject:z.string().trim().min(1).max(300), body:z.string().trim().min(1).max(50000), idempotencyKey:z.string().uuid(),contactId:z.number().int().positive().optional() }).strict().safeParse(req.body);
+      if (!input.success) return res.status(400).json({error:"Email inválido. Revisá destinatario, asunto y mensaje."});
+      const { to,subject,body,contactId,idempotencyKey:emailRequestKey }=input.data;
+      const userId = req.user!.id;
 
       if (!to || !subject || !body) {
         return res.status(400).json({ error: 'Se requieren los campos: to, subject, body' });
@@ -23292,42 +23286,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'El asunto no puede estar vacío' });
       }
 
-      const sgApiKey = process.env.SENDGRID_API_KEY;
+      const sgApiKey = getTransactionalEmailConfig()?.apiKey;
       if (!sgApiKey) {
-        return res.status(500).json({ error: 'SendGrid no configurado. Falta SENDGRID_API_KEY.' });
+        return res.status(500).json({ error: 'El proveedor de email no está configurado.' });
       }
 
-      // Enviar email via SendGrid
-      const sgMail = await import('@sendgrid/mail');
-      sgMail.default.setApiKey(sgApiKey);
+      // Enviar por el transporte compartido
 
-      const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@epical.digital';
+      const fromEmail = getTransactionalEmailConfig()?.from || 'noreply@epical.digital';
 
-      await sgMail.default.send({
+      await sendTransactionalEmail({
         to: String(to).trim(),
         from: fromEmail,
         subject: sanitizedSubject,
         text: body,
-        html: body.replace(/\n/g, '<br>'),
-      });
+        html: escapeHtml(body).replace(/\n/g, '<br>'),
+      }, `crm:${userId}:${leadId}:${emailRequestKey}`);
 
       // Registrar actividad de email en el timeline
-      const [activity] = await db.insert(crmActivities).values({
+      const activity = await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'crm-email:'+emailRequestKey}))`);
+        const [existing] = await tx.select().from(crmActivities).where(and(eq(crmActivities.leadId,leadId),sql`${crmActivities.emailMetadata}->>'requestKey'=${emailRequestKey}`)).limit(1);
+        if(existing) return existing;
+        const [activity] = await tx.insert(crmActivities).values({
         leadId,
         type: 'email',
         title: `Email: ${subject}`,
         content: body,
         activityDate: new Date(),
         createdBy: userId,
-        emailMetadata: { subject, to, body, sentAt: new Date().toISOString() },
+        emailMetadata: { subject, to, body, requestKey:emailRequestKey,sentAt: new Date().toISOString() },
       }).returning();
 
       // Actualizar updatedAt del lead
-      await db.update(crmLeads).set({ updatedAt: new Date() }).where(eq(crmLeads.id, leadId));
+      await tx.update(crmLeads).set({ updatedAt: new Date() }).where(eq(crmLeads.id, leadId));
 
+        return activity;
+      });
       res.json({ success: true, activity });
     } catch (error: any) {
-      console.error('SendGrid error:', error?.response?.body || (error as Error).message);
+      console.error('Email error:', error?.response?.body || (error as Error).message);
       res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
@@ -24241,22 +24239,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
-  const notifyTaskAssignment = async (task: { id: number; projectId: number; title: string; assigneeId?: number | null; collaboratorIds?: number[] | null }, actorId: number) => {
+  const notifyTaskAssignment = async (task: { id: number; projectId: number; title: string; assigneeId?: number | null; collaboratorIds?: number[] | null }, actorId: number, tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
     const personnelIds = [...new Set([task.assigneeId, ...(task.collaboratorIds ?? [])].filter((id): id is number => typeof id === "number"))];
     if (!personnelIds.length) return;
-    const recipients = await db.select({ userId: users.id }).from(users).innerJoin(personnel,
+    const recipients = await tx.select({ userId: users.id }).from(users).innerJoin(personnel,
       sql`LOWER(TRIM(${users.email})) = LOWER(TRIM(${personnel.email}))`)
       .where(and(inArray(personnel.id, personnelIds), eq(users.isActive, true)));
-    const [project] = await db.select({ name: activeProjects.name }).from(activeProjects).where(eq(activeProjects.id, task.projectId)).limit(1);
+    const [project] = await tx.select({ name: activeProjects.name }).from(activeProjects).where(eq(activeProjects.id, task.projectId)).limit(1);
     await persistUserNotifications(recipients.map((row) => row.userId).filter((id) => id !== actorId), {
-      eventKey: `task-assigned:${task.id}:${Date.now()}`,
+      eventKey: `task-assigned:${task.id}:${actorId}:${personnelIds.slice().sort((a,b)=>a-b).join("-")}:${(task as { updatedAt?: Date }).updatedAt?.toISOString() ?? "created"}`,
       type: "task_assigned",
       title: "Te asignaron una tarea",
       message: `${task.title}${project?.name ? ` · ${project.name}` : ""}`,
       entityType: "task",
       entityId: task.id,
-      actionUrl: `/tasks/projects/${task.projectId}?taskId=${task.id}`,
-    });
+      threadKey: `task:${task.id}`, actionUrl: `/tasks/projects/${task.projectId}?taskId=${task.id}`,
+    }, tx);
   };
 
   app.post("/api/tasks", requireAuth, async (req: Request, res: Response) => {
@@ -24317,9 +24315,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const [created] = await db.transaction(async tx => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(293, ${data.projectId})`);
-        return tx.insert(tasks).values({ ...data, assignedBy: assignmentActor({}, data, Number(user.id)), blockedAt: data.status === "blocked" ? new Date() : null }).returning();
+        const [created] = await tx.insert(tasks).values({ ...data, assignedBy: assignmentActor({}, data, Number(user.id)), blockedAt: data.status === "blocked" ? new Date() : null }).returning();
+        await notifyTaskAssignment(created, Number(user.id), tx);
+        return [created];
       });
-      await notifyTaskAssignment(created, Number(user.id));
       res.json({ ...created, ...await taskAssignmentAdvisory(created) });
     } catch (error: any) {
       if (error.name === "ZodError") return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
@@ -24547,12 +24546,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (saved && (updates.sectionName !== undefined || updates.parentTaskId !== undefined)) {
           await tx.execute(sql`WITH RECURSIVE tree AS (SELECT id FROM tasks WHERE parent_task_id=${taskId} UNION SELECT child.id FROM tasks child JOIN tree parent ON child.parent_task_id=parent.id) UPDATE tasks SET section_name=${saved.sectionName}, updated_at=NOW() WHERE id IN (SELECT id FROM tree)`);
         }
+        const previouslyAssigned = new Set([currentTask.assigneeId, ...(currentTask.collaboratorIds ?? [])].filter((id): id is number => typeof id === "number"));
+        const newlyAssigned = [saved.assigneeId, ...(saved.collaboratorIds ?? [])].filter((id): id is number => typeof id === "number" && !previouslyAssigned.has(id));
+        if (newlyAssigned.length) await notifyTaskAssignment({ ...saved, assigneeId: null, collaboratorIds: newlyAssigned }, Number((req.user as any)?.id), tx);
         return saved;
       });
       if (!updated) return res.status(404).json({ message: "Tarea no encontrada" });
-      const previouslyAssigned = new Set([existingTask.assigneeId, ...(existingTask.collaboratorIds ?? [])].filter((id): id is number => typeof id === "number"));
-      const newlyAssigned = [updated.assigneeId, ...(updated.collaboratorIds ?? [])].filter((id): id is number => typeof id === "number" && !previouslyAssigned.has(id));
-      if (newlyAssigned.length) await notifyTaskAssignment({ ...updated, assigneeId: null, collaboratorIds: newlyAssigned }, Number((req.user as any)?.id));
       if (existingTask.parentTaskId !== updated.parentTaskId) {
         if (existingTask.parentTaskId) await recalculateTaskLoggedHours(existingTask.parentTaskId);
         if (updated.parentTaskId) await recalculateTaskLoggedHours(updated.parentTaskId);
@@ -24886,28 +24885,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!projectId) return res.status(404).json({ message: "Tarea no encontrada" });
       if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a esta tarea" });
       const authorId = (req as any).user?.id ?? null;
-      const [comment] = await db.insert(taskComments).values({ taskId, authorId, content: content.trim() }).returning();
-      const [task] = await db.select({ id: tasks.id, title: tasks.title, projectId: tasks.projectId, assigneeId: tasks.assigneeId })
-        .from(tasks).where(eq(tasks.id, taskId)).limit(1);
-      const priorAuthors = await db.select({ userId: taskComments.authorId }).from(taskComments)
-        .where(and(eq(taskComments.taskId, taskId), sql`${taskComments.id} <> ${comment.id}`, isNotNull(taskComments.authorId)));
-      const recipientIds = priorAuthors.map((row) => row.userId!).filter((id) => id !== authorId);
-      if (task?.assigneeId) {
-        const assigneeUsers = await db.select({ userId: users.id }).from(users).innerJoin(personnel,
-          sql`LOWER(TRIM(${users.email})) = LOWER(TRIM(${personnel.email}))`)
-          .where(and(eq(personnel.id, task.assigneeId), eq(users.isActive, true)));
-        recipientIds.push(...assigneeUsers.map((row) => row.userId));
-      }
-      const [project] = task ? await db.select({ name: activeProjects.name }).from(activeProjects).where(eq(activeProjects.id, task.projectId)).limit(1) : [];
-      const [author] = authorId ? await db.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, authorId)).limit(1) : [];
-      await persistUserNotifications(recipientIds.filter((id) => id !== authorId), {
-        eventKey: `task-comment:${comment.id}`,
-        type: "task_reply",
-        title: "Nueva respuesta en una tarea",
-        message: `${author ? `${author.firstName} ${author.lastName}` : "Alguien"} comentó en “${task?.title || "Tarea"}”${project?.name ? ` · ${project.name}` : ""}.`,
-        entityType: "task",
-        entityId: taskId,
-        actionUrl: `/tasks/projects/${task?.projectId}?taskId=${taskId}`,
+      const comment = await db.transaction(async tx => {
+        const [comment] = await tx.insert(taskComments).values({ taskId, authorId, content: content.trim() }).returning();
+        const [task] = await tx.select({ id: tasks.id, title: tasks.title, projectId: tasks.projectId, assigneeId: tasks.assigneeId, collaboratorIds:tasks.collaboratorIds })
+          .from(tasks).where(eq(tasks.id, taskId)).limit(1);
+        const priorAuthors = await tx.select({ userId: taskComments.authorId }).from(taskComments)
+          .where(and(eq(taskComments.taskId, taskId), sql`${taskComments.id} <> ${comment.id}`, isNotNull(taskComments.authorId)));
+        const recipientIds = priorAuthors.map((row) => row.userId!).filter((id) => id !== authorId);
+        if (task && [task.assigneeId,...(task.collaboratorIds??[])].some(Boolean)) {
+          const assigneeUsers = await tx.select({ userId: users.id }).from(users).innerJoin(personnel,
+            sql`LOWER(TRIM(${users.email})) = LOWER(TRIM(${personnel.email}))`)
+            .where(and(inArray(personnel.id,[task.assigneeId,...(task.collaboratorIds??[])].filter((id):id is number=>typeof id === "number")), eq(users.isActive, true)));
+          recipientIds.push(...assigneeUsers.map((row) => row.userId));
+        }
+        const [project] = task ? await tx.select({ name: activeProjects.name }).from(activeProjects).where(eq(activeProjects.id, task.projectId)).limit(1) : [];
+        const [author] = authorId ? await tx.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, authorId)).limit(1) : [];
+        await persistUserNotifications(recipientIds.filter((id) => id !== authorId), {
+          eventKey: `task-comment:${comment.id}`,
+          type: "task_reply",
+          title: "Nueva respuesta en una tarea",
+          message: `${author ? `${author.firstName} ${author.lastName}` : "Alguien"} comentó en “${task?.title || "Tarea"}”${project?.name ? ` · ${project.name}` : ""}.`,
+          entityType: "task",
+          entityId: taskId,
+          threadKey: `task:${taskId}`, actionUrl: `/tasks/projects/${task?.projectId}?taskId=${taskId}&commentId=${comment.id}`,
+        }, tx);
+        return comment;
       });
       res.status(201).json(comment);
     } catch (error) {
@@ -26631,9 +26633,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .onConflictDoUpdate({ target: monthlySettlementDeclarations.closingId, set: { bankFxRate, usdAmount, closingFxRate, differenceARS, status: "pending", submittedAt: new Date(), reviewedBy: null, reviewedAt: null, reviewReason: null, updatedAt: new Date() }, setWhere: sql`${monthlySettlementDeclarations.status} <> 'approved'` }).returning();
         if (!row) throw Object.assign(new Error("La declaración fue aprobada mientras la editabas. Actualizá la pantalla."), { status: 409 });
         await tx.insert(monthlySettlementEvents).values({ declarationId: row.id, action: previous ? "resubmitted" : "submitted", actorUserId: access.userId, metadata: { closingId, usdAmount, closingFxRate, bankFxRate, differenceARS, previous: previous ?? null } });
+        await createUserNotifications(await operationsNotificationUserIds(tx), { eventKey: `monthly-settlement:${row.id}:${row.updatedAt.toISOString()}`, type: "monthly_settlement", title: "Diferencia cambiaria para revisar", message: `Una persona declaró su tipo de cambio bancario para ${closing.year}-${String(closing.month).padStart(2, "0")}.`, entityId: row.id, actionUrl: settlementReviewDestination(`${closing.year}-${String(closing.month).padStart(2, "0")}`) }, tx);
         return { ...row, closingYear: closing.year, closingMonth: closing.month };
       });
-      await createUserNotifications(await operationsNotificationUserIds(), { eventKey: `monthly-settlement:${declaration.id}:${declaration.updatedAt.toISOString()}`, type: "monthly_settlement", title: "Diferencia cambiaria para revisar", message: `Una persona declaró su tipo de cambio bancario para ${declaration.closingYear}-${String(declaration.closingMonth).padStart(2, "0")}.`, entityId: declaration.id, actionUrl: settlementReviewDestination(`${declaration.closingYear}-${String(declaration.closingMonth).padStart(2, "0")}`) });
+
       res.status(201).json(declaration);
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
@@ -26658,11 +26661,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [declaration] = await tx.update(monthlySettlementDeclarations).set({ status: input.action === "approve" ? "approved" : "rejected", reviewedBy: Number((req.user as any)?.id), reviewedAt: new Date(), reviewReason: input.reason ?? null, updatedAt: new Date() }).where(and(eq(monthlySettlementDeclarations.id, id), eq(monthlySettlementDeclarations.status, "pending"), eq(monthlySettlementDeclarations.submittedAt, new Date(input.submittedAt)))).returning();
       if (!declaration) throw Object.assign(new Error("La declaración cambió o ya fue revisada. Actualizá la pantalla antes de decidir."), { status: 409 });
       await tx.insert(monthlySettlementEvents).values({ declarationId: id, action: input.action, actorUserId: Number((req.user as any)?.id), metadata: { reason: input.reason, submittedAt: declaration.submittedAt, bankFxRate: declaration.bankFxRate, usdAmount: declaration.usdAmount, closingFxRate: declaration.closingFxRate, differenceARS: declaration.differenceARS } });
+      const [person] = await tx.select({ email: personnel.email }).from(personnel).where(eq(personnel.id, declaration.personnelId));
+      const [owner] = person?.email ? await tx.select({ id: users.id }).from(users).where(sql`LOWER(TRIM(${users.email})) = LOWER(TRIM(${person.email}))`).limit(1) : [];
+      if (owner) await createUserNotifications([owner.id], { eventKey: `monthly-settlement-reviewed:${declaration.id}:${declaration.updatedAt.toISOString()}`, type: "monthly_settlement", title: input.action === "approve" ? "Conciliación aprobada" : "La conciliación requiere cambios", message: input.reason || (input.action === "approve" ? "Operaciones aprobó tu diferencia cambiaria." : "Revisá la declaración y volvé a enviarla."), entityId: declaration.id, actionUrl: "/my-invoices" }, tx);
       return declaration;
       });
-      const [person] = await db.select({ email: personnel.email }).from(personnel).where(eq(personnel.id, declaration.personnelId));
-      const [owner] = person?.email ? await db.select({ id: users.id }).from(users).where(sql`LOWER(TRIM(${users.email})) = LOWER(TRIM(${person.email}))`).limit(1) : [];
-      if (owner) await createUserNotifications([owner.id], { eventKey: `monthly-settlement-reviewed:${declaration.id}:${declaration.updatedAt.toISOString()}`, type: "monthly_settlement", title: input.action === "approve" ? "Conciliación aprobada" : "La conciliación requiere cambios", message: input.reason || (input.action === "approve" ? "Operaciones aprobó tu diferencia cambiaria." : "Revisá la declaración y volvé a enviarla."), entityId: declaration.id, actionUrl: "/my-invoices" });
       res.json(declaration);
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Acción inválida", errors: error.errors });
@@ -26990,18 +26993,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           absenceId: absence.id, eventKey: `requested:${absence.id}`, action: "requested",
           toStatus: "pending", actorUserId: access.userId, metadata: { daysByYear: businessDaysByYear(data.startDate, data.endDate, holidayDates) },
         });
+        const [person] = await tx.select({ name: personnel.name, email: personnel.email }).from(personnel).where(eq(personnel.id, personnelId));
+        const [owner] = person?.email ? await tx.select({ id: users.id }).from(users).where(sql`LOWER(TRIM(${users.email})) = LOWER(TRIM(${person.email}))`).limit(1) : [];
+        await createUserNotifications(await operationsNotificationUserIds(tx), {
+          eventKey: `absence-requested:${absence.id}`, type: "absence_request", title: "Nueva solicitud de ausencia",
+          message: `${person?.name || "Una persona"} solicitó ${businessDays.length} día(s) hábil(es).`, entityId: absence.id,
+          actionUrl: absenceNotificationDestination("operations"),
+        }, tx);
+        if (access.isOperations && owner) await createUserNotifications([owner.id], {
+          eventKey: `absence-created-by-ops:${absence.id}`, type: "absence_request", title: "Ausencia registrada",
+          message: `Operaciones registró una ausencia para vos (${absence.startDate} al ${absence.endDate}).`, entityId: absence.id,
+        }, tx);
         return [absence];
-      });
-      const [person] = await db.select({ name: personnel.name, email: personnel.email }).from(personnel).where(eq(personnel.id, personnelId));
-      const [owner] = person?.email ? await db.select({ id: users.id }).from(users).where(sql`LOWER(TRIM(${users.email})) = LOWER(TRIM(${person.email}))`).limit(1) : [];
-      await createUserNotifications(await operationsNotificationUserIds(), {
-        eventKey: `absence-requested:${created.id}`, type: "absence_request", title: "Nueva solicitud de ausencia",
-        message: `${person?.name || "Una persona"} solicitó ${businessDays.length} día(s) hábil(es).`, entityId: created.id,
-        actionUrl: absenceNotificationDestination("operations"),
-      });
-      if (access.isOperations && owner) await createUserNotifications([owner.id], {
-        eventKey: `absence-created-by-ops:${created.id}`, type: "absence_request", title: "Ausencia registrada",
-        message: `Operaciones registró una ausencia para vos (${created.startDate} al ${created.endDate}).`, entityId: created.id,
       });
       res.status(201).json(created);
     } catch (error: any) {
@@ -27099,9 +27102,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [row] = await tx.update(personnelAbsences).set(updates).where(and(eq(personnelAbsences.id, absenceId), sql`xmin::text = ${current.rowVersion}`)).returning();
         if (!row) throw Object.assign(new Error("La solicitud cambió; actualizá la pantalla"), { status: 409 });
         await tx.insert(absenceEvents).values({ absenceId, eventKey: `edited:${absenceId}:${Date.now()}`, action: "edited", fromStatus: current.status, toStatus: updates.status ?? current.status, actorUserId: access.userId, metadata: { previous: current, daysByYear: businessDaysByYear(startDate, endDate, holidayDates), planningStatus: updates.planningStatus ?? current.planningStatus } });
+        if (updates.status === "pending") await createUserNotifications(await operationsNotificationUserIds(tx), { eventKey: `absence-resubmitted:${absenceId}:${row.updatedAt.toISOString()}`, type: "absence_request", title: "Ausencia modificada", message: "Una solicitud aprobada fue modificada y requiere nueva aprobación.", entityId: absenceId, actionUrl: absenceNotificationDestination("operations") }, tx);
         return [row];
       });
-      if (updates.status === "pending") await createUserNotifications(await operationsNotificationUserIds(), { eventKey: `absence-resubmitted:${absenceId}:${Date.now()}`, type: "absence_request", title: "Ausencia modificada", message: "Una solicitud aprobada fue modificada y requiere nueva aprobación.", entityId: absenceId, actionUrl: absenceNotificationDestination("operations") });
+
       res.json(updated);
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
@@ -27219,30 +27223,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fromStatus: current.status, toStatus: nextStatus, reason: input.reason || null, actorUserId: access.userId,
           metadata: { allowNegativeBalance: input.allowNegativeBalance, daysByYear: requestedByYear },
         }).onConflictDoNothing();
+        if (input.action === "request_cancellation") {
+          await createUserNotifications(await operationsNotificationUserIds(tx), {
+            eventKey: `absence-cancellation-requested:${absenceId}:${new Date(row.updatedAt).toISOString()}`,
+            type: "absence_cancellation",
+            title: "Cancelación de ausencia pendiente", message: "Hay una cancelación que requiere revisión.", entityId: absenceId,
+            actionUrl: absenceNotificationDestination("operations"),
+          }, tx);
+        } else if (!ownerActions.includes(input.action)) {
+          const [owner]=await tx.select({id:users.id}).from(users).innerJoin(personnel,sql`lower(trim(${personnel.email}))=lower(trim(${users.email}))`).where(eq(personnel.id,current.personnelId));
+          const decisionTitle: Record<string, string> = {
+            approve: "Ausencia aprobada",
+            reject: "Ausencia rechazada",
+            approve_cancellation: "Cancelación confirmada",
+            reject_cancellation: "Cancelación rechazada",
+          };
+          if(owner) await createUserNotifications([owner.id], {
+            eventKey: `absence-${input.action}:${absenceId}:${new Date(row.updatedAt).toISOString()}`,
+            type: "absence_decision",
+            title: decisionTitle[input.action] || "Solicitud actualizada",
+            message: input.reason || `Tu solicitud ahora está ${nextStatus}.`, entityId: absenceId,
+          }, tx);
+        }
         return row;
       });
 
-      if (input.action === "request_cancellation") {
-        await createUserNotifications(await operationsNotificationUserIds(), {
-          eventKey: `absence-cancellation-requested:${absenceId}:${new Date(updated.updatedAt).toISOString()}`,
-          type: "absence_cancellation",
-          title: "Cancelación de ausencia pendiente", message: "Hay una cancelación que requiere revisión.", entityId: absenceId,
-          actionUrl: absenceNotificationDestination("operations"),
-        });
-      } else if (!ownerActions.includes(input.action) && current.requestedBy) {
-        const decisionTitle: Record<string, string> = {
-          approve: "Ausencia aprobada",
-          reject: "Ausencia rechazada",
-          approve_cancellation: "Cancelación confirmada",
-          reject_cancellation: "Cancelación rechazada",
-        };
-        await createUserNotifications([current.requestedBy], {
-          eventKey: `absence-${input.action}:${absenceId}:${new Date(updated.updatedAt).toISOString()}`,
-          type: "absence_decision",
-          title: decisionTitle[input.action] || "Solicitud actualizada",
-          message: input.reason || `Tu solicitud ahora está ${nextStatus}.`, entityId: absenceId,
-        });
-      }
       res.json(updated);
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Acción inválida", errors: error.errors });
@@ -27365,157 +27370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(row);
   });
 
-  app.get("/api/notifications", requireAuth, async (req, res) => {
-    const userId = Number((req.user as any)?.id);
-    const requestedLimit = Number(req.query.limit ?? 20);
-    const limit = Number.isInteger(requestedLimit) ? Math.min(50, Math.max(1, requestedLimit)) : 20;
-    const beforeId = Number(req.query.beforeId);
-    const conditions = [eq(userNotifications.userId, userId)];
-    if (req.query.unreadOnly === "true") conditions.push(isNull(userNotifications.readAt));
-    if (Number.isInteger(beforeId) && beforeId > 0) conditions.push(lt(userNotifications.id, beforeId));
-    const [rows, unreadResult] = await Promise.all([
-      db.select().from(userNotifications).where(and(...conditions)).orderBy(desc(userNotifications.id)).limit(limit + 1),
-      db.select({ count: sql<number>`count(*)::int` }).from(userNotifications)
-        .where(and(eq(userNotifications.userId, userId), isNull(userNotifications.readAt))),
-    ]);
-    const hasMore = rows.length > limit;
-    const items = hasMore ? rows.slice(0, limit) : rows;
-    res.json({ items, unreadCount: unreadResult[0]?.count ?? 0, hasMore, nextCursor: hasMore ? items.at(-1)?.id ?? null : null });
-  });
-  app.get("/api/notifications/preferences", requireAuth, async (req, res) => {
-    const userId = Number((req.user as any)?.id);
-    const [preferences] = await db.select().from(userNotificationPreferences).where(eq(userNotificationPreferences.userId, userId)).limit(1);
-    res.json(preferences ?? { userId, desktopEnabled: false, emailEnabled: false, setupCompletedAt: null });
-  });
-  app.get("/api/notifications/push/public-key", requireAuth, async (_req, res) => {
-    res.setHeader("Cache-Control", "no-store");
-    res.json({ publicKey: getWebPushPublicKey() });
-  });
-  app.post("/api/notifications/push/subscribe", requireAuth, async (req, res) => {
-    const parsed = z.object({
-      endpoint: z.string().url().refine((value) => new URL(value).protocol === "https:", "El endpoint debe usar HTTPS"),
-      expirationTime: z.number().nullable().optional(),
-      keys: z.object({ p256dh: z.string().min(16).max(256), auth: z.string().min(8).max(256) }).strict(),
-    }).strict().safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Suscripción Web Push inválida" });
-    if (!getWebPushPublicKey()) return res.status(503).json({ message: "Web Push no está configurado en el servidor" });
-    const userId = Number((req.user as any)?.id);
-    const now = new Date();
-    await db.insert(userNotificationPushSubscriptions).values({
-      userId,
-      endpoint: parsed.data.endpoint,
-      p256dh: parsed.data.keys.p256dh,
-      auth: parsed.data.keys.auth,
-      userAgent: req.get("user-agent")?.slice(0, 500) ?? null,
-      updatedAt: now,
-    }).onConflictDoUpdate({
-      target: userNotificationPushSubscriptions.endpoint,
-      set: {
-        userId,
-        p256dh: parsed.data.keys.p256dh,
-        auth: parsed.data.keys.auth,
-        userAgent: req.get("user-agent")?.slice(0, 500) ?? null,
-        updatedAt: now,
-      },
-    });
-    res.json({ success: true });
-  });
-  app.delete("/api/notifications/push/subscribe", requireAuth, async (req, res) => {
-    const parsed = z.object({ endpoint: z.string().url() }).strict().safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Suscripción Web Push inválida" });
-    const userId = Number((req.user as any)?.id);
-    await db.delete(userNotificationPushSubscriptions).where(and(
-      eq(userNotificationPushSubscriptions.userId, userId),
-      eq(userNotificationPushSubscriptions.endpoint, parsed.data.endpoint),
-    ));
-    res.json({ success: true });
-  });
-  app.post("/api/notifications/push/test", requireAuth, async (req, res) => {
-    const parsed = z.object({
-      endpoint: z.string().url().max(2048).refine((value) => new URL(value).protocol === "https:", "El endpoint debe usar HTTPS"),
-      testId: z.string().uuid(),
-    }).strict().safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Suscripción Web Push inválida" });
-    const result = await sendUserWebPushTest(Number((req.user as any)?.id), parsed.data.endpoint, parsed.data.testId);
-    if (!result.ok) return res.status(result.status).json({ message: result.message });
-    res.json({ success: true });
-  });
-  app.put("/api/notifications/preferences", requireAuth, async (req, res) => {
-    const parsed = z.object({
-      desktopEnabled: z.boolean(),
-      emailEnabled: z.boolean(),
-      discreetMode: z.boolean().optional(),
-      categoryPreferences: z.record(z.enum(["mind", "daily", "tasks", "crm", "team", "quotations"]), z.object({ desktop: z.boolean().optional(), email: z.boolean().optional() }).strict()).optional(),
-      setupCompleted: z.boolean().optional(),
-    }).strict().safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Preferencias inválidas" });
-    const { setupCompleted, ...channels } = parsed.data;
-    if (setupCompleted && !channels.desktopEnabled && !channels.emailEnabled) {
-      return res.status(400).json({ message: "Activá al menos un canal de notificaciones para continuar" });
-    }
-    const userId = Number((req.user as any)?.id);
-    const now = new Date();
-    const [preferences] = await db.insert(userNotificationPreferences).values({
-      userId,
-      ...channels,
-      ...(setupCompleted ? { setupCompletedAt: now } : {}),
-      updatedAt: now,
-    }).onConflictDoUpdate({ target: userNotificationPreferences.userId, set: {
-      ...channels,
-      ...(setupCompleted ? { setupCompletedAt: now } : {}),
-      updatedAt: now,
-    } }).returning();
-    res.json(preferences);
-  });
-  app.patch("/api/notifications/read-all", requireAuth, async (req, res) => {
-    const userId = Number((req.user as any)?.id);
-    await db.update(userNotifications).set({ readAt: new Date() }).where(and(eq(userNotifications.userId, userId), isNull(userNotifications.readAt)));
-    res.json({ success: true });
-  });
-  app.patch("/api/notifications/:id/read", requireAuth, async (req, res) => {
-    const userId = Number((req.user as any)?.id);
-    const [row] = await db.update(userNotifications).set({ readAt: new Date() }).where(and(
-      eq(userNotifications.id, Number(req.params.id)), eq(userNotifications.userId, userId),
-    )).returning();
-    if (!row) return res.status(404).json({ message: "Notificación no encontrada" });
-    res.json(row);
-  });
-  app.patch("/api/notifications/read-many", requireAuth, async (req, res) => {
-    const parsed = z.object({ ids: z.array(z.number().int().positive()).min(1).max(100) }).strict().safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Lista de notificaciones inválida" });
-    const userId = Number((req.user as any)?.id);
-    const rows = await db.update(userNotifications).set({ readAt: new Date() }).where(and(
-      eq(userNotifications.userId, userId), inArray(userNotifications.id, [...new Set(parsed.data.ids)]), isNull(userNotifications.readAt),
-    )).returning({ id: userNotifications.id });
-    res.json({ updated: rows.length });
-  });
-
-  app.get("/api/admin/notification-email-deliveries", requireAuth, async (req, res) => {
-    if (!(req.user as any)?.isAdmin) return res.status(403).json({ message: "Se requiere acceso de administrador" });
-    const counts = await db.select({ status: userNotificationEmailDeliveries.status, count: sql<number>`count(*)::int` })
-      .from(userNotificationEmailDeliveries).groupBy(userNotificationEmailDeliveries.status);
-    const recent = await db.select({
-      id: userNotificationEmailDeliveries.id,
-      status: userNotificationEmailDeliveries.status,
-      attempts: userNotificationEmailDeliveries.attempts,
-      lastError: userNotificationEmailDeliveries.lastError,
-      updatedAt: userNotificationEmailDeliveries.updatedAt,
-      type: userNotifications.type,
-      title: userNotifications.title,
-    }).from(userNotificationEmailDeliveries)
-      .innerJoin(userNotifications, eq(userNotifications.id, userNotificationEmailDeliveries.notificationId))
-      .where(inArray(userNotificationEmailDeliveries.status, ["pending", "failed"]))
-      .orderBy(desc(userNotificationEmailDeliveries.updatedAt)).limit(50);
-    res.json({ counts: Object.fromEntries(counts.map((row) => [row.status, row.count])), attention: recent });
-  });
-  app.post("/api/admin/notification-email-deliveries/:id/retry", requireAuth, async (req, res) => {
-    if (!(req.user as any)?.isAdmin) return res.status(403).json({ message: "Se requiere acceso de administrador" });
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID inválido" });
-    const queued = await retryUserNotificationEmailDelivery(id);
-    if (!queued) return res.status(409).json({ message: "El email no existe o no está en estado de fallo" });
-    res.json({ success: true });
-  });
+  registerNotificationRoutes(app,requireAuth);
 
   // Legacy read remains scoped; unsafe direct mutations are retired.
   app.get("/api/personnel-absences", requireAuth, async (req, res) => {

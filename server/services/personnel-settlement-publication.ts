@@ -4,7 +4,7 @@ import { financialAuditEvents, monthlyClosings, personnel, personnelMonthlySettl
 import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
 import { settlementWorkflow } from "@shared/utils/settlement-workflow";
 import { calculatePersonnelSettlement } from "./personnel-settlement";
-import { lockSettlementPeriod } from "./personnel-settlement-workflow";
+import { lockSettlementPeriod, notifySettlement } from "./personnel-settlement-workflow";
 
 function fail(message: string, statusCode = 409): never {
   throw Object.assign(new Error(message), { statusCode });
@@ -82,6 +82,7 @@ export async function savePersonnelSettlement(personnelId: number, actorId: numb
       beforeData: current ? { status: current.status, version: flow.version, totalARS: current.totalARS, billingCurrency: current.billingCurrencySnapshot, requiresInvoice: flow.requiresInvoice !== false } : null,
       afterData: { personnelId, closingId: closing.id, status: saved.status, version: saved.workflow.version, totalARS, hours: hoursSnapshot, billingCurrency, requiresInvoice, beforeCut, operationalHoursRemainOpen: !cut },
     });
+    if (saved.status === "published") await notifySettlement(saved,"person","Tu cierre está listo: completá el siguiente paso",tx);
     return saved;
   });
 }
