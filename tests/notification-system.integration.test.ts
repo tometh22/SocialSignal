@@ -438,6 +438,13 @@ describe.skipIf(!fixture.url)(
       expect(await statuses()).toEqual(["sent"]);
       expect(vi.mocked(webpush.sendNotification)).toHaveBeenCalledTimes(2);
     });
+    it("recovers processing deliveries left by the previous worker without a batch row", async () => {
+      await createUserNotifications([1], input);
+      await query("DELETE FROM notification_email_batches; UPDATE user_notification_email_deliveries SET batch_key=NULL,status='processing',locked_at=NOW()-INTERVAL '10 minutes'");
+      await dispatchUserNotificationEmails();
+      expect(await statuses()).toEqual(["sent"]);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
     it("recovers stale mail leases and stops retrying ambiguous deliveries outside the provider window", async () => {
       await createUserNotifications([1], input);
       await query(

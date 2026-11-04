@@ -250,10 +250,11 @@ export async function dispatchUserNotificationEmails() {
   try {
     // Bootstrap legacy deliveries, without dropping pending work at deployment.
     await pool.query(`INSERT INTO notification_email_batches(batch_key,user_id)
-      SELECT DISTINCT COALESCE(batch_key,'notification:'||notification_id),user_id FROM user_notification_email_deliveries WHERE status='pending' ON CONFLICT DO NOTHING`);
+      SELECT DISTINCT COALESCE(batch_key,'notification:'||notification_id),user_id FROM user_notification_email_deliveries WHERE status IN ('pending','processing') ON CONFLICT DO NOTHING`);
     const claimed = await pool.query(`WITH due AS (
       SELECT b.batch_key FROM notification_email_batches b WHERE
-        (b.status='pending' AND EXISTS(SELECT 1 FROM user_notification_email_deliveries d WHERE COALESCE(d.batch_key,'notification:'||d.notification_id)=b.batch_key AND d.status='pending' AND d.next_attempt_at<=NOW()))
+        (b.status='pending' AND EXISTS(SELECT 1 FROM user_notification_email_deliveries d WHERE COALESCE(d.batch_key,'notification:'||d.notification_id)=b.batch_key
+          AND ((d.status='pending' AND d.next_attempt_at<=NOW()) OR (d.status='processing' AND d.locked_at<NOW()-INTERVAL '5 minutes'))))
         OR (b.status='processing' AND b.updated_at<NOW()-INTERVAL '5 minutes')
       ORDER BY b.updated_at FOR UPDATE SKIP LOCKED LIMIT 10
     ) UPDATE notification_email_batches b SET status='processing',updated_at=NOW() FROM due WHERE b.batch_key=due.batch_key RETURNING b.*`);
