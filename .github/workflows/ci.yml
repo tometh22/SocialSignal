@@ -83,7 +83,12 @@ jobs:
           npm run db:performance-indexes
 
       - name: Install browser
-        run: npx playwright install --with-deps chromium
+        run: |
+          # Keep dependency verification while avoiding the slow regional mirror.
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          fi
+          npx playwright install --with-deps chromium
 
       - name: Browser smoke tests
         run: npm run test:e2e
