@@ -23,6 +23,7 @@ import {
   useDismissTrainingInvitation,
 } from "@/hooks/use-training";
 import { authFetchJson } from "@/lib/queryClient";
+import { ApiError } from "@/lib/api-error";
 import {
   canAccessTraining,
   TRAINING_STEPS,
@@ -58,6 +59,36 @@ function LoadError({ retry }: { retry: () => void }) {
   );
 }
 
+// Cached content may survive a connection/server error, but never an explicit
+// authentication, authorization or availability rejection from the server.
+function accessRejected(error: Error | null): boolean {
+  return error instanceof ApiError && [401, 403, 404].includes(error.status);
+}
+
+function RefreshWarning({
+  visible,
+  retry,
+}: {
+  visible: boolean;
+  retry: () => void;
+}) {
+  if (!visible) return null;
+  return (
+    <div
+      role="alert"
+      className="mx-auto mb-4 max-w-3xl rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+    >
+      <p>
+        No pudimos actualizar la capacitación. Conservamos tu respuesta en esta
+        pantalla.
+      </p>
+      <Button variant="outline" size="sm" className="mt-2" onClick={retry}>
+        Reintentar actualización
+      </Button>
+    </div>
+  );
+}
+
 export default function TrainingPage() {
   const [, params] = useRoute("/training/:lessonId");
   const catalog = useTrainingCatalog();
@@ -70,17 +101,23 @@ export default function TrainingPage() {
         Cargando tu capacitación…
       </p>
     );
-  if (catalog.isError || !catalog.data)
+  if (!catalog.data || accessRejected(catalog.error))
     return <LoadError retry={() => void catalog.refetch()} />;
   const lessons = catalog.data.lessons;
   if (params?.lessonId) {
     const summary = lessons.find((l) => l.id === params.lessonId);
     return summary ? (
-      <LessonView
-        key={`${summary.id}:${summary.version}`}
-        lessonId={summary.id}
-        audience={catalog.data.audience}
-      />
+      <>
+        <RefreshWarning
+          visible={catalog.isError}
+          retry={() => void catalog.refetch()}
+        />
+        <LessonView
+          key={`${summary.id}:${summary.version}`}
+          lessonId={summary.id}
+          audience={catalog.data.audience}
+        />
+      </>
     ) : (
       <div className="space-y-4 p-6">
         <h1 className="text-2xl font-semibold">Lección no disponible</h1>
@@ -108,6 +145,10 @@ export default function TrainingPage() {
   );
   return (
     <div className="mx-auto max-w-6xl space-y-7 pb-8">
+      <RefreshWarning
+        visible={catalog.isError}
+        retry={() => void catalog.refetch()}
+      />
       <section className="overflow-hidden rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-6 sm:p-8">
         <div className="flex items-center gap-2 text-sm font-semibold text-indigo-700">
           <GraduationCap className="h-5 w-5" /> APRENDÉ CON MIND
@@ -295,7 +336,7 @@ function LessonView({
     refetchOnWindowFocus: true,
   });
   if (query.isLoading) return <p role="status">Cargando lección…</p>;
-  if (query.isError || !query.data)
+  if (!query.data || accessRejected(query.error))
     return (
       <div className="space-y-4">
         <Button asChild variant="ghost">
@@ -307,10 +348,16 @@ function LessonView({
   if (!canAccessTraining(audience, query.data.access))
     return <p>Esta lección ya no está disponible para tu cuenta.</p>;
   return (
-    <LessonPlayer
-      key={`${lessonId}:${query.data.version}`}
-      lesson={query.data}
-    />
+    <>
+      <RefreshWarning
+        visible={query.isError}
+        retry={() => void query.refetch()}
+      />
+      <LessonPlayer
+        key={`${lessonId}:${query.data.version}`}
+        lesson={query.data}
+      />
+    </>
   );
 }
 

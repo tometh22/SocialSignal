@@ -242,3 +242,112 @@ test("admin sees the internal curriculum including finance, operations and confi
     page.getByText("No encontramos lecciones con esos filtros."),
   ).toBeVisible();
 });
+
+test("background refresh failures preserve unsaved answers and failed-save recovery", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await signIn(page);
+  await page.goto("/training/tareas");
+  await page.getByRole("button", { name: /Aprendé/ }).click();
+  await page
+    .getByRole("button", { name: "Guardar explicación como leída" })
+    .click();
+  await page.getByRole("button", { name: "Siguiente", exact: true }).click();
+  await page
+    .getByLabel("Título", { exact: true })
+    .fill("Respuesta todavía sin guardar");
+  await page.route("**/api/training/lessons/tareas/progress", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: '{"message":"Error temporal de guardado"}',
+    }),
+  );
+  await page.getByRole("button", { name: "Comprobar respuesta" }).click();
+  await expect(
+    page.getByRole("button", { name: "Reintentar guardado" }),
+  ).toBeVisible();
+
+  const catalogFailure = (route: import("@playwright/test").Route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: '{"message":"Error temporal de catálogo"}',
+    });
+  await page.route("**/api/training", catalogFailure);
+  // Exercise the automatic catalog refresh and its retry without a real minute of waiting.
+  const refreshed = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/training") && response.status() === 503,
+  );
+  await page.clock.runFor(61_000);
+  await refreshed;
+  await page.clock.runFor(2_000);
+  await expect(
+    page.getByText(
+      "No pudimos actualizar la capacitación. Conservamos tu respuesta en esta pantalla.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByLabel("Título", { exact: true })).toHaveValue(
+    "Respuesta todavía sin guardar",
+  );
+  await expect(
+    page.getByRole("button", { name: "Reintentar guardado" }),
+  ).toBeVisible();
+
+  // Recover catalog first, then fail only the detail's window-focus refresh.
+  await page.unroute("**/api/training", catalogFailure);
+  await page.getByRole("button", { name: "Reintentar actualización" }).click();
+  await expect(
+    page.getByRole("button", { name: "Reintentar actualización" }),
+  ).toHaveCount(0);
+  const detailFailure = (route: import("@playwright/test").Route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: '{"message":"Error temporal de lección"}',
+    });
+  await page.route("**/api/training/lessons/tareas", detailFailure);
+  const focused = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/training/lessons/tareas") &&
+      response.status() === 503,
+  );
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event("visibilitychange")),
+  );
+  await focused;
+  await page.clock.runFor(2_000);
+  await expect(
+    page.getByRole("button", { name: "Reintentar actualización" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Título", { exact: true })).toHaveValue(
+    "Respuesta todavía sin guardar",
+  );
+  await expect(
+    page.getByRole("button", { name: "Reintentar guardado" }),
+  ).toBeVisible();
+
+  // Explicit revocation is different: cached content must stop being shown.
+  await page.unroute("**/api/training/lessons/tareas", detailFailure);
+  await page.route("**/api/training/lessons/tareas", (route) =>
+    route.fulfill({
+      status: 404,
+      contentType: "application/json",
+      body: '{"message":"Lección no disponible"}',
+    }),
+  );
+  const rejected = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/training/lessons/tareas") &&
+      response.status() === 404,
+  );
+  await page.getByRole("button", { name: "Reintentar actualización" }).click();
+  await rejected;
+  await page.clock.runFor(2_000);
+  await expect(page.getByLabel("Título", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText("No pudimos cargar la capacitación.", { exact: false }),
+  ).toBeVisible();
+});
