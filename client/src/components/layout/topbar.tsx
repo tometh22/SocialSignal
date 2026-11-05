@@ -242,6 +242,7 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
     // Project task pages render a richer in-page breadcrumb with the project name.
     // The generic route breadcrumb only knows the numeric id, so showing both is noisy.
     if (/^\/tasks\/projects\/\d+$/.test(location)) return [];
+    if (location === '/training' || location.startsWith('/training/')) return [{ name: 'Capacitación', path: '/training' }];
     if (location === "/") return [{ name: "Inicio", path: "/" }];
     const paths = location.split("/").filter(Boolean);
     const result: { name: string; path: string }[] = [];

@@ -1,4 +1,5 @@
 import { registerNotificationRoutes } from "./routes-notifications";
+import { registerTrainingRoutes } from "./routes-training";
 import { getTransactionalEmailConfig, sendTransactionalEmail } from "./services/email-transport";
 import { withJobLock } from "./services/job-lock";
 import { quotationListStatsQuery } from "./domain/quotation-list-stats";
@@ -1083,6 +1084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerBiRoutes(app, pool, requireAuth);
   registerSearchRoutes(app, requireAuth, accessibleTaskProjectIds);
   registerPerformanceRoutes(app, pool, requireAuth);
+  registerTrainingRoutes(app, pool, requireAuth);
   app.use((req, res, next) => {
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && req.path.startsWith("/api") && !/^\/api\/(?:telemetry|notifications|reviews|status-semanal|conversations)(?:\/|$)/.test(req.path)) {
       res.once("finish", () => {

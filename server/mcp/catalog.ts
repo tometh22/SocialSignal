@@ -1,5 +1,7 @@
 // Explicit business-data allowlist. Review permissions and fields before adding resources.
 export const excludedMindTables = {
+  training_progress: "Avance y respuestas personales de capacitación; solo accesibles por su titular en la app.",
+  training_preferences: "Preferencias personales de capacitación; no son datos de negocio.",
   "notification_email_batches": "Contenido privado de la cola de correo",
   "notification_email_events": "Eventos técnicos de entrega del proveedor",
   "notification_email_suppressions": "Bloqueos privados de direcciones de correo",
