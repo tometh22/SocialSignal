@@ -27,6 +27,19 @@ export const users = pgTable("users", {
 });
 
 export const USER_ROLES = ["admin", "manager", "member", "external_provider"] as const;
+export const trainingProgress = pgTable("training_progress", {
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  lessonId: text("lesson_id").notNull(),
+  version: integer("version").notNull(),
+  state: jsonb("state").notNull().default({ completedSteps: [], answers: {} }),
+  completedAt: timestamp("completed_at"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, t => ({ pk: primaryKey({ columns: [t.userId, t.lessonId, t.version] }), versionCheck: check("training_progress_version_check", sql`${t.version} > 0`) }));
+
+export const trainingPreferences = pgTable("training_preferences", {
+  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  invitationDismissedAt: timestamp("invitation_dismissed_at"),
+});
 export type UserRole = typeof USER_ROLES[number];
 
 // Esquema para crear usuarios

@@ -1,6 +1,7 @@
 import { deliverableNameCompatibilityMigrationSql } from "./migrations/deliverable-name-compatibility";
 import { payrollDocumentModesMigrationSql } from "./migrations/payroll-document-modes";
 import { capacityPlanningMigrationSql } from "./migrations/capacity-planning";
+import { trainingMigrationSql } from "./migrations/training";
 import { teamSettlementWorkflowMigrationSql } from "./migrations/team-settlement-workflow";
 import express, { type Request, Response, NextFunction } from "express";
 import { notificationReliabilityMigrationSql } from "./migrations/notification-reliability";
@@ -95,6 +96,7 @@ async function applyPendingMigrations() {
 
   try {
     await run('0086 MCP OAuth grants', mcpOauthMigrationSql);
+    await run('0094 interactive training', trainingMigrationSql);
     // 0002_new_terrax: personnel extra columns (idempotent guard for Railway DB)
     // These were added via drizzle-kit migration in the repo but may not have been
     // applied if drizzle-kit push/migrate was never run on the production DB.

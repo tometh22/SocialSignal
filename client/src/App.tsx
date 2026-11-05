@@ -19,6 +19,8 @@ const Clients = lazy(() => import("@/pages/clients"));
 const Admin = lazy(() => import("@/pages/admin-fixed"));
 const AdminDataSources = lazy(() => import("@/pages/admin-data-sources"));
 const AdminDefinitions = lazy(() => import("@/pages/admin-definitions"));
+const TrainingPage = lazy(() => import("@/pages/training"));
+import { TrainingInvitation } from "@/components/training/training-invitation";
 
 // Project Management Pages
 const ActiveProjectsNext = lazy(() => import("@/pages/active-projects-next"));
@@ -249,6 +251,7 @@ function AppRoutes() {
 
           <div className="flex min-h-0 flex-col flex-1 overflow-clip min-w-0">
             <Topbar onMenuClick={() => setMobileSidebarOpen(true)} />
+            <TrainingInvitation />
             <main className={isReviewRoom ? "app-main flex-1 min-h-0 flex flex-col overflow-hidden" : "app-main flex-1 overflow-y-auto overflow-x-hidden"}>
               <div className={isReviewRoom ? "app-content status-room-content max-w-full" : "app-content max-w-full p-3 sm:p-5 lg:p-6"}>
                 <Suspense fallback={<AppRouteFallback />}>
@@ -258,6 +261,8 @@ function AppRoutes() {
 
                   {/* Core Application Routes */}
                   <ProtectedRoute path="/notifications" component={NotificationsPage} />
+                  <ProtectedRoute path="/training" component={TrainingPage} />
+                  <ProtectedRoute path="/training/:lessonId" component={TrainingPage} />
                   <ProtectedRoute path="/" component={HomeDashboard} requiredAnyPermission={HOME_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/dashboard" component={ExecutiveDashboardV2} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/dashboard-legacy" component={() => <Redirect to="/dashboard" />} />

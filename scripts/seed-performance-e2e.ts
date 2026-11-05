@@ -58,5 +58,18 @@ try {
     baseCost: 100, complexityAdjustment: 0, markupAmount: 50, totalAmount: 150, archivedAt: index === 0 ? new Date() : null,
   })));
   for (const view of ["pnl_mensual", "proyectos_mensual", "costos_mensual", "equipo_mensual", "cashflow", "revenue_por_cliente"]) await pool.query(`CREATE VIEW vw_looker_${view} AS SELECT 1 AS test_value`);
+  // Dedicated accounts keep the training journey independent of operational tests.
+  for (const profile of ['member', 'admin', 'provider'] as const) {
+    const email = `e2e-training-${profile}@example.test`;
+    const [user] = await db.insert(schema.users).values({ firstName: 'Capacitación', lastName: profile, email, password,
+      role: profile === 'provider' ? 'external_provider' : profile, isAdmin: profile === 'admin',
+      permissions: profile === 'member' ? ['task_manager'] : [] }).returning();
+    const [person] = await db.insert(schema.personnel).values({ name: `Capacitación ${profile}`, email, roleId: role.id, hourlyRate: 10 }).returning();
+    await db.insert(schema.userNotificationPreferences).values({ userId: user.id, setupCompletedAt: new Date() });
+    if (profile === 'provider') {
+      const [provider] = await db.insert(schema.externalProviders).values({ userId: user.id, companyName: 'Proveedor de capacitación', personnelId: person.id }).returning();
+      await db.insert(schema.providerProjectAccess).values({ providerId: provider.id, projectId: project.id, canLogHours: true });
+    }
+  }
   console.log(JSON.stringify({ people, projectId: project.id, taskId: tasks[0].id, today }));
 } finally { await pool.end(); }

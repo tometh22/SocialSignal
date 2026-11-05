@@ -156,7 +156,7 @@ export default function HomeDashboard() {
     .filter(({ bucket }) => bucket === "overdue" || bucket === "in_progress")
     .sort((a, b) => (a.task.dueDate?.slice(0, 10) ?? "9999").localeCompare(b.task.dueDate?.slice(0, 10) ?? "9999"))
     .map(({ task }) => task);
-  const todayTaskCount = personalTasks ? (personalTasks.counts.overdue ?? 0) + (personalTasks.counts.in_progress ?? 0) : 0;
+  const todayTaskCount = (personalTasks?.counts?.overdue ?? 0) + (personalTasks?.counts?.in_progress ?? 0);
   const daysLate = (due: string) => Math.round((Date.parse(`${todayCivil}T00:00:00Z`) - Date.parse(`${due.slice(0, 10)}T00:00:00Z`)) / 86_400_000);
 
   // Capacidad del equipo: sólo para quien ya accede a Operaciones.

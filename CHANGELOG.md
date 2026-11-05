@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.14.26 — 2026-11-05
+
+- Nueva sección Capacitación con 37 lecciones por permisos, búsqueda, módulos, avance personal y acceso para proveedores. Invitación inicial descartable y ayuda integrada en escritorio y móvil.
+- Explicaciones, formularios simulados, ejercicios de orden y preguntas con devolución. Las prácticas usan datos ficticios y solo guardan respuestas y avance, sin modificar registros operativos.
+- Progreso por usuario, lección y versión; reintentos, continuidad entre sesiones y conservación del historial. El servidor valida respuestas y acceso, incluidos proyectos y habilitación de horas de proveedores.
+- Migración aditiva 0094 para progreso y preferencias. Ambos quedan excluidos del catálogo MCP como información personal. Se evita un fallo de Inicio en cuentas nuevas sin conteos de tareas.
+- Pruebas de permisos, persistencia, concurrencia y versiones con PostgreSQL aislado; recorridos de navegador para capacitación, teclado, móvil y recuperación de errores de guardado. Inventario de funciones y mantenimiento documentados.
+
 ## 1.14.25 — 2026-11-04
 
 - Las notificaciones verifican permisos, membresías y titularidad al crearse, mostrarse y enviarse, también en MCP. Se separan las audiencias de tareas, salas, aprobaciones, ausencias y liquidaciones.
