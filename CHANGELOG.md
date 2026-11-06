@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.32 — 2026-11-06
+
+- Mis tareas prioriza los vencimientos más próximos también al cargar más páginas. Mantiene un orden estable para fechas iguales y deja las tareas sin vencimiento al final; Finalizadas conserva su orden anterior.
+- El Panel de horas incorpora gráficos de estimadas por semana y por proyecto, con los mismos filtros de período, persona, proyecto y sección. Los gráficos semanales comparten escala y los proyectos conservan sus colores entre reales y estimadas.
+- Las semanas con planificación y sin horas registradas también se muestran. Las estimaciones conservan la regla de semanas completas que intersectan el período, aclarada en pantalla.
+- Regresiones de paginación con PostgreSQL incorporadas a CI, agregación semanal y verificación de navegador en escritorio y móvil. Sin nuevas migraciones.
+
 ## 1.14.31 — 2026-11-06
 
 - Corrige la fuente de las exclusiones: los meses del Máster leen una misma instantánea de Resumen Ejecutivo, Costos directos e indirectos, Costos estimados y las provisiones pertinentes de Pasivo. Los consumos de Pasivo ya no sustituyen los gastos que realmente alimentan el resultado.

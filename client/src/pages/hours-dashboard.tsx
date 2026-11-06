@@ -25,6 +25,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { parseTaskCivilDate } from "@shared/utils/task-civil-date";
 import { approvedAbsenceRanges, countWorkdays } from "@shared/utils/available-hours";
 import { formatTaskHoursLabel } from "@shared/utils/task-hours-label";
+import type { WeeklyHours } from "@shared/utils/weekly-hours";
 
 type Personnel = { id: number; name: string };
 type Project = { id: number; name: string; client_name: string };
@@ -34,7 +35,7 @@ const CHART_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3
 type HoursSummary = {
   entries: any[];
   availableSections?: { value: string; label: string }[];
-  byWeek: { week: string; hours: number }[];
+  byWeek: WeeklyHours[];
   byProject: { projectId: number | null; name: string; hours: number; estimatedHours: number }[];
   byPerson: { personnelId: number; name: string; hours: number; estimatedHours: number }[];
   activeTeam?: { id: number; name: string; contractType: string; dailyHours: number }[];
@@ -134,9 +135,13 @@ export default function HoursDashboardPage() {
 
   const weeklyData = (summary?.byWeek || []).map(w => ({
     week: format(parseTaskCivilDate(w.week), "dd/MM", { locale: es }),
-    horas: parseFloat(w.hours.toFixed(2)),
-    label: formatHoursLabel(w.hours),
+    hours: Number(w.hours.toFixed(2)),
+    estimatedHours: Number((w.estimatedHours ?? 0).toFixed(2)),
+    realLabel: formatHoursLabel(w.hours),
+    estimatedLabel: formatHoursLabel(w.estimatedHours ?? 0),
   }));
+  const weeklyMax = Math.max(1, ...weeklyData.flatMap(w => [w.hours, w.estimatedHours]));
+  const hasEstimates = (summary?.byProject || []).some(project => project.estimatedHours > 0);
 
   // Holidays for the relevant years to compute available hours (sin feriados)
   const rangeYears = Array.from(new Set([
@@ -312,12 +317,12 @@ export default function HoursDashboardPage() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      ) : !summary || summary.entries.length === 0 ? (
+      ) : !summary || (summary.entries.length === 0 && !hasEstimates) ? (
         <EmptyState
           announce
           icon={<Clock className="h-5 w-5" />}
-          title="No hay horas registradas"
-          description="No encontramos registros para los filtros elegidos. Podés cambiar el período o cargar horas desde una tarea."
+          title="No hay horas registradas ni estimadas"
+          description="No encontramos registros ni estimaciones para los filtros elegidos. Podés cambiar el período o cargar horas desde una tarea."
           action={(
             <Button asChild>
               <Link href="/tasks">Ir a mis tareas</Link>
@@ -360,80 +365,86 @@ export default function HoursDashboardPage() {
             )}
           </MetricGrid>
 
-          {/* Charts */}
+          {/* Real and planned hours share the same weeks, scale and project colors. */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Bar chart - hours by week */}
-            <div className="bg-card rounded-xl border p-4">
-              <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-primary" />
-                Horas por semana
-              </h3>
-              {weeklyData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={weeklyData} margin={{ top: 18, right: 10, left: -10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="week" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                    <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
-                      formatter={(v: any) => [`${v}h`, "Horas"]}
-                      labelFormatter={(label) => `Sem. del ${label}`}
-                    />
-                    <Bar dataKey="horas" fill="#6366f1" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="label" position="top" style={{ fontSize: "10px", fill: "hsl(var(--muted-foreground))", fontWeight: 600 }} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">Sin datos</div>
-              )}
-            </div>
-
-            {/* Pie chart - by project */}
-            <div className="bg-card rounded-xl border p-4">
-              <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                <PieChart className="h-4 w-4 text-primary" />
-                Tiempo por proyecto <span className="text-xs font-normal text-muted-foreground">· horas del período</span>
-              </h3>
-              {summary.byProject.length > 0 ? (
-                <div className="flex items-center gap-4">
-                  <ResponsiveContainer width="55%" height={200}>
-                    <RPieChart>
-                      <Pie
-                        data={summary.byProject}
-                        dataKey="hours"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={2}
-                      >
-                        {summary.byProject.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(v: any) => [`${v.toFixed(1)}h`]}
-                        contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
-                      />
-                    </RPieChart>
-                  </ResponsiveContainer>
-                  <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[200px]">
-                    {summary.byProject.map((p, i) => (
-                      <div key={p.projectId ?? "unassigned"} className="flex items-center gap-2 text-xs">
-                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-                        <span className="flex-1 truncate text-muted-foreground" title={p.name}>{p.name}</span>
-                        <span className="font-semibold text-foreground flex-shrink-0 tabular-nums">{p.hours.toFixed(1)}h</span>
-                      </div>
-                    ))}
-                  </div>
+            {(["hours", "estimatedHours"] as const).map(metric => {
+              const estimated = metric === "estimatedHours";
+              return (
+                <div key={metric} className="bg-card rounded-xl border p-4">
+                  <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-primary" />
+                    {estimated ? "Horas estimadas por semana" : "Horas reales por semana"}
+                  </h3>
+                  {weeklyData.some(week => week[metric] > 0) ? (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart accessibilityLayer data={weeklyData} margin={{ top: 18, right: 10, left: -10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="week" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                        <YAxis domain={[0, weeklyMax]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
+                          formatter={(value: number) => [formatTaskHoursLabel(value), estimated ? "Estimadas" : "Reales"]}
+                          labelFormatter={label => `Sem. del ${label}`}
+                        />
+                        <Bar dataKey={metric} name={estimated ? "Estimadas" : "Reales"} fill={estimated ? "#0ea5e9" : "#6366f1"} radius={[4, 4, 0, 0]}>
+                          <LabelList dataKey={estimated ? "estimatedLabel" : "realLabel"} position="top" style={{ fontSize: "10px", fill: "hsl(var(--muted-foreground))", fontWeight: 600 }} />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
+                      {estimated ? "Sin horas estimadas para los filtros elegidos" : "Sin horas registradas para los filtros elegidos"}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">Sin datos</div>
-              )}
-            </div>
+              );
+            })}
+
+            {(["hours", "estimatedHours"] as const).map(metric => {
+              const estimated = metric === "estimatedHours";
+              const projectsWithHours = summary.byProject.filter(project => project[metric] > 0);
+              return (
+                <div key={`project-${metric}`} className="bg-card rounded-xl border p-4">
+                  <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                    <PieChart className="h-4 w-4 text-primary" />
+                    {estimated ? "Horas estimadas por proyecto" : "Tiempo por proyecto"}
+                    <span className="text-xs font-normal text-muted-foreground">· horas del período</span>
+                  </h3>
+                  {projectsWithHours.length > 0 ? (
+                    <div className="flex items-center gap-4">
+                      <ResponsiveContainer width="55%" height={200}>
+                        <RPieChart>
+                          <Pie data={projectsWithHours} dataKey={metric} nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2}>
+                            {projectsWithHours.map(project => (
+                              <Cell key={project.projectId ?? "unassigned"} fill={CHART_COLORS[summary.byProject.indexOf(project) % CHART_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value: number) => formatTaskHoursLabel(value)}
+                            contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
+                          />
+                        </RPieChart>
+                      </ResponsiveContainer>
+                      <div className="flex-1 min-w-0 space-y-1.5 overflow-y-auto max-h-[200px]">
+                        {projectsWithHours.map(project => (
+                          <div key={project.projectId ?? "unassigned"} className="flex items-center gap-2 text-xs">
+                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: CHART_COLORS[summary.byProject.indexOf(project) % CHART_COLORS.length] }} />
+                            <span className="flex-1 truncate text-muted-foreground" title={project.name}>{project.name}</span>
+                            <span className="font-semibold text-foreground flex-shrink-0 tabular-nums">{project[metric].toFixed(1)}h</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+                      {estimated ? "Sin horas estimadas para los filtros elegidos" : "Sin horas registradas para los filtros elegidos"}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
+          <p className="text-xs text-muted-foreground">Las estimaciones incluyen las semanas completas que intersectan el período elegido. Las horas reales corresponden a los días del período.</p>
 
           {/* Calidad de estimación por proyecto — estimado vs real del período
               anclado a la tarea, independiente de quién cargó las horas. */}
