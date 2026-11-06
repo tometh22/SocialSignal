@@ -9740,6 +9740,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/v2/executive/proyeccion/escenario", requireAuth, requirePermission("dashboard", "finance"), async (req, res) => {
+    const year = Number(req.query.year ?? new Date().getFullYear());
+    if (!Number.isInteger(year) || year < 2020 || year > 2100) return res.status(400).json({ message: "year inválido" });
+    try {
+      const { getFinancialScenario } = await import('./services/financial-scenario');
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json(await getFinancialScenario(year));
+    } catch (error) {
+      console.error('❌ Escenario financiero:', error);
+      res.status(500).json({ message: 'No se pudieron cargar los conceptos del escenario' });
+    }
+  });
+
   app.get("/api/v2/executive/dashboard", requireAuth, requirePermission("dashboard", "finance"), async (req, res) => {
     try {
       const p = (k: string) => { const v = parseInt(req.query[k] as string); return isNaN(v) ? undefined : v; };

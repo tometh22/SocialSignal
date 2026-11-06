@@ -15,6 +15,8 @@ vi.mock("../server/db", async () => {
 
 import { pool } from "../server/db";
 import { getNativeProjectionSummary } from "../server/services/financial-native-dashboard";
+import { getFinancialScenario } from "../server/services/financial-scenario";
+import { calculateFinancialScenario } from "../shared/financial-scenario";
 
 describe.skipIf(!setup.url)("financial projection sources", () => {
   let admin: Client;
@@ -27,10 +29,16 @@ describe.skipIf(!setup.url)("financial projection sources", () => {
       CREATE TABLE financial_close_periods (period_key text PRIMARY KEY, status text);
       CREATE TABLE monthly_financial_summary (
         period_key text PRIMARY KEY, facturacion_total numeric, costos_directos numeric,
-        costos_indirectos numeric, ebit_operativo numeric, cierre_date timestamp
+        costos_indirectos numeric, ebit_operativo numeric, cierre_date timestamp,
+        beneficio_neto numeric, margen_neto numeric
       );
-      CREATE TABLE fact_cost_month (period_key text PRIMARY KEY, direct_usd numeric, indirect_usd numeric);
-      CREATE TABLE fact_estimated_cost_month (month_key text, monto_total_usd numeric);
+      CREATE TABLE fact_cost_month (period_key text PRIMARY KEY, direct_usd numeric, indirect_usd numeric, provisions_usd numeric);
+      CREATE TABLE fact_estimated_cost_month (month_key text, monto_total_usd numeric, id serial, detalle text, subtipo_costo text, puesto text);
+      CREATE TABLE pasivo_entries (
+        id serial PRIMARY KEY, period_key text, detalle text, concepto text, descripcion text, vendor_name text,
+        subtipo_costo text, fecha_emision timestamp, source text DEFAULT 'excel', cost_treatment text DEFAULT 'unclassified',
+        net_amount numeric, currency text, cotizacion numeric, monto_total_usd numeric, monto_usd numeric, monto_ars numeric, voided_at timestamp
+      );
       CREATE TABLE revenue_events (
         id serial PRIMARY KEY, client_name text DEFAULT 'Cliente', project_name text, project_id integer,
         amount_usd numeric, invoice_period text, delivery_start text, delivery_end text,
@@ -42,7 +50,7 @@ describe.skipIf(!setup.url)("financial projection sources", () => {
   });
   beforeEach(async () => {
     await pool.query(`TRUNCATE system_config, financial_close_periods, monthly_financial_summary,
-      fact_cost_month, fact_estimated_cost_month, revenue_events`);
+      fact_cost_month, fact_estimated_cost_month, revenue_events, pasivo_entries`);
   });
   afterAll(async () => {
     await pool.end();
@@ -143,5 +151,48 @@ describe.skipIf(!setup.url)("financial projection sources", () => {
     `);
     const result = await getNativeProjectionSummary(2026);
     expect(result.meses[0]).toMatchObject({ cierre: true, facturacion: 2500, costos: 600, resultado: 1900 });
+  });
+
+  it("loads annual scenario detail without adding card estimates, voids or balance-only documents", async () => {
+    await pool.query(`
+      INSERT INTO system_config VALUES ('app_mode_cutover_date','2026-01');
+      INSERT INTO monthly_financial_summary (period_key,facturacion_total,ebit_operativo,beneficio_neto,margen_neto) VALUES
+        ('2026-01',1000,400,250,25), ('2026-02',100,100,100,100), ('2026-11',1000,400,1000,100);
+      INSERT INTO fact_estimated_cost_month (month_key,monto_total_usd,detalle,subtipo_costo) VALUES
+        ('2026-01',200,'Tarjeta USA','Tarjeta'), ('2026-11',200,'Tarjeta USA','Tarjeta');
+      INSERT INTO pasivo_entries (period_key,detalle,concepto,subtipo_costo,monto_total_usd,fecha_emision) VALUES
+        ('2026-01','Tarjeta USA','REPLIT PURCHASE','Tarjeta',100,'2026-01-15');
+      INSERT INTO pasivo_entries (period_key,detalle,monto_total_usd,voided_at) VALUES ('2026-01','Void',999,now());
+      INSERT INTO pasivo_entries (period_key,detalle,monto_total_usd,cost_treatment) VALUES ('2026-01','Balance',999,'balance_only');
+    `);
+    const data = await getFinancialScenario(2026);
+    expect(data.costs).toHaveLength(2);
+    expect(data.costs[0]).toMatchObject({ description: 'REPLIT PURCHASE', amountUsd: 100, source: 'ledger', date: '2026-01-15' });
+    expect(data.costs[1]).toMatchObject({ source: 'estimate', periodKey: '2026-11', amountUsd: 200 });
+    const result = calculateFinancialScenario(data, data.costs.map(cost => cost.id));
+    expect(result.excludedUsd).toBe(300);
+    expect(result.baseNetProfitUsd).toBe(350);
+    expect(result.adjustedNetProfitUsd).toBe(450);
+    expect(result.netMonthCount).toBe(2);
+    expect(result.months[1].netProfitUsd).toBe(100);
+    expect(result.months[10].adjustedNetProfitUsd).toBeNull();
+  });
+
+  it("uses net invoice amounts and period provisions for native months; missing FX stays unknown", async () => {
+    await pool.query(`
+      INSERT INTO revenue_events (invoice_period,amount_usd) VALUES ('2026-06',1000);
+      INSERT INTO fact_cost_month VALUES ('2026-06',600,100,50);
+      INSERT INTO pasivo_entries (period_key,detalle,concepto,source,cost_treatment,net_amount,currency,cotizacion,monto_total_usd) VALUES
+        ('2026-06','OpenAI','API','mind_intake','indirect',200,'ARS',2,121),
+        ('2026-06','Neon','DB','mind_intake','indirect',200,'ARS',NULL,121);
+    `);
+    const data = await getFinancialScenario(2026);
+    expect(data.months[5].netProfitUsd).toBe(250);
+    const openai = data.costs.find(cost => cost.concept === 'OpenAI')!;
+    expect(openai.amountUsd).toBe(100);
+    expect(data.costs.find(cost => cost.concept === 'Neon')?.amountUsd).toBeNull();
+    expect(calculateFinancialScenario(data, data.costs.map(cost => cost.id))).toMatchObject({
+      excludedUsd: 100, adjustedCostUsd: 600, adjustedEbitUsd: 400, adjustedNetProfitUsd: 350,
+    });
   });
 });

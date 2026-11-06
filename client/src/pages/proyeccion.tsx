@@ -17,6 +17,7 @@ import { CompactPageHeader } from "@/components/ui/compact-page-header";
 import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
 import { PageShell } from "@/components/ui/page-shell";
 import { ToolbarPanel } from "@/components/ui/toolbar-panel";
+import { CostScenario } from "@/components/finance/cost-scenario";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Target, TrendingUp, DollarSign, Info } from "lucide-react";
@@ -144,6 +145,8 @@ export default function ProyeccionPage() {
                 />
               ))}
             </MetricGrid>
+
+            <CostScenario key={year} year={year} />
 
             <Card>
               <CardHeader className="pb-3">
