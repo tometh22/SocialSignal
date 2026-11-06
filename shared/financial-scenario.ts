@@ -15,15 +15,18 @@ export interface ScenarioCost {
   description: string;
   category: string;
   date: string | null;
-  source: 'ledger' | 'estimate';
+  source: 'ledger' | 'estimate' | 'master';
   amountUsd: number | null;
-  impact: 'operating' | 'net';
+  impact: 'operating' | 'net' | 'ebit';
+  sourceDetail?: string;
 }
 
 export interface FinancialScenario {
   year: number;
   months: ScenarioMonth[];
   costs: ScenarioCost[];
+  sourceReadAt?: string;
+  warnings?: string[];
 }
 
 export const roundScenarioMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
@@ -51,13 +54,15 @@ export function calculateFinancialScenario(data: FinancialScenario, selectedIds:
   const months = data.months.map(base => {
     const costs = selected.filter(cost => cost.periodKey === base.periodKey);
     const excludedUsd = roundScenarioMoney(costs.reduce((total, cost) => total + cost.amountUsd!, 0));
-    const operatingExcludedUsd = roundScenarioMoney(costs.filter(cost => cost.impact === 'operating')
+    const operatingExcludedUsd = roundScenarioMoney(costs.filter(cost => cost.impact !== 'net')
+      .reduce((total, cost) => total + cost.amountUsd!, 0));
+    const netExcludedUsd = roundScenarioMoney(costs.filter(cost => cost.impact !== 'ebit')
       .reduce((total, cost) => total + cost.amountUsd!, 0));
     return {
-      ...base, excludedUsd, operatingExcludedUsd,
+      ...base, excludedUsd, operatingExcludedUsd, netExcludedUsd,
       adjustedCostUsd: roundScenarioMoney(base.costUsd - operatingExcludedUsd),
       adjustedEbitUsd: roundScenarioMoney(base.ebitUsd + operatingExcludedUsd),
-      adjustedNetProfitUsd: base.netProfitUsd == null ? null : roundScenarioMoney(base.netProfitUsd + excludedUsd),
+      adjustedNetProfitUsd: base.netProfitUsd == null ? null : roundScenarioMoney(base.netProfitUsd + netExcludedUsd),
     };
   });
   const sum = (pick: (month: typeof months[number]) => number) =>
@@ -73,7 +78,7 @@ export function calculateFinancialScenario(data: FinancialScenario, selectedIds:
     adjustedEbitUsd: sum(month => month.adjustedEbitUsd),
     baseNetProfitUsd: netMonths.length ? sum(month => month.netProfitUsd ?? 0) : null,
     adjustedNetProfitUsd: netMonths.length ? sum(month => month.adjustedNetProfitUsd ?? 0) : null,
-    netChangeUsd: netMonths.length ? roundScenarioMoney(netMonths.reduce((total, month) => total + month.excludedUsd, 0)) : null,
+    netChangeUsd: netMonths.length ? roundScenarioMoney(netMonths.reduce((total, month) => total + month.netExcludedUsd, 0)) : null,
     netMonthCount: netMonths.length,
     missingNetMonths: months.filter(month => month.netProfitUsd == null).map(month => month.monthLabel),
     negativeCostMonths: months.filter(month => month.adjustedCostUsd < 0).map(month => month.monthLabel),
