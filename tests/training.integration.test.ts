@@ -4,7 +4,6 @@ import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { registerTrainingRoutes } from "../server/routes-training";
 import { trainingMigrationSql } from "../server/migrations/training";
-import { trainingLessons } from "../server/content/training-catalog";
 
 const url = process.env.TRAINING_TEST_DATABASE_URL;
 if (url && !["localhost", "127.0.0.1", "[::1]"].includes(new URL(url).hostname))
@@ -31,15 +30,13 @@ const submit = (
   answer?: unknown,
   user = "1",
   id = "bienvenida",
-  version = 1,
+  version = 2,
 ) =>
   req(`/lessons/${id}/progress`, user, {
     step,
     version,
     ...(answer === undefined ? {} : { answer }),
   });
-const curriculum = (id = "bienvenida") =>
-  trainingLessons.find((l) => l.id === id)!;
 
 describe.skipIf(!url)("training API / PostgreSQL", () => {
   beforeAll(async () => {
@@ -95,7 +92,7 @@ describe.skipIf(!url)("training API / PostgreSQL", () => {
     await pool.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
     await pool.end();
   });
-  it("rejects anonymous, inaccessible lessons and forged ownership; returns no solutions", async () => {
+  it("rejects anonymous, inaccessible lessons and forged ownership; returns instructions without assessments", async () => {
     expect((await req("", "")).status).toBe(401);
     expect((await req("/lessons/reportes")).status).toBe(404);
     expect((await submit("learn", undefined, "1", "reportes")).status).toBe(
@@ -116,26 +113,54 @@ describe.skipIf(!url)("training API / PostgreSQL", () => {
     const response = await req("/lessons/bienvenida");
     expect(response.headers.get("cache-control")).toBe("no-store");
     const lesson = await response.json();
-    expect(lesson.practice).not.toHaveProperty("answer");
-    expect(lesson.check).not.toHaveProperty("feedback");
+    expect(lesson).not.toHaveProperty("practice");
+    expect(lesson).not.toHaveProperty("check");
+    expect(lesson.instructions.length).toBeGreaterThan(2);
   });
-  it("persists unsuccessful answers, validates completion, resumes and preserves completion on replay", async () => {
-    const lesson = curriculum();
-    await submit("learn");
-    let result = await (await submit("practice", "wrong")).json();
-    expect(result.feedback.correct).toBe(false);
-    expect(result.progress.completedAt).toBeNull();
+  it("serves screenshots only to the authorized session, including provider capabilities", async () => {
+    expect((await req("/lessons/bienvenida/media/referencia", "")).status).toBe(
+      401,
+    );
+    expect((await req("/lessons/administracion/media/referencia")).status).toBe(
+      404,
+    );
+    expect((await req("/lessons/horas/media/referencia", "3")).status).toBe(
+      404,
+    );
+    expect((await req("/lessons/bienvenida/media/unknown")).status).toBe(404);
     expect(
-      (await (await req("/lessons/bienvenida")).json()).progress.answers
-        .practice,
-    ).toBe("wrong");
-    await submit("practice", lesson.practice.answer);
-    result = await (await submit("check", lesson.check.answer)).json();
-    expect(result.progress.completedAt).not.toBeNull();
+      (await req("/lessons/bienvenida/media/%2e%2e%2fadmin.jpg")).status,
+    ).toBe(404);
+    const image = await req("/lessons/horas/media/referencia");
+    expect(image.status).toBe(200);
+    expect(image.headers.get("content-type")).toContain("image/jpeg");
+    expect(image.headers.get("cache-control")).toBe("no-store");
+    expect(new Uint8Array(await image.arrayBuffer()).subarray(0, 3)).toEqual(
+      new Uint8Array([0xff, 0xd8, 0xff]),
+    );
+    expect(
+      (await req("/lessons/proveedor-horas/media/referencia", "3")).status,
+    ).toBe(200);
+    await pool.query("UPDATE provider_project_access SET can_log_hours=FALSE");
+    expect(
+      (await req("/lessons/proveedor-horas/media/referencia", "3")).status,
+    ).toBe(404);
+  });
+  it("records optional reading, resumes across sessions and preserves the original timestamp", async () => {
+    const initial = await (await req("/lessons/bienvenida")).json();
+    expect(initial.progress.completedAt).toBeNull();
+    // Merely opening a guide does not record reading or require assessment.
+    expect(
+      (await pool.query("SELECT * FROM training_progress")).rows,
+    ).toHaveLength(0);
+    const result = await (await submit("learn")).json();
+    expect(result.progress.completedAt).toBeTruthy();
+    expect(result.progress.completedSteps).toEqual(["learn"]);
+    expect(result.progress.answers).toEqual({});
     const completedAt = result.progress.completedAt;
-    expect(
-      (await (await submit("check", "wrong")).json()).progress.completedAt,
-    ).toBe(completedAt);
+    expect((await (await submit("learn")).json()).progress.completedAt).toBe(
+      completedAt,
+    );
     expect(
       (await (await req("/lessons/bienvenida", "2")).json()).progress
         .completedSteps,
@@ -145,25 +170,25 @@ describe.skipIf(!url)("training API / PostgreSQL", () => {
         (l: any) => l.id === "bienvenida",
       ).progress.completedAt,
     ).toBe(completedAt);
+    expect((await submit("practice", "old answer")).status).toBe(400);
     await req("/invitation", "1", { dismissed: true });
     expect((await (await req()).json()).invitationDismissed).toBe(true);
     expect((await (await req("", "2")).json()).invitationDismissed).toBe(false);
   });
-  it("does not lose completed steps when tabs submit concurrently", async () => {
-    const lesson = curriculum();
+  it("keeps concurrent read markers idempotent", async () => {
     const responses = await Promise.all([
       submit("learn"),
-      submit("practice", lesson.practice.answer),
-      submit("check", lesson.check.answer),
+      submit("learn"),
+      submit("learn"),
     ]);
     expect(responses.every((r) => r.ok)).toBe(true);
     const detail = await (await req("/lessons/bienvenida")).json();
-    expect(detail.progress.completedSteps).toEqual([
-      "learn",
-      "practice",
-      "check",
-    ]);
-    expect(detail.progress.completedAt).not.toBeNull();
+    expect(detail.progress.completedSteps).toEqual(["learn"]);
+    expect(detail.progress.completedAt).toBeTruthy();
+    const timestamps = await Promise.all(
+      responses.map(async (r) => (await r.json()).progress.completedAt),
+    );
+    expect(new Set(timestamps).size).toBe(1);
   });
   it("updates permissions and provider capabilities without deleting past progress", async () => {
     await submit("learn", undefined, "1", "horas");
@@ -195,31 +220,30 @@ describe.skipIf(!url)("training API / PostgreSQL", () => {
       expect(catalog.lessons.some((l: any) => l.id === "reportes")).toBe(false);
     }
   });
-  it("keeps version history and rejects attempts submitted against an old version", async () => {
-    const lesson = curriculum();
-    await submit("learn");
-    await submit("practice", lesson.practice.answer);
-    await submit("check", lesson.check.answer);
-    const previous = lesson.version;
-    try {
-      lesson.version = previous + 1;
-      const detail = await (await req("/lessons/bienvenida")).json();
-      expect(detail.needsUpdate).toBe(true);
-      expect(detail.progress.completedSteps).toEqual([]);
-      expect((await submit("learn")).status).toBe(409);
-      expect(
-        (await submit("learn", undefined, "1", "bienvenida", lesson.version))
-          .ok,
-      ).toBe(true);
-      const rows = await pool.query(
-        "SELECT version,completed_at FROM training_progress WHERE user_id=1 AND lesson_id=$1 ORDER BY version",
-        [lesson.id],
-      );
-      expect(rows.rows).toHaveLength(2);
-      expect(rows.rows[0].completed_at).not.toBeNull();
-      expect(rows.rows[1].completed_at).toBeNull();
-    } finally {
-      lesson.version = previous;
-    }
+  it("preserves version 1 exercise history while new guides have their own read marker", async () => {
+    const legacy = {
+      completedSteps: ["learn", "practice", "check"],
+      answers: { practice: "option-1", check: "option-2" },
+    };
+    await pool.query(
+      `INSERT INTO training_progress(user_id,lesson_id,version,state,completed_at) VALUES(1,'bienvenida',1,$1,NOW())`,
+      [JSON.stringify(legacy)],
+    );
+    let detail = await (await req("/lessons/bienvenida")).json();
+    expect(detail.needsUpdate).toBe(true);
+    expect(detail.progress.completedSteps).toEqual([]);
+    expect(
+      (await submit("learn", undefined, "1", "bienvenida", 1)).status,
+    ).toBe(409);
+    expect((await submit("learn")).ok).toBe(true);
+    detail = await (await req("/lessons/bienvenida")).json();
+    expect(detail.needsUpdate).toBe(false);
+    expect(detail.progress.completedAt).toBeTruthy();
+    const rows = await pool.query(
+      "SELECT version,state,completed_at FROM training_progress WHERE user_id=1 AND lesson_id='bienvenida' ORDER BY version",
+    );
+    expect(rows.rows).toHaveLength(2);
+    expect(rows.rows[0].state).toEqual(legacy);
+    expect(rows.rows.every((row) => row.completed_at)).toBe(true);
   });
 });

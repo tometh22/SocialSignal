@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import {
   canAccessTraining,
   TRAINING_SECTIONS,
@@ -8,8 +8,8 @@ import {
 import {
   trainingLessons,
   publicLesson,
-  gradeTrainingAnswer,
 } from "../server/content/training-catalog";
+import { trainingScreenshots } from "../server/content/training-media";
 import { trainingSubmissionSchema } from "../server/routes-training";
 import { trainingMigrationSql } from "../server/migrations/training";
 
@@ -67,70 +67,66 @@ describe("training access and curriculum", () => {
       "carga-financiera",
     );
   });
-  it("has stable unique ids and usable, server-graded exercises for every lesson", () => {
+  it("provides complete reference instructions for every area without assessments", () => {
     expect(new Set(trainingLessons.map((l) => l.id)).size).toBe(
       trainingLessons.length,
     );
     expect(new Set(trainingLessons.map((l) => l.module)).size).toBe(9);
-    expect(new Set(trainingLessons.map((l) => l.practice.kind))).toEqual(
-      new Set(["choice", "order", "form"]),
-    );
     for (const lesson of trainingLessons) {
+      expect(lesson.version).toBe(2);
+      expect(lesson.instructions.length).toBeGreaterThanOrEqual(3);
+      expect(lesson.instructions.every((step) => step.length > 30)).toBe(true);
+      expect(lesson.verification.length).toBeGreaterThan(20);
       expect(lesson.explanation.length).toBeGreaterThanOrEqual(2);
       expect(lesson.covers.length).toBeGreaterThan(0);
-      for (const step of ["practice", "check"] as const) {
-        expect(
-          gradeTrainingAnswer(lesson, step, lesson[step].answer).correct,
-        ).toBe(true);
-        expect(
-          gradeTrainingAnswer(lesson, step, "incorrect answer").correct,
-        ).toBe(false);
-        expect(publicLesson(lesson)[step]).not.toHaveProperty("answer");
-        expect(publicLesson(lesson)[step]).not.toHaveProperty("feedback");
-      }
+      expect(publicLesson(lesson)).not.toHaveProperty("practice");
+      expect(publicLesson(lesson)).not.toHaveProperty("check");
+      expect(lesson.minutes).toBeGreaterThan(0);
     }
   });
-  it("accepts decimal commas and rejects blanks, wrong ordering, duplicated steps and malformed payloads", () => {
-    const hours = trainingLessons.find((l) => l.id === "horas")!;
+  it("accepts only a personal read marker and rejects quiz or forged completion payloads", () => {
     expect(
-      gradeTrainingAnswer(hours, "practice", {
-        hours: "2,5",
-        date: "2026-11-12",
-      }).correct,
+      trainingSubmissionSchema.safeParse({ version: 2, step: "learn" }).success,
     ).toBe(true);
-    expect(
-      gradeTrainingAnswer(hours, "practice", { hours: "", date: "2026-11-12" })
-        .correct,
-    ).toBe(false);
-    const ordering = trainingLessons.find((l) => l.id === "crm")!;
-    expect(
-      gradeTrainingAnswer(ordering, "practice", ["item-0", "item-0", "item-2"])
-        .correct,
-    ).toBe(false);
-    expect(
-      trainingSubmissionSchema.safeParse({ version: 1, step: "check" }).success,
-    ).toBe(false);
-    expect(
-      trainingSubmissionSchema.safeParse({
-        version: 1,
-        step: "learn",
-        userId: 22,
-      }).success,
-    ).toBe(false);
-    expect(
-      trainingSubmissionSchema.safeParse({
-        version: 1,
-        step: "learn",
-        completed: true,
-      }).success,
-    ).toBe(false);
-    expect(
-      trainingSubmissionSchema.safeParse({
-        version: 1,
-        step: "practice",
-        answer: "x".repeat(1001),
-      }).success,
-    ).toBe(false);
+    for (const payload of [
+      { version: 2, step: "check" },
+      { version: 2, step: "practice", answer: "x" },
+      { version: 2, step: "learn", userId: 22 },
+      { version: 2, step: "learn", completed: true },
+      { version: 2, step: "learn", answer: "x" },
+    ])
+      expect(trainingSubmissionSchema.safeParse(payload).success).toBe(false);
+  });
+  it("ships real private screenshots for every guide, tied to an existing instruction", () => {
+    expect(Object.keys(trainingScreenshots).sort()).toEqual(
+      trainingLessons.map((lesson) => lesson.id).sort(),
+    );
+    for (const lesson of trainingLessons) {
+      const media = publicLesson(lesson).screenshots;
+      expect(media.length).toBeGreaterThan(0);
+      for (const [index, screenshot] of media.entries()) {
+        expect(screenshot.src).toBe(
+          `/api/training/lessons/${lesson.id}/media/${screenshot.id}`,
+        );
+        expect(screenshot.step).toBeGreaterThan(0);
+        expect(screenshot.step).toBeLessThanOrEqual(lesson.instructions.length);
+        expect(screenshot.alt.length).toBeGreaterThan(10);
+        expect(screenshot.caption.length).toBeGreaterThan(30);
+        expect(screenshot.width).toBeGreaterThan(300);
+        expect(screenshot.height).toBeGreaterThan(100);
+        const authored = trainingScreenshots[lesson.id][index];
+        expect(authored.fileName).toMatch(/^[a-z0-9-]+\.jpg$/);
+        const file = `server/content/training-media/${authored.fileName}`;
+        expect(readFileSync(file).subarray(0, 3)).toEqual(
+          Buffer.from([0xff, 0xd8, 0xff]),
+        );
+        expect(statSync(file).size).toBeLessThan(250_000);
+        expect(
+          existsSync(`client/public/training-media/${authored.fileName}`),
+        ).toBe(false);
+        expect(screenshot).not.toHaveProperty("fileName");
+      }
+    }
   });
   it("maps current feature routes to lessons; excludes only aliases and technical/demo routes", () => {
     const app = readFileSync("client/src/App.tsx", "utf8");

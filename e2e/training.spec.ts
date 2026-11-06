@@ -13,7 +13,7 @@ async function signIn(page: Page, profile = "member") {
   ).toBeTruthy();
 }
 
-test("personal learning: invitation, search, feedback, completion and another session", async ({
+test("reference guides: invitation, search, immediate instructions and optional reading across sessions", async ({
   page,
   browser,
 }) => {
@@ -22,8 +22,8 @@ test("personal learning: invitation, search, feedback, completion and another se
   const invitation = page.getByRole("complementary", {
     name: "Invitación a capacitación",
   });
-  // The seed creates a fresh account; dismiss persists across subsequent visits.
   await expect(invitation).toBeVisible();
+  await expect(invitation).toContainText("Instrucciones paso a paso");
   await page
     .getByRole("button", { name: "Descartar invitación a capacitación" })
     .click();
@@ -56,161 +56,156 @@ test("personal learning: invitation, search, feedback, completion and another se
   ).toHaveCount(0);
   await page.getByRole("textbox", { name: "Buscar capacitación" }).fill("");
   await page.screenshot({
-    path: ".context/training-catalog-desktop.png",
+    path: ".context/training-guides-desktop.png",
     fullPage: true,
   });
   await page.goto("/training/bienvenida");
-  await page
-    .getByRole("button", { name: "Guardar explicación como leída" })
-    .click();
-  await page.getByRole("button", { name: "Siguiente", exact: true }).click();
-  await page.getByLabel("Crear registros reales para probar").check();
-  await page.getByRole("button", { name: "Comprobar respuesta" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Paso a paso", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Paso a paso" }).getByRole("listitem"),
+  ).toHaveCount(4);
+  await expect(
+    page.getByRole("button", { name: "Comprobar respuesta" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Marcar como leída" }).click();
   await expect(page.getByRole("status")).toContainText(
-    "Podés intentarlo nuevamente",
+    "Guía marcada como leída",
   );
-  await page.getByLabel("Buscarla en Capacitación").check();
-  await page.getByRole("button", { name: "Comprobar respuesta" }).click();
-  await expect(page.getByRole("status")).toContainText("Avance guardado");
   await page.reload();
+  await expect(page.getByRole("button", { name: "Guía leída" })).toBeDisabled();
   await expect(
-    page.getByRole("heading", { name: "Comprobá", exact: true }),
-  ).toBeVisible();
-  await page.getByLabel("Tus respuestas y avance personal").check();
-  await page.getByRole("button", { name: "Comprobar respuesta" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Lección completada" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Repetir lección" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Lección completada" }),
+    page.getByRole("heading", { name: "Paso a paso", exact: true }),
   ).toBeVisible();
   const context = await browser.newContext();
   try {
     const other = await context.newPage();
     await signIn(other);
-    const result = await (
-      await other.request.get("/api/training/lessons/bienvenida")
-    ).json();
-    expect(result.progress.completedAt).toBeTruthy();
-    await other.goto("/training");
+    await other.goto("/training/bienvenida");
     await expect(
-      other.getByText("1 /", { exact: false }).first(),
-    ).toBeVisible();
+      other.getByRole("button", { name: "Guía leída" }),
+    ).toBeDisabled();
   } finally {
     await context.close();
   }
 });
 
-test("practice forms recover failed saves and never write operational data", async ({
+test("consulting instructions needs no writes and failed read markers never block work", async ({
   page,
 }) => {
   await signIn(page);
-  await page.goto("/training/horas");
   const writes: string[] = [];
   page.on("request", (request) => {
     if (
       !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
-      /\/api\/(?:tasks|provider|me\/invoices|active-projects|finance|financial|time-entries)/.test(
-        request.url(),
-      )
+      request.url().includes("/api/")
     )
-      writes.push(request.url());
+      writes.push(new URL(request.url()).pathname);
   });
-  await page
-    .getByRole("button", { name: "Guardar explicación como leída" })
-    .click();
-  await page.getByRole("button", { name: "Siguiente", exact: true }).click();
-  await page.getByLabel("Horas trabajadas").fill("2,5");
-  await page.getByLabel("Fecha", { exact: true }).fill("2026-11-12");
+  await page.goto("/training/horas");
+  await expect(
+    page.getByRole("region", { name: "Paso a paso" }).getByRole("listitem"),
+  ).toHaveCount(5);
+  await expect(
+    page.getByRole("link", { name: "Abrir Panel de horas" }),
+  ).toBeVisible();
+  expect(writes).toEqual([]);
+  await page.screenshot({
+    path: ".context/training-guide-desktop.png",
+    fullPage: true,
+  });
   await page.route(
     "**/api/training/lessons/horas/progress",
-    async (route) => {
-      await route.fulfill({
+    (route) =>
+      route.fulfill({
         status: 503,
         contentType: "application/json",
-        body: JSON.stringify({ message: "Error temporal de prueba" }),
-      });
-    },
+        body: '{"message":"Error temporal de prueba"}',
+      }),
     { times: 1 },
   );
-  await page.getByRole("button", { name: "Comprobar respuesta" }).click();
+  await page.getByRole("button", { name: "Marcar como leída" }).click();
   await expect(page.getByRole("alert")).toContainText(
-    "No se pudo guardar tu avance",
+    "No se pudo guardar la marca de lectura",
   );
-  await expect(page.getByLabel("Horas trabajadas")).toHaveValue("2,5");
-  await page.getByRole("button", { name: "Reintentar guardado" }).click();
-  await expect(page.getByRole("status")).toContainText("Avance guardado");
-  expect(writes).toEqual([]);
+  await page.getByRole("link", { name: "Abrir Panel de horas" }).click();
+  await expect(page).toHaveURL(/\/tasks\/hours-dashboard$/);
+  await page.goto("/training/horas");
+  await page.getByRole("button", { name: "Marcar como leída" }).click();
+  await expect(page.getByRole("status")).toContainText(
+    "Guía marcada como leída",
+  );
+  expect(
+    writes.every((path) => path === "/api/training/lessons/horas/progress"),
+  ).toBe(true);
   await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole("link", { name: "Todas las guías" })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: ".context/training-guide-mobile.png",
+    fullPage: true,
+  });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
-  ).toBeTruthy();
-  await page.screenshot({
-    path: ".context/training-practice-mobile.png",
-    fullPage: true,
-  });
+  ).toBe(true);
   expect(
     (await page.request.get("/api/training/lessons/reportes")).status(),
   ).toBe(404);
   await page.goto("/training/reportes");
   await expect(
-    page.getByRole("heading", { name: "Lección no disponible" }),
+    page.getByRole("heading", { name: "Guía no disponible" }),
   ).toBeVisible();
 });
 
-test("provider gets its own curriculum and can order steps with the keyboard", async ({
+test("provider has relevant procedures and keyboard access without exercises", async ({
   page,
 }) => {
   await signIn(page, "provider");
   await page.goto("/training");
-  await expect(
-    page.getByRole("heading", { name: "Mi panel de proveedor", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", {
-      name: "Cargar horas como proveedor",
-      exact: true,
-    }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "CRM", exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByRole("heading", {
-      name: "Registrar y revisar horas",
-      exact: true,
-    }),
-  ).toHaveCount(0);
-  await page.goto("/training/proveedor-facturas");
-  await page
-    .getByRole("button", { name: "Guardar explicación como leída" })
-    .click();
-  await page.getByRole("button", { name: "Siguiente", exact: true }).click();
-  const lastUp = page.getByRole("button", { name: "Subir paso 3" });
-  await lastUp.focus();
+  for (const name of ["Mi panel de proveedor", "Cargar horas como proveedor"])
+    await expect(
+      page.getByRole("heading", { name, exact: true }),
+    ).toBeVisible();
+  for (const name of ["CRM", "Registrar y revisar horas"])
+    await expect(page.getByRole("heading", { name, exact: true })).toHaveCount(
+      0,
+    );
+  const guideLink = page.getByRole("link", {
+    name: /Mis facturas de proveedor/,
+  });
+  await guideLink.focus();
   await page.keyboard.press("Enter");
-  const secondUp = page.getByRole("button", { name: "Subir paso 2" });
-  await secondUp.focus();
+  await expect(page).toHaveURL(/\/training\/proveedor-facturas$/);
+  await expect(
+    page.getByRole("heading", { name: "Paso a paso", exact: true }),
+  ).toBeVisible();
+  const details = page.locator("summary");
+  await details.focus();
   await page.keyboard.press("Enter");
-  await page.getByRole("button", { name: "Comprobar respuesta" }).click();
-  await expect(page.getByRole("status")).toContainText("Avance guardado");
+  await expect(
+    page.getByText(
+      "Consultá el estado de la factura y los motivos de devolución.",
+      { exact: false },
+    ),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Todas las guías" }).click();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/training");
   await page.screenshot({
-    path: ".context/training-provider-mobile.png",
+    path: ".context/training-provider-guides-mobile.png",
     fullPage: true,
   });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
-  ).toBeTruthy();
+  ).toBe(true);
 });
 
-test("admin sees the internal curriculum including finance, operations and configuration", async ({
+test("admin can find instructions by area and clear search filters", async ({
   page,
 }) => {
   await signIn(page, "admin");
@@ -239,80 +234,59 @@ test("admin sees the internal curriculum including finance, operations and confi
     .getByRole("textbox", { name: "Buscar capacitación" })
     .fill("nada-coincide");
   await expect(
-    page.getByText("No encontramos lecciones con esos filtros."),
+    page.getByText("No encontramos guías con esos filtros."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Limpiar filtros" }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Personal, roles y tarifas",
+      exact: true,
+    }),
   ).toBeVisible();
 });
 
-test("background refresh failures preserve unsaved answers and failed-save recovery", async ({
+test("background failures preserve pending reading recovery; explicit revocation hides cached instructions", async ({
   page,
 }) => {
   await page.clock.install();
   await signIn(page);
   await page.goto("/training/tareas");
-  await page.getByRole("button", { name: /Aprendé/ }).click();
-  await page
-    .getByRole("button", { name: "Guardar explicación como leída" })
-    .click();
-  await page.getByRole("button", { name: "Siguiente", exact: true }).click();
-  await page
-    .getByLabel("Título", { exact: true })
-    .fill("Respuesta todavía sin guardar");
-  await page.route("**/api/training/lessons/tareas/progress", (route) =>
+  const saveFailure = (route: import("@playwright/test").Route) =>
     route.fulfill({
       status: 503,
       contentType: "application/json",
-      body: '{"message":"Error temporal de guardado"}',
-    }),
-  );
-  await page.getByRole("button", { name: "Comprobar respuesta" }).click();
+      body: '{"message":"Error temporal"}',
+    });
+  await page.route("**/api/training/lessons/tareas/progress", saveFailure);
+  await page.getByRole("button", { name: "Marcar como leída" }).click();
   await expect(
     page.getByRole("button", { name: "Reintentar guardado" }),
   ).toBeVisible();
-
-  const catalogFailure = (route: import("@playwright/test").Route) =>
-    route.fulfill({
-      status: 503,
-      contentType: "application/json",
-      body: '{"message":"Error temporal de catálogo"}',
-    });
-  await page.route("**/api/training", catalogFailure);
-  // Exercise the automatic catalog refresh and its retry without a real minute of waiting.
+  await page.route("**/api/training", saveFailure);
   const refreshed = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/api/training") && response.status() === 503,
+    (r) => r.url().endsWith("/api/training") && r.status() === 503,
   );
   await page.clock.runFor(61_000);
   await refreshed;
   await page.clock.runFor(2_000);
   await expect(
-    page.getByText(
-      "No pudimos actualizar la capacitación. Conservamos tu respuesta en esta pantalla.",
-    ),
+    page.getByRole("button", { name: "Reintentar actualización" }),
   ).toBeVisible();
-  await expect(page.getByLabel("Título", { exact: true })).toHaveValue(
-    "Respuesta todavía sin guardar",
-  );
   await expect(
     page.getByRole("button", { name: "Reintentar guardado" }),
   ).toBeVisible();
-
-  // Recover catalog first, then fail only the detail's window-focus refresh.
-  await page.unroute("**/api/training", catalogFailure);
+  await expect(
+    page.getByRole("heading", { name: "Paso a paso", exact: true }),
+  ).toBeVisible();
+  await page.unroute("**/api/training", saveFailure);
   await page.getByRole("button", { name: "Reintentar actualización" }).click();
   await expect(
     page.getByRole("button", { name: "Reintentar actualización" }),
   ).toHaveCount(0);
-  const detailFailure = (route: import("@playwright/test").Route) =>
-    route.fulfill({
-      status: 503,
-      contentType: "application/json",
-      body: '{"message":"Error temporal de lección"}',
-    });
-  await page.route("**/api/training/lessons/tareas", detailFailure);
+  await page.route("**/api/training/lessons/tareas", saveFailure);
   const focused = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/api/training/lessons/tareas") &&
-      response.status() === 503,
+    (r) =>
+      r.url().endsWith("/api/training/lessons/tareas") && r.status() === 503,
   );
   await page.evaluate(() =>
     window.dispatchEvent(new Event("visibilitychange")),
@@ -322,32 +296,109 @@ test("background refresh failures preserve unsaved answers and failed-save recov
   await expect(
     page.getByRole("button", { name: "Reintentar actualización" }),
   ).toBeVisible();
-  await expect(page.getByLabel("Título", { exact: true })).toHaveValue(
-    "Respuesta todavía sin guardar",
-  );
   await expect(
     page.getByRole("button", { name: "Reintentar guardado" }),
   ).toBeVisible();
-
-  // Explicit revocation is different: cached content must stop being shown.
-  await page.unroute("**/api/training/lessons/tareas", detailFailure);
+  await page.unroute("**/api/training/lessons/tareas", saveFailure);
   await page.route("**/api/training/lessons/tareas", (route) =>
     route.fulfill({
       status: 404,
       contentType: "application/json",
-      body: '{"message":"Lección no disponible"}',
+      body: '{"message":"Guía no disponible"}',
     }),
   );
   const rejected = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/api/training/lessons/tareas") &&
-      response.status() === 404,
+    (r) =>
+      r.url().endsWith("/api/training/lessons/tareas") && r.status() === 404,
   );
   await page.getByRole("button", { name: "Reintentar actualización" }).click();
   await rejected;
   await page.clock.runFor(2_000);
-  await expect(page.getByLabel("Título", { exact: true })).toHaveCount(0);
   await expect(
-    page.getByText("No pudimos cargar la capacitación.", { exact: false }),
+    page.getByRole("heading", { name: "Paso a paso", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("No pudimos cargar la guía.", { exact: false }),
   ).toBeVisible();
+});
+
+test("real screenshots can be opened with the keyboard and zoomed on mobile", async ({
+  page,
+}) => {
+  await signIn(page);
+  await page.goto("/training/horas");
+  const reference = page.getByRole("region", { name: "Referencia visual" });
+  const thumbnail = reference.getByRole("img");
+  await expect(thumbnail).toBeVisible();
+  await expect(thumbnail).toHaveJSProperty("naturalWidth", 535);
+  const enlarge = reference.getByRole("button", { name: /^Ampliar captura:/ });
+  await enlarge.focus();
+  await page.keyboard.press("Enter");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByRole("img", {
+      name: "Formulario de registro de horas en una tarea",
+      exact: true,
+    }),
+  ).toHaveJSProperty("complete", true);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(enlarge).toBeFocused();
+  await reference.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: ".context/training-with-screenshot-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await enlarge.click();
+  await dialog.getByRole("button", { name: "Ver tamaño original" }).click();
+  await expect(
+    dialog.getByRole("button", { name: "Ajustar a la pantalla" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  const viewer = dialog.getByRole("region", { name: "Captura ampliada" });
+  expect(
+    await viewer.evaluate((node) => node.scrollWidth > node.clientWidth),
+  ).toBe(true);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await dialog.getByRole("button", { name: "Ajustar a la pantalla" }).click();
+  await page.screenshot({
+    path: ".context/training-screenshot-mobile.png",
+    fullPage: true,
+  });
+  await dialog.getByRole("button", { name: "Cerrar", exact: true }).click();
+  await expect(
+    page.getByRole("link", { name: "Abrir Tareas", exact: true }),
+  ).toBeEnabled();
+});
+
+test("a failed screenshot can retry without hiding instructions or blocking navigation", async ({
+  page,
+}) => {
+  await signIn(page);
+  await page.route(
+    "**/api/training/lessons/horas/media/referencia",
+    (route) => route.fulfill({ status: 503, body: "Temporary test failure" }),
+    { times: 1 },
+  );
+  await page.goto("/training/horas");
+  const reference = page.getByRole("region", { name: "Referencia visual" });
+  await reference.scrollIntoViewIfNeeded();
+  await expect(reference.getByRole("status")).toContainText(
+    "No pudimos cargar la captura",
+  );
+  await expect(
+    page.getByRole("heading", { name: "Paso a paso", exact: true }),
+  ).toBeVisible();
+  await reference.getByRole("button", { name: "Reintentar imagen" }).click();
+  await expect(reference.getByRole("img")).toHaveJSProperty(
+    "naturalWidth",
+    535,
+  );
+  await page.getByRole("link", { name: "Todas las guías" }).click();
+  await expect(page).toHaveURL(/\/training$/);
 });
