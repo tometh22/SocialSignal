@@ -9732,12 +9732,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "year inválido" });
     }
     try {
-      const { getNativeProjectionSummary } = await import('./services/financial-native-dashboard');
-      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
-      res.json(await getNativeProjectionSummary(year));
+      const { getFinancialProjection } = await import('./services/financial-projection');
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json(await getFinancialProjection(year));
     } catch (error: any) {
       console.error('❌ Proyección error:', error?.message || error);
-      res.status(500).json({ message: 'Error obteniendo la proyección', error: error?.message });
+      res.status(500).json({ message: 'Error obteniendo la proyección' });
     }
   });
 
@@ -9749,7 +9749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Cache-Control', 'private, no-store');
       res.json(await getFinancialScenario(year));
     } catch (error) {
-      console.error('❌ Escenario financiero:', error);
+      console.error('❌ Escenario financiero:', error instanceof Error ? error.message : 'Error de lectura');
       res.status(500).json({ message: 'No se pudieron cargar los conceptos del escenario' });
     }
   });

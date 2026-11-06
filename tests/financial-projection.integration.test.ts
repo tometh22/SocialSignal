@@ -16,6 +16,12 @@ vi.mock("../server/db", async () => {
 import { pool } from "../server/db";
 import { getNativeProjectionSummary } from "../server/services/financial-native-dashboard";
 import { getFinancialScenario } from "../server/services/financial-scenario";
+vi.mock('../server/services/financial-master-scenario', async importOriginal => ({
+  ...await importOriginal<typeof import('../server/services/financial-master-scenario')>(),
+  getMasterScenarioSnapshot: vi.fn(),
+}));
+import { getMasterScenarioSnapshot } from '../server/services/financial-master-scenario';
+import { getFinancialProjection } from '../server/services/financial-projection';
 import { calculateFinancialScenario } from "../shared/financial-scenario";
 
 describe.skipIf(!setup.url)("financial projection sources", () => {
@@ -153,29 +159,34 @@ describe.skipIf(!setup.url)("financial projection sources", () => {
     expect(result.meses[0]).toMatchObject({ cierre: true, facturacion: 2500, costos: 600, resultado: 1900 });
   });
 
-  it("loads annual scenario detail without adding card estimates, voids or balance-only documents", async () => {
+  it("reconciles live Master detail and totals instead of imported liabilities or stale summaries", async () => {
+    const summaryHeader = ['Mes', 'Año', ...Array(11).fill(''), 'Ventas del mes', 'EBIT Utilidad operativa', 'Beneficio Neto'];
+    vi.mocked(getMasterScenarioSnapshot).mockResolvedValue({
+      summary: [summaryHeader, ['01 ene', 2026, ...Array(11).fill(null), 1000, 900, 900]],
+      actual: [['Detalle', 'Subtipo de costo', 'Mes', 'Año Facturación', 'Año', ...Array(13).fill(''), 'Monto Total USD'],
+        ['Tarjeta USA', 'Tarjeta', '01 ene', null, 2026, '', '', 'REPLIT PURCHASE', ...Array(10).fill(null), 100]],
+      estimates: [['Mes', 'Año', '', 'Detalle', ...Array(8).fill(''), 'Monto Total USD'],
+        ['01 ene', 2026, null, 'Tarjeta USA', ...Array(8).fill(null), 500]],
+      liabilities: [['Detalle', '', 'Mes', 'Año', ...Array(9).fill(''), 'Monto Total USD'],
+        ['Tarjeta USA', 'Tarjeta', '01 ene', 2026, ...Array(9).fill(null), 999]],
+      readAt: '2026-11-06T12:00:00Z',
+    });
     await pool.query(`
-      INSERT INTO system_config VALUES ('app_mode_cutover_date','2026-01');
-      INSERT INTO monthly_financial_summary (period_key,facturacion_total,ebit_operativo,beneficio_neto,margen_neto) VALUES
-        ('2026-01',1000,400,250,25), ('2026-02',100,100,100,100), ('2026-11',1000,400,1000,100);
-      INSERT INTO fact_estimated_cost_month (month_key,monto_total_usd,detalle,subtipo_costo) VALUES
-        ('2026-01',200,'Tarjeta USA','Tarjeta'), ('2026-11',200,'Tarjeta USA','Tarjeta');
-      INSERT INTO pasivo_entries (period_key,detalle,concepto,subtipo_costo,monto_total_usd,fecha_emision) VALUES
-        ('2026-01','Tarjeta USA','REPLIT PURCHASE','Tarjeta',100,'2026-01-15');
-      INSERT INTO pasivo_entries (period_key,detalle,monto_total_usd,voided_at) VALUES ('2026-01','Void',999,now());
-      INSERT INTO pasivo_entries (period_key,detalle,monto_total_usd,cost_treatment) VALUES ('2026-01','Balance',999,'balance_only');
+      INSERT INTO monthly_financial_summary (period_key,facturacion_total,ebit_operativo,beneficio_neto)
+        VALUES ('2026-01',900,400,250);
+      INSERT INTO pasivo_entries (period_key,detalle,concepto,monto_total_usd)
+        VALUES ('2026-01','Tarjeta USA','REPLIT PURCHASE',999);
     `);
     const data = await getFinancialScenario(2026);
-    expect(data.costs).toHaveLength(2);
-    expect(data.costs[0]).toMatchObject({ description: 'REPLIT PURCHASE', amountUsd: 100, source: 'ledger', date: '2026-01-15' });
-    expect(data.costs[1]).toMatchObject({ source: 'estimate', periodKey: '2026-11', amountUsd: 200 });
+    expect(data.costs).toHaveLength(1);
+    expect(data.costs[0]).toMatchObject({ description: 'REPLIT PURCHASE', amountUsd: 100, source: 'master' });
     const result = calculateFinancialScenario(data, data.costs.map(cost => cost.id));
-    expect(result.excludedUsd).toBe(300);
-    expect(result.baseNetProfitUsd).toBe(350);
-    expect(result.adjustedNetProfitUsd).toBe(450);
-    expect(result.netMonthCount).toBe(2);
-    expect(result.months[1].netProfitUsd).toBe(100);
-    expect(result.months[10].adjustedNetProfitUsd).toBeNull();
+    expect(result.adjustedNetProfitUsd).toBe(1000);
+    expect(result.adjustedCostUsd).toBe(0);
+    expect((await getFinancialProjection(2026)).facturacion.total).toBe(1000);
+    expect((await getFinancialProjection(2026)).costos.total).toBe(100);
+    vi.mocked(getMasterScenarioSnapshot).mockRejectedValueOnce(new Error('Sheets unavailable'));
+    await expect(getFinancialScenario(2026)).rejects.toThrow('Sheets unavailable');
   });
 
   it("uses net invoice amounts and period provisions for native months; missing FX stays unknown", async () => {

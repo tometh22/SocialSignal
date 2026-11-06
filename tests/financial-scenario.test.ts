@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('../server/db', () => ({ pool: { query: vi.fn() } }));
 import { calculateFinancialScenario, matchesScenarioCost, type FinancialScenario, type ScenarioCost } from '../shared/financial-scenario';
-import { buildScenarioCosts } from '../server/services/financial-scenario';
+import { buildNativeScenarioCosts } from '../server/services/financial-scenario';
 
 const cost = (id: string, amountUsd: number | null, periodKey = '2026-01', impact: ScenarioCost['impact'] = 'operating'): ScenarioCost => ({
   id, amountUsd, periodKey, impact, concept: 'Tarjeta USA', description: 'OPENAI API 01/12', category: 'Tecnología', source: 'ledger', date: null,
@@ -65,37 +65,37 @@ describe('financial scenario calculation', () => {
   });
 });
 
-describe('cost sources without double counting', () => {
-  const months = [{ periodKey: '2026-01', fuenteFacturacion: 'master' }, { periodKey: '2026-02', fuenteFacturacion: 'master' }];
+describe('native cost sources', () => {
+  const months = [{ periodKey: '2026-01', fuenteFacturacion: 'mind' }, { periodKey: '2026-02', fuenteFacturacion: 'master' }];
   const base = { period_key: '2026-01', detalle: 'Tarjeta USA', subtipo_costo: 'Tarjeta', amount_usd: 100 };
-  it('uses all distinct posted consumptions instead of the estimated monthly card total', () => {
-    const rows = buildScenarioCosts(months,
-      [{ ...base, id: 1, source: 'excel', concepto: 'Replit' }, { ...base, id: 2, source: 'excel', concepto: 'Replit' }],
-      [{ ...base, id: 3, amount_usd: 150 }, { ...base, id: 4, period_key: '2026-02', amount_usd: 170 }]);
-    expect(rows.map(row => row.id)).toEqual(['ledger:1', 'ledger:2', 'estimate:4']);
-    expect(rows.reduce((sum, row) => sum + row.amountUsd!, 0)).toBe(370);
+  it('keeps distinct consumptions and excludes Master months and balance-only documents', () => {
+    const rows = buildNativeScenarioCosts(months, [
+      { ...base, id: 1, source: 'mind_intake', concepto: 'Replit' },
+      { ...base, id: 2, source: 'mind_intake', concepto: 'Replit' },
+      { ...base, id: 3, period_key: '2026-02', source: 'excel' },
+      { ...base, id: 4, cost_treatment: 'balance_only' },
+    ]);
+    expect(rows.map(row => row.id)).toEqual(['ledger:1', 'ledger:2']);
     expect(rows[0].description).toContain('Replit');
   });
-  it('excludes balance-only documents and does not use the imported plan for a native period', () => {
-    expect(buildScenarioCosts([{ ...months[0], fuenteFacturacion: 'mind' }],
-      [{ ...base, id: 1, cost_treatment: 'balance_only' }], [{ ...base, id: 2 }])).toEqual([]);
-  });
-  it('retains missing amounts and uses the same VAT basis as the imported operating ledger', () => {
-    const rows = buildScenarioCosts(months, [
+  it('retains missing amounts and does not strip VAT a second time from native rollup amounts', () => {
+    const rows = buildNativeScenarioCosts(months, [
       { ...base, id: 1, source: 'excel', amount_usd: null },
       { ...base, id: 2, source: 'excel', detalle: 'Itecsa', amount_usd: 121 },
       { ...base, id: 3, source: 'excel', detalle: 'Itecsa', amount_usd: 100, has_net_amount: true },
-    ], []);
+    ]);
     expect(rows.find(row => row.id === 'ledger:1')?.amountUsd).toBeNull();
-    expect(rows.find(row => row.id === 'ledger:2')?.amountUsd).toBe(100);
+    expect(rows.find(row => row.id === 'ledger:2')?.amountUsd).toBe(121);
     expect(rows.find(row => row.id === 'ledger:3')?.amountUsd).toBe(100);
   });
   it('uses explicit native cost treatment ahead of the imported category mapping', () => {
-    const rows = buildScenarioCosts([{ ...months[0], fuenteFacturacion: 'mind' }], [
+    const rows = buildNativeScenarioCosts(months, [
       { ...base, id: 1, cost_treatment: 'direct', subtipo_costo: 'Equipo - Bono' },
       { ...base, id: 2, cost_treatment: 'provision' },
-    ], []);
+      { ...base, id: 3, cost_treatment: 'unclassified', subtipo_costo: 'Impuestos ARG' },
+    ]);
     expect(rows.find(row => row.id === 'ledger:1')?.impact).toBe('operating');
     expect(rows.find(row => row.id === 'ledger:2')?.impact).toBe('net');
+    expect(rows.find(row => row.id === 'ledger:3')?.impact).toBe('operating');
   });
 });

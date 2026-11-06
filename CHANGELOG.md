@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.31 — 2026-11-06
+
+- Corrige la fuente de las exclusiones: los meses del Máster leen una misma instantánea de Resumen Ejecutivo, Costos directos e indirectos, Costos estimados y las provisiones pertinentes de Pasivo. Los consumos de Pasivo ya no sustituyen los gastos que realmente alimentan el resultado.
+- Cada mes usa una sola base de costos conciliada con Ventas menos EBIT, sin rellenar gastos reales con estimados. Se conservan la precisión y las reglas de las fórmulas del Máster: IVA ya excluido, impuestos bajo EBIT y bonos con impacto separado sobre EBIT y neto. Si el detalle no concilia, se informa y se deshabilitan las exclusiones afectadas.
+- Proyección y simulación comparten la base actual del Máster; los meses nativos conservan su fuente. El escenario muestra la fecha de consulta y la hoja/fila de cada gasto, reconoce la clasificación Marketing y mantiene los importes fijos durante la selección. Al salir se descarta la caché de esa simulación.
+- Regresiones de selección parcial, paginación, filtros, exclusión masiva y reversión; pruebas con PostgreSQL y conciliación de las fórmulas del Máster, devoluciones, importes faltantes y precisión monetaria. Sin migraciones ni modificaciones del Máster.
+
 ## 1.14.30 — 2026-11-06
 
 - Proyección incorpora «Escenario sin reinversión»: búsqueda anual de conceptos, proveedores y consumos de tarjeta, selección individual o de todas las coincidencias, y comparación de costos, EBIT y beneficio neto. La selección se acumula entre búsquedas, puede revertirse y se reinicia al salir o cambiar de año; no modifica la contabilidad.

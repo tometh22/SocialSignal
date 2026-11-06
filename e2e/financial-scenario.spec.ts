@@ -95,3 +95,55 @@ test('an unavailable source can be retried without showing an invented zero resu
   await expect(panel.getByText('No hay coincidencias.', { exact: false })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+test('partial selection, filtered deselection, refunds, missing amounts and hidden selections remain exact', async ({ page }) => {
+  const fixture = scenarioFixture(year);
+  fixture.costs.push(
+    { ...fixture.costs[0], id: 'refund', description: 'Replit devolución', amountUsd: -5 },
+    { ...fixture.costs[0], id: 'bonus', description: 'Equipo-Bono', amountUsd: 40, impact: 'ebit' },
+    { ...fixture.costs[0], id: 'tax', description: 'IIBB', amountUsd: 30, impact: 'net' },
+    { ...fixture.costs[0], id: 'missing', description: 'Replit sin importe', amountUsd: null as unknown as number },
+  );
+  let loads = 0;
+  await page.route('**/api/v2/executive/proyeccion/escenario?year=*', route => {
+    loads++;
+    return route.fulfill({ json: fixture });
+  });
+  await openProjection(page);
+  const panel = page.getByTestId('cost-scenario');
+  const search = panel.getByRole('textbox', { name: 'Buscar conceptos en todo el año' });
+  const bulk = panel.getByRole('checkbox', { name: 'Excluir todas las coincidencias', exact: true });
+  await search.fill('Replit');
+  await panel.getByRole('checkbox', { name: 'Excluir Replit consumo 1 · 01 mes', exact: true }).check();
+  await expect(bulk).toHaveAttribute('data-state', 'indeterminate');
+  await bulk.check();
+  await expect(page.getByTestId('scenario-excluded')).toContainText('345,00');
+  await expect(page.getByTestId('scenario-excluded')).toContainText('36 movimientos');
+  await panel.getByRole('button', { name: 'Siguiente', exact: true }).click();
+  await expect(panel.getByRole('checkbox', { name: 'Excluir Replit sin importe · 01 mes', exact: true })).toBeDisabled();
+  await search.fill('Railway');
+  await bulk.check();
+  await expect(page.getByTestId('scenario-excluded')).toContainText('365,00');
+  await search.fill('Replit');
+  await bulk.uncheck();
+  await expect(page.getByTestId('scenario-excluded')).toContainText('20,00');
+  await search.fill('Equipo-Bono, IIBB');
+  await bulk.check();
+  await expect(page.getByTestId('scenario-cost')).toContainText('11.940,00');
+  await expect(page.getByTestId('scenario-ebit')).toContainText('24.060,00');
+  await expect(page.getByTestId('scenario-net')).toContainText('15.050,00');
+  await search.fill('');
+  await panel.getByRole('checkbox', { name: 'Solo excluidos', exact: true }).check();
+  await expect(panel.getByRole('table', { name: 'Conceptos para excluir' }).getByRole('row')).toHaveCount(4);
+  await panel.getByRole('checkbox', { name: 'Excluir Equipo-Bono · 01 mes', exact: true }).click();
+  await expect(panel.getByRole('table', { name: 'Conceptos para excluir' }).getByRole('row')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Ocultar simulación' }).click();
+  await page.getByRole('button', { name: 'Simular exclusiones' }).click();
+  await expect(page.getByTestId('scenario-excluded')).toContainText('50,00');
+  expect(loads).toBe(1);
+  await panel.getByText('Comparación mes a mes', { exact: true }).click();
+  await expect(panel.getByRole('table', { name: 'Comparación mensual del escenario' }).getByRole('row').nth(1)).toContainText('1.500,00 → US$ 1.530,00');
+  await bulk.uncheck();
+  await expect(page.getByTestId('scenario-excluded')).toContainText('0 movimientos');
+  await expect(page.getByTestId('scenario-net')).toContainText('15.000,00');
+});
