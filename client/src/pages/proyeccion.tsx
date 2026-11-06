@@ -1,8 +1,8 @@
 /**
  * Proyección — ejecutado vs proyectado del ejercicio.
  *
- * Reemplaza la página "Proyección (resumen)" del Looker Studio, leyendo la misma
- * solapa del Excel MAESTRO. Responde la pregunta que el board hace siempre:
+ * Combina el histórico importado con los ingresos y cierres de Mind.
+ * Responde la pregunta que el board hace siempre:
  * cómo venimos contra lo que proyectamos.
  *
  * Los costos usan la base consistente con el EBIT (ventas − EBIT, sin impuestos
@@ -83,7 +83,7 @@ export default function ProyeccionPage() {
     <PageShell>
       <CompactPageHeader
         title="Proyección"
-        description="Ejecutado contra proyectado del ejercicio, sobre el Excel MAESTRO"
+        description="Ejecutado contra proyectado del ejercicio, con el histórico importado y los datos de Mind"
       />
 
       <ToolbarPanel>
