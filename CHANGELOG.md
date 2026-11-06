@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.30 — 2026-11-06
+
+- Proyección incorpora «Escenario sin reinversión»: búsqueda anual de conceptos, proveedores y consumos de tarjeta, selección individual o de todas las coincidencias, y comparación de costos, EBIT y beneficio neto. La selección se acumula entre búsquedas, puede revertirse y se reinicia al salir o cambiar de año; no modifica la contabilidad.
+- El detalle registrado sustituye el estimado del mismo concepto/categoría/mes, sin sumar pagos de caja ni documentos de balance o anulados. Se conservan devoluciones, importes netos y conversiones de moneda; los movimientos sin importe o tipo de cambio no se excluyen como si fueran cero.
+- La comparación conserva los demás ingresos y gastos, sin recalcular tasas impositivas. El neto identifica meses faltantes o con fórmulas inconsistentes y muestra un subtotal explícito, sin presentarlo como total anual. Los conceptos fiscales afectan solo al neto, respetando el tratamiento explícito de los movimientos nativos.
+- Validación con PostgreSQL y recorridos de navegador para búsqueda, selección entre páginas, reversión, cambio de año, permisos, recuperación de errores y móvil. Endpoint de solo lectura con los permisos del reporte; sin nuevas migraciones.
+
 ## 1.14.29 — 2026-11-06
 
 - Proyección conserva los doce meses de la base anual importada del Máster, incluidos los posteriores al corte operativo. Corrige la exclusión de agosto a diciembre introducida al recuperar el histórico en 1.14.28.
