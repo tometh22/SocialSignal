@@ -9767,12 +9767,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endMonth = p('endMonth');
       const { fetchNativeExecutiveDashboard } = await import('./services/financial-native-dashboard');
       const result = await fetchNativeExecutiveDashboard(year, month, quarter, yearTotal, startYear, startMonth, endYear, endMonth);
-      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
-      res.setHeader('X-Financial-Source', 'mind-native');
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('X-Financial-Source', result.filtered?.fuenteDatos ?? 'mind');
       res.json(result);
     } catch (error: any) {
       console.error('❌ Native financial dashboard error:', error?.message || error);
-      res.status(500).json({ message: 'Error construyendo el dashboard financiero de Mind', error: error?.message });
+      res.status(500).json({ message: 'Error construyendo el dashboard financiero de Mind' });
     }
   });
 

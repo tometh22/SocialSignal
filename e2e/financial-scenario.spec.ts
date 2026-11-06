@@ -147,3 +147,19 @@ test('partial selection, filtered deselection, refunds, missing amounts and hidd
   await expect(page.getByTestId('scenario-excluded')).toContainText('0 movimientos');
   await expect(page.getByTestId('scenario-net')).toContainText('15.000,00');
 });
+
+test('source precision survives annual totals and reincorporation without cent differences', async ({ page }) => {
+  const fixture = scenarioFixture(year);
+  fixture.months.forEach(month => { month.costUsd = 8.004; month.ebitUsd = 2.004; month.netProfitUsd = 1.004; });
+  fixture.costs = fixture.months.map((month,index)=>({ ...fixture.costs[0], id:`fraction:${index}`, periodKey:month.periodKey, amountUsd:0.004 }));
+  await page.route('**/api/v2/executive/proyeccion/escenario?year=*', route=>route.fulfill({json:fixture}));
+  await openProjection(page);
+  await expect(page.getByTestId('scenario-ebit')).toContainText('24,05');
+  const panel = page.getByTestId('cost-scenario');
+  await panel.getByRole('checkbox',{name:'Excluir todas las coincidencias',exact:true}).check();
+  await expect(page.getByTestId('scenario-excluded')).toContainText('0,05');
+  await expect(page.getByTestId('scenario-ebit')).toContainText('24,10');
+  await panel.getByRole('button',{name:'Reincorporar todo'}).click();
+  await expect(page.getByTestId('scenario-ebit')).toContainText('24,05');
+  await expect(page.getByTestId('scenario-net')).toContainText('12,05');
+});

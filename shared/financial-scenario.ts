@@ -51,23 +51,33 @@ export function calculateFinancialScenario(data: FinancialScenario, selectedIds:
     seen.add(cost.id);
     return true;
   });
-  const months = data.months.map(base => {
+  // Keep source precision through both monthly and annual calculations. Round only
+  // the returned display values, never values that are aggregated again.
+  const rawMonths = data.months.map(base => {
     const costs = selected.filter(cost => cost.periodKey === base.periodKey);
-    const excludedUsd = roundScenarioMoney(costs.reduce((total, cost) => total + cost.amountUsd!, 0));
-    const operatingExcludedUsd = roundScenarioMoney(costs.filter(cost => cost.impact !== 'net')
-      .reduce((total, cost) => total + cost.amountUsd!, 0));
-    const netExcludedUsd = roundScenarioMoney(costs.filter(cost => cost.impact !== 'ebit')
-      .reduce((total, cost) => total + cost.amountUsd!, 0));
+    const excludedUsd = costs.reduce((total, cost) => total + cost.amountUsd!, 0);
+    const operatingExcludedUsd = costs.filter(cost => cost.impact !== 'net')
+      .reduce((total, cost) => total + cost.amountUsd!, 0);
+    const netExcludedUsd = costs.filter(cost => cost.impact !== 'ebit')
+      .reduce((total, cost) => total + cost.amountUsd!, 0);
     return {
       ...base, excludedUsd, operatingExcludedUsd, netExcludedUsd,
-      adjustedCostUsd: roundScenarioMoney(base.costUsd - operatingExcludedUsd),
-      adjustedEbitUsd: roundScenarioMoney(base.ebitUsd + operatingExcludedUsd),
-      adjustedNetProfitUsd: base.netProfitUsd == null ? null : roundScenarioMoney(base.netProfitUsd + netExcludedUsd),
+      adjustedCostUsd: base.costUsd - operatingExcludedUsd,
+      adjustedEbitUsd: base.ebitUsd + operatingExcludedUsd,
+      adjustedNetProfitUsd: base.netProfitUsd == null ? null : base.netProfitUsd + netExcludedUsd,
     };
   });
-  const sum = (pick: (month: typeof months[number]) => number) =>
-    roundScenarioMoney(months.reduce((total, month) => total + pick(month), 0));
-  const netMonths = months.filter(month => month.netProfitUsd != null);
+  const sum = (pick: (month: typeof rawMonths[number]) => number) =>
+    roundScenarioMoney(rawMonths.reduce((total, month) => total + pick(month), 0));
+  const netMonths = rawMonths.filter(month => month.netProfitUsd != null);
+  const months = rawMonths.map(month => ({ ...month,
+    excludedUsd: roundScenarioMoney(month.excludedUsd),
+    operatingExcludedUsd: roundScenarioMoney(month.operatingExcludedUsd),
+    netExcludedUsd: roundScenarioMoney(month.netExcludedUsd),
+    adjustedCostUsd: roundScenarioMoney(month.adjustedCostUsd),
+    adjustedEbitUsd: roundScenarioMoney(month.adjustedEbitUsd),
+    adjustedNetProfitUsd: month.adjustedNetProfitUsd == null ? null : roundScenarioMoney(month.adjustedNetProfitUsd),
+  }));
   return {
     months, selected,
     excludedUsd: sum(month => month.excludedUsd),
