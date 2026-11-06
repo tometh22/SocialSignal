@@ -1,30 +1,40 @@
-# Capacitación interactiva
+# Capacitación: guías de uso
 
-La sección /training y su ayuda usan el catálogo versionado de server/content/training-catalog.ts. Las prácticas solo escriben respuestas y progreso personal; no invocan servicios operativos. El contenido se sirve desde el servidor después de verificar permisos, sin soluciones en el payload inicial.
+La sección /training ofrece instrucciones de consulta por función y permiso. No tiene ejercicios, evaluaciones, recorridos obligatorios ni metas de progreso. Todas las instrucciones están disponibles al abrir una guía; los enlaces a las pantallas de trabajo están al inicio. La búsqueda y el filtro por área permiten ir directo a la tarea necesaria.
 
-## Mantenimiento
+## Contenido y mantenimiento
 
-- Mantener el id estable. Incrementar version si cambian de forma sustancial la explicación, los ejercicios o su criterio de aprobación. Las correcciones de estilo no requieren reiniciar el avance.
-- Cada lección tiene tres pasos: explicación, práctica y comprobación. Se completa al guardar la lectura y resolver ambos ejercicios. Los errores también se guardan para retomar; los reintentos son ilimitados. Repetir no borra un completado.
-- access debe reflejar los permisos de las funciones enseñadas. Los proveedores nunca heredan contenido interno, incluso si tienen permisos internos cargados por error. Las horas externas requieren perfil activo, vínculo con personal y al menos un proyecto abierto habilitado.
-- covers es el inventario de rutas de cada lección. Las pruebas fallan si una nueva ruta funcional protegida queda sin cubrir. Los enlaces de salida abren pantallas existentes sin inventar ids de registros.
-- Los enlaces públicos de propuestas se explican en el recorrido comercial; la capacitación sigue siendo privada. Los aliases y redirecciones no agregan lecciones. /currency-demo se excluye por ser una herramienta demostrativa, no un flujo de negocio.
-- El avance histórico se conserva si cambian los permisos. Los totales solo incluyen versiones actuales y lecciones accesibles. Una versión nueva muestra Actualización disponible si había una anterior completada.
+- El catálogo versionado vive en server/content/training-catalog.ts. Cada guía incluye finalidad, instrucciones numeradas, qué revisar, un ejemplo y detalles adicionales desplegables. La duración estima tiempo de lectura.
+- Mantener el id estable e incrementar version ante un cambio sustancial. La versión 2 reemplaza los ejercicios de la versión 1 por procedimientos. Se conserva el historial previo sin alterarlo.
+- Marcar como leída es opcional y personal. No hace falta guardar la lectura para navegar, abrir la función o consultar otra guía. Un error de guardado permite reintentar y no bloquea el trabajo.
+- access refleja permisos efectivos; los proveedores no heredan contenido interno. Las horas externas requieren proveedor activo, vínculo con Personal y al menos un proyecto abierto habilitado.
+- covers mantiene el inventario de rutas. Las pruebas detectan rutas funcionales protegidas sin cubrir. Los enlaces deben abrir destinos existentes sin inventar identificadores; su etiqueta describe la pantalla de destino.
+- Una actualización conserva el historial y se muestra como Guía actualizada si se había completado una versión anterior. Los cambios de permisos no borran lecturas anteriores.
+
+## Capturas de referencia
+
+Las 37 guías incluyen imágenes reales de la app, tomadas en un entorno local con cuentas y datos de ejemplo. Se muestran como miniaturas opcionales con el paso al que corresponden, texto alternativo y una indicación concreta. El visor permite ampliar, ajustar a pantalla o consultar el tamaño original; funciona con teclado y móvil. No hay reproducción automática. Un error de imagen no impide consultar las instrucciones.
+
+- `server/content/training-media.ts` vincula cada imagen con la guía y su paso. `server/content/training-media/` conserva los JPEG originales revisados. No se usan capturas de producción ni se alteran los controles con imágenes generadas.
+- La API autentica y verifica los permisos de la guía también para cada imagen. Los archivos no están en `public/`; el build los copia a `dist/training-media`, fuera de `dist/public`. Las respuestas usan `Cache-Control: no-store`.
+- Para renovar las imágenes, iniciá la app con una base local de pruebas, sembrada con `scripts/seed-performance-e2e.ts`. Ejecutá `npx tsx scripts/capture-training-media.ts`; `TRAINING_CAPTURE_URL` debe ser local y `TRAINING_CAPTURE_LESSONS` puede limitar la lista de identificadores separados por comas.
+- El script genera candidatos y sus dimensiones en `.context/training-media/`. Revisá cada captura antes de copiarla al directorio del servidor: debe mostrar controles útiles, sin errores, indicadores de carga ni datos reales. Algunos ejemplos requieren preparar registros ficticios válidos en esa base aislada. Ajustá la leyenda y el paso cuando cambie la interfaz. Las guías de horas usan `horas-formulario.jpg`; las guías que parten de Cartera comparten `cartera.jpg`.
 
 ## Contrato y persistencia
 
-- GET /api/training: catálogo autorizado, progreso actual, indicador de actualización, permisos efectivos y estado de la invitación.
-- GET /api/training/lessons/:lessonId: contenido autorizado y progreso. Una lección desconocida o no accesible devuelve 404.
-- PUT /api/training/lessons/:lessonId/progress: {version, step, answer?}. step: learn | practice | check. El servidor valida ejercicios y devuelve {progress, feedback}; 409 si la versión cambió. No acepta userId ni banderas de completado.
-- PUT /api/training/invitation: {dismissed: true}. La preferencia pertenece al usuario autenticado y se sincroniza entre dispositivos.
-- training_progress usa clave (user_id, lesson_id, version); guarda pasos resueltos, últimas respuestas, fecha de completado y actualización. Una transacción con bloqueo de fila combina escrituras concurrentes sin perder completados.
-- training_preferences guarda el descarte de la invitación. Las dos tablas se eliminan en cascada al borrar al usuario. Migración 0094 incluida tanto en arranque como en SQL manual; no modifica registros operativos.
+- GET /api/training: catálogo autorizado, lectura actual, actualización y preferencia de invitación.
+- GET /api/training/lessons/:lessonId: instrucciones y progreso. Devuelve 404 si no hay acceso. No envía ejercicios ni soluciones.
+- PUT /api/training/lessons/:lessonId/progress: {version, step: "learn"}. Registra la lectura y devuelve {progress, feedback}. Rechaza respuestas, userId y banderas de completado; 409 ante versión obsoleta.
+- GET /api/training/lessons/:lessonId/media/:mediaId: imagen autorizada de la guía, con 404 si no existe o no hay acceso.
+- PUT /api/training/invitation: {dismissed: true}. Conserva el descarte entre dispositivos.
+- training_progress conserva su clave (user_id, lesson_id, version) y las respuestas históricas. La lectura de una versión nueva se registra en otra fila. Una transacción con bloqueo de fila hace idempotentes las escrituras simultáneas.
+- No se requiere otra migración. Las tablas de capacitación permanecen privadas y las guías no escriben en APIs operativas.
 
 ## Verificación
 
-Ejecutar npm run check, npm test, npm run build y npm run check:bundle. Las pruebas PostgreSQL de capacitación se habilitan con TRAINING_TEST_DATABASE_URL apuntando a una base local; crean y eliminan un schema propio. CI ya configura esa variable.
+Ejecutar npm run check, npm test, npm run build y npm run check:bundle. TRAINING_TEST_DATABASE_URL habilita las pruebas PostgreSQL contra una base local aislada; cada ejecución usa su propio schema.
 
-Las pruebas e2e/training.spec.ts usan las cuentas e2e-training-* creadas por scripts/seed-performance-e2e.ts en una base local dedicada mind_e2e*. Incluyen permisos, continuidad entre sesiones, recuperación de errores, teclado y móvil. No se deben ejecutar contra producción. Las capturas se guardan en .context/training-*.png.
+Las pruebas e2e/training.spec.ts usan las cuentas e2e-training-* en una base local mind_e2e*. Verifican consulta directa sin pasos obligatorios, lectura opcional entre sesiones, recuperación de errores sin bloquear enlaces, permisos, búsqueda, teclado y móvil. Las capturas se guardan en .context/training-*.png.
 
 ## Inventario de funciones
 

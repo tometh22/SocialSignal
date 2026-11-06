@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.27 — 2026-11-06
+
+- Capacitación pasa a ser una biblioteca de 37 guías de consulta con instrucciones numeradas, ejemplos, puntos de revisión y enlaces a las funciones. Se eliminan ejercicios, evaluaciones y recorridos obligatorios; la marca de lectura es opcional y conserva el historial anterior.
+- Capturas reales de la app con datos de ejemplo en todas las guías, acompañadas por indicaciones del paso correspondiente. Visor ampliable, tamaño original y navegación con teclado y móvil; un error de imagen permite reintentar sin bloquear las instrucciones.
+- Las imágenes se sirven mediante una API autenticada que respeta los permisos de cada guía, incluidas las habilitaciones específicas de proveedores. El build las conserva fuera del directorio público; no se requiere una nueva migración.
+- Se actualizan la invitación, la ayuda contextual, la documentación y las pruebas de lectura, versiones, acceso directo a imágenes y recuperación de errores.
+
 ## 1.14.26 — 2026-11-05
 
 - Nueva sección Capacitación con 37 lecciones por permisos, búsqueda, módulos, avance personal y acceso para proveedores. Invitación inicial descartable y ayuda integrada en escritorio y móvil.

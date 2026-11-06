@@ -5,12 +5,10 @@ import {
   type RequestHandler,
 } from "express";
 import type { Pool } from "pg";
+import path from "node:path";
+import { trainingScreenshots } from "./content/training-media";
 import { z } from "zod";
-import {
-  trainingLessons,
-  publicLesson,
-  gradeTrainingAnswer,
-} from "./content/training-catalog";
+import { trainingLessons, publicLesson } from "./content/training-catalog";
 import {
   canAccessTraining,
   emptyTrainingProgress,
@@ -19,25 +17,14 @@ import {
   type TrainingProgress,
 } from "../shared/training";
 
-const answerSchema = z.union([
-  z.string().max(1000),
-  z.array(z.string().max(100)).max(20),
-  z
-    .record(z.string().max(100), z.string().max(1000))
-    .refine((v) => Object.keys(v).length <= 20),
-]);
+// Version 2 guides only record an optional read marker. No quiz payloads or
+// client-selected ownership/completion flags are accepted.
 export const trainingSubmissionSchema = z
   .object({
     version: z.number().int().positive(),
-    step: z.enum(TRAINING_STEPS),
-    answer: answerSchema.optional(),
+    step: z.literal("learn"),
   })
-  .strict()
-  .refine(
-    (v) =>
-      v.step === "learn" ? v.answer === undefined : v.answer !== undefined,
-    "Respuesta requerida para el ejercicio",
-  );
+  .strict();
 
 type ProgressRow = {
   lesson_id: string;
@@ -158,12 +145,50 @@ export function registerTrainingRoutes(
     );
     res.json({ invitationDismissed: true });
   });
+  route("get", "/lessons/:lessonId/media/:mediaId", async (req, res, next) => {
+    const lesson = trainingLessons.find(
+      (item) => item.id === req.params.lessonId,
+    );
+    if (!lesson || !canAccessTraining(await audienceFor(req), lesson.access)) {
+      res.status(404).json({ message: "Captura no disponible." });
+      return;
+    }
+    const screenshot = trainingScreenshots[lesson.id]?.find(
+      (item) => item.id === req.params.mediaId,
+    );
+    if (!screenshot) {
+      res.status(404).json({ message: "Captura no disponible." });
+      return;
+    }
+    // Only authored filenames can reach sendFile. Never interpolate request paths.
+    const root = path.resolve(
+      import.meta.dirname,
+      process.env.NODE_ENV === "production"
+        ? "training-media"
+        : "content/training-media",
+    );
+    res.sendFile(
+      screenshot.fileName,
+      { root, cacheControl: false, dotfiles: "deny" },
+      (error) => {
+        if (!error) return;
+        if (
+          !res.headersSent &&
+          (error as NodeJS.ErrnoException).code === "ENOENT"
+        ) {
+          res.status(404).json({ message: "Captura no disponible." });
+          return;
+        }
+        next(error);
+      },
+    );
+  });
   route("get", "/lessons/:lessonId", async (req, res) => {
     const lesson = trainingLessons.find((l) => l.id === req.params.lessonId);
     if (!lesson || !canAccessTraining(await audienceFor(req), lesson.access)) {
       res
         .status(404)
-        .json({ message: "Esta lección no está disponible para tu cuenta." });
+        .json({ message: "Esta guía no está disponible para tu cuenta." });
       return;
     }
     const progress = await pool.query<ProgressRow>(
@@ -184,25 +209,23 @@ export function registerTrainingRoutes(
     if (!lesson || !canAccessTraining(await audienceFor(req), lesson.access)) {
       res
         .status(404)
-        .json({ message: "Esta lección no está disponible para tu cuenta." });
+        .json({ message: "Esta guía no está disponible para tu cuenta." });
       return;
     }
     const parsed = trainingSubmissionSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ message: "Revisá los datos de la respuesta." });
+      res.status(400).json({ message: "Revisá los datos de la solicitud." });
       return;
     }
     if (parsed.data.version !== lesson.version) {
-      res
-        .status(409)
-        .json({
-          message:
-            "La lección se actualizó. Volvé a abrirla para continuar con la versión vigente.",
-        });
+      res.status(409).json({
+        message:
+          "La guía se actualizó. Volvé a abrirla para consultar la versión vigente.",
+      });
       return;
     }
-    const { step, answer } = parsed.data;
-    const feedback = gradeTrainingAnswer(lesson, step, answer);
+    const { step } = parsed.data;
+    const feedback = { correct: true, explanation: "Guía marcada como leída." };
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -223,10 +246,7 @@ export function registerTrainingRoutes(
       );
       const state = {
         completedSteps,
-        answers: {
-          ...row.state.answers,
-          ...(answer === undefined ? {} : { [step]: answer }),
-        },
+        answers: row.state.answers,
       };
       const result = await client.query<ProgressRow>(
         `UPDATE training_progress SET state=$4::jsonb, updated_at=NOW(),
@@ -237,7 +257,7 @@ export function registerTrainingRoutes(
           lesson.id,
           lesson.version,
           JSON.stringify(state),
-          completedSteps.length === TRAINING_STEPS.length,
+          completedSteps.includes("learn"),
         ],
       );
       await client.query("COMMIT");

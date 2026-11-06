@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { GraduationCap, X } from "lucide-react";
+import { BookOpen, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   useTrainingCatalog,
@@ -20,17 +20,15 @@ export function TrainingInvitation() {
   return (
     <aside
       aria-label="Invitación a capacitación"
-      className="mx-3 mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-indigo-950 sm:mx-5"
+      className="mx-3 mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3 sm:mx-5"
     >
-      <GraduationCap className="h-5 w-5 shrink-0" aria-hidden="true" />
+      <BookOpen className="h-5 w-5 shrink-0" aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold">Aprendé a usar Mind a tu ritmo</p>
-        <p className="text-xs">
-          Lecciones y prácticas elegidas según tu acceso.
-        </p>
+        <p className="text-sm font-semibold">Consultá cómo usar cada función</p>
+        <p className="text-xs">Instrucciones paso a paso según tus permisos.</p>
       </div>
-      <Button asChild size="sm">
-        <Link href="/training">Explorar capacitación</Link>
+      <Button asChild size="sm" variant="outline">
+        <Link href="/training">Consultar guías</Link>
       </Button>
       <Button
         size="icon"

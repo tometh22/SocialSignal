@@ -142,7 +142,7 @@ export default function SidebarFixed({ mobileMode = false, onNavigate }: Sidebar
       items: [
         { href: "/provider/dashboard", title: "Mi panel", icon: Briefcase, description: "Tus proyectos asignados" },
         { href: "/my-invoices", title: "Mis facturas", icon: Receipt, description: "Subí tu factura mensual" },
-        { href: "/training", title: "Capacitación", icon: GraduationCap, description: "Aprendé y practicá a tu ritmo" },
+        { href: "/training", title: "Capacitación", icon: GraduationCap, description: "Instrucciones paso a paso" },
       ]
     },
   ];
@@ -152,7 +152,7 @@ export default function SidebarFixed({ mobileMode = false, onNavigate }: Sidebar
       title: "",
       items: [
         { href: "/", title: "Inicio", icon: Home, description: "Resumen personal", anyPermissions: HOME_ACCESS_SECTIONS },
-        { href: "/training", title: "Capacitación", icon: GraduationCap, description: "Lecciones para tu perfil" },
+        { href: "/training", title: "Capacitación", icon: GraduationCap, description: "Guías de uso según tus permisos" },
         { href: "/review/objectives", title: "Objetivos", icon: Flag, description: "Plan del año y acciones de la semana", permission: 'operations' as AppSection },
         { href: "/absences", title: "Mis ausencias", icon: UserX, description: "Solicitudes y saldos", anyPermissions: HOME_ACCESS_SECTIONS },
         { href: "/my-invoices", title: "Mis facturas", icon: Receipt, description: "Tu cierre y comprobantes", anyPermissions: HOME_ACCESS_SECTIONS },

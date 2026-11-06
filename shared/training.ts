@@ -46,19 +46,7 @@ export function canAccessTraining(
   );
 }
 
-export type TrainingExercise =
-  | { kind: "choice"; prompt: string; options: { id: string; label: string }[] }
-  | { kind: "order"; prompt: string; items: { id: string; label: string }[] }
-  | {
-      kind: "form";
-      prompt: string;
-      fields: {
-        id: string;
-        label: string;
-        type: "text" | "number" | "date";
-        placeholder?: string;
-      }[];
-    };
+// Retained in persisted progress so version 1 exercise history remains readable.
 export type TrainingAnswer = string | string[] | Record<string, string>;
 export const TRAINING_STEPS = ["learn", "practice", "check"] as const;
 export type TrainingStep = (typeof TRAINING_STEPS)[number];
@@ -79,11 +67,22 @@ export type TrainingLessonSummary = {
   progress: TrainingProgress;
   needsUpdate: boolean;
 };
+export type TrainingScreenshot = {
+  id: string;
+  src: string;
+  alt: string;
+  caption: string;
+  /** One-based instruction number. */
+  step: number;
+  width: number;
+  height: number;
+};
 export type TrainingLesson = TrainingLessonSummary & {
   explanation: string[];
   example: string;
-  practice: TrainingExercise;
-  check: TrainingExercise;
+  instructions: string[];
+  verification: string;
+  screenshots: TrainingScreenshot[];
   links: { label: string; href: string }[];
 };
 export type TrainingCatalog = {

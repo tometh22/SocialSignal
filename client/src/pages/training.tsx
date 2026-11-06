@@ -1,44 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link, useRoute } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  BookOpen,
-  CheckCircle2,
-  Clock3,
-  GraduationCap,
-  RotateCcw,
-  Search,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Check, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { GuideScreenshots } from "@/components/training/guide-screenshots";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  useTrainingCatalog,
-  useDismissTrainingInvitation,
-} from "@/hooks/use-training";
+import { useTrainingCatalog } from "@/hooks/use-training";
 import { authFetchJson } from "@/lib/queryClient";
 import { ApiError } from "@/lib/api-error";
 import {
   canAccessTraining,
-  TRAINING_STEPS,
-  type TrainingAnswer,
-  type TrainingExercise,
   type TrainingLesson,
   type TrainingSaveResult,
-  type TrainingStep,
 } from "@shared/training";
 
-const stepLabels: Record<TrainingStep, string> = {
-  learn: "Aprendé",
-  practice: "Practicá",
-  check: "Comprobá",
-};
 const normalizeSearch = (value: string) =>
   value
     .normalize("NFD")
@@ -47,10 +23,9 @@ const normalizeSearch = (value: string) =>
 
 function LoadError({ retry }: { retry: () => void }) {
   return (
-    <div role="alert" className="rounded-xl border p-6">
+    <div role="alert" className="rounded-lg border p-6">
       <p className="mb-3">
-        No pudimos cargar la capacitación. Revisá tu conexión e intentá
-        nuevamente.
+        No pudimos cargar la guía. Revisá tu conexión e intentá nuevamente.
       </p>
       <Button variant="outline" onClick={retry}>
         Reintentar
@@ -59,8 +34,7 @@ function LoadError({ retry }: { retry: () => void }) {
   );
 }
 
-// Cached content may survive a connection/server error, but never an explicit
-// authentication, authorization or availability rejection from the server.
+// Connection errors can retain cached instructions, but revocations cannot.
 function accessRejected(error: Error | null): boolean {
   return error instanceof ApiError && [401, 403, 404].includes(error.status);
 }
@@ -76,11 +50,11 @@ function RefreshWarning({
   return (
     <div
       role="alert"
-      className="mx-auto mb-4 max-w-3xl rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+      className="mx-auto mb-4 max-w-3xl rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
     >
       <p>
-        No pudimos actualizar la capacitación. Conservamos tu respuesta en esta
-        pantalla.
+        No pudimos actualizar las guías. Mostramos la última información
+        disponible.
       </p>
       <Button variant="outline" size="sm" className="mt-2" onClick={retry}>
         Reintentar actualización
@@ -92,13 +66,12 @@ function RefreshWarning({
 export default function TrainingPage() {
   const [, params] = useRoute("/training/:lessonId");
   const catalog = useTrainingCatalog();
-  const dismiss = useDismissTrainingInvitation();
   const [search, setSearch] = useState("");
   const [module, setModule] = useState("all");
   if (catalog.isLoading)
     return (
       <p role="status" className="p-6">
-        Cargando tu capacitación…
+        Cargando guías…
       </p>
     );
   if (!catalog.data || accessRejected(catalog.error))
@@ -120,21 +93,16 @@ export default function TrainingPage() {
       </>
     ) : (
       <div className="space-y-4 p-6">
-        <h1 className="text-2xl font-semibold">Lección no disponible</h1>
+        <h1 className="text-2xl font-semibold">Guía no disponible</h1>
         <p>
-          Esta lección no está disponible para tu cuenta o tus permisos
-          cambiaron.
+          Esta guía no está disponible para tu cuenta o tus permisos cambiaron.
         </p>
-        <Button asChild>
+        <Button asChild variant="outline">
           <Link href="/training">Volver a Capacitación</Link>
         </Button>
       </div>
     );
   }
-  const complete = lessons.filter((l) => l.progress.completedAt).length;
-  const continuing =
-    lessons.find((l) => !l.progress.completedAt && l.progress.updatedAt) ??
-    lessons.find((l) => !l.progress.completedAt);
   const modules = Array.from(new Set(lessons.map((l) => l.module)));
   const visible = lessons.filter(
     (l) =>
@@ -144,77 +112,21 @@ export default function TrainingPage() {
       ),
   );
   return (
-    <div className="mx-auto max-w-6xl space-y-7 pb-8">
+    <div className="mx-auto max-w-5xl space-y-6 pb-8">
       <RefreshWarning
         visible={catalog.isError}
         retry={() => void catalog.refetch()}
       />
-      <section className="overflow-hidden rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-6 sm:p-8">
-        <div className="flex items-center gap-2 text-sm font-semibold text-indigo-700">
-          <GraduationCap className="h-5 w-5" /> APRENDÉ CON MIND
+      <header>
+        <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+          <BookOpen className="h-4 w-4" aria-hidden="true" /> Guías de uso
         </div>
-        <div className="mt-4 flex flex-col justify-between gap-6 md:flex-row md:items-end">
-          <div className="max-w-xl">
-            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              Capacitación
-            </h1>
-            <p className="mt-3 text-muted-foreground">
-              Tu recorrido para trabajar con confianza. Explicaciones cortas,
-              ejemplos y práctica, según las funciones que tenés habilitadas.
-            </p>
-            {continuing ? (
-              <Button asChild className="mt-5 gap-2">
-                <Link href={`/training/${continuing.id}`}>
-                  Continuar aprendiendo <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            ) : (
-              <p className="mt-5 font-medium text-emerald-700">
-                Completaste tu recorrido. Podés repetir cualquier lección.
-              </p>
-            )}
-          </div>
-          <div className="w-full rounded-2xl border bg-white/80 p-5 md:w-64">
-            <p className="text-sm text-muted-foreground">Tu avance personal</p>
-            <p className="mt-1 text-3xl font-semibold">
-              {complete}
-              <span className="text-lg font-normal text-muted-foreground">
-                {" "}
-                / {lessons.length} lecciones
-              </span>
-            </p>
-            <progress
-              className="mt-3 h-2 w-full appearance-none overflow-hidden rounded-full [&::-webkit-progress-bar]:bg-indigo-100 [&::-webkit-progress-value]:bg-indigo-600 [&::-moz-progress-bar]:bg-indigo-600"
-              max={Math.max(1, lessons.length)}
-              value={complete}
-              aria-label="Lecciones completadas"
-            />
-            <p className="mt-2 text-xs text-muted-foreground">
-              Se guarda en tu cuenta para seguir desde otro dispositivo.
-            </p>
-          </div>
-        </div>
-        {!catalog.data.invitationDismissed && (
-          <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-indigo-100 pt-4">
-            <p className="text-xs text-muted-foreground">
-              Siempre podés volver desde el menú o la ayuda.
-            </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={dismiss.isPending}
-              onClick={() => dismiss.mutate()}
-            >
-              No volver a mostrar la invitación
-            </Button>
-            {dismiss.isError && (
-              <span role="alert" className="text-sm text-red-700">
-                No se guardó. Intentá nuevamente.
-              </span>
-            )}
-          </div>
-        )}
-      </section>
+        <h1 className="text-3xl font-semibold tracking-tight">Capacitación</h1>
+        <p className="mt-2 text-muted-foreground">
+          Instrucciones paso a paso para las funciones que tenés habilitadas.
+          Consultá lo que necesitás y volvé a tu trabajo.
+        </p>
+      </header>
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
           <Search
@@ -224,7 +136,7 @@ export default function TrainingPage() {
           <Input
             className="pl-10"
             aria-label="Buscar capacitación"
-            placeholder="¿Qué querés aprender? Buscá tareas, horas, facturas…"
+            placeholder="Buscar una tarea o función: horas, facturas, ausencias…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -242,13 +154,14 @@ export default function TrainingPage() {
         </select>
       </div>
       <p className="text-sm text-muted-foreground" aria-live="polite">
-        {visible.length} lecciones disponibles · Prácticas con datos ficticios
+        {visible.length} guías disponibles
       </p>
       {!visible.length && (
-        <div className="rounded-2xl border border-dashed p-8 text-center">
-          <p>No encontramos lecciones con esos filtros.</p>
+        <div className="rounded-lg border p-6">
+          <p>No encontramos guías con esos filtros.</p>
           <Button
             variant="link"
+            className="px-0"
             onClick={() => {
               setSearch("");
               setModule("all");
@@ -264,53 +177,36 @@ export default function TrainingPage() {
         return (
           <section key={name} aria-label={name}>
             <h2 className="mb-3 text-lg font-semibold">{name}</h2>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2">
               {items.map((l) => (
-                <Card key={l.id} className="transition-shadow hover:shadow-md">
-                  <CardContent className="flex h-full flex-col p-5 sm:p-5">
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock3 className="h-3.5 w-3.5" />
-                        {l.minutes} min
-                      </span>
-                      {l.progress.completedAt ? (
-                        <Badge variant="secondary" className="text-emerald-700">
-                          <CheckCircle2 className="mr-1 h-3 w-3" />
-                          Completada
-                        </Badge>
-                      ) : l.needsUpdate ? (
-                        <Badge variant="secondary">
-                          Actualización disponible
-                        </Badge>
-                      ) : l.progress.updatedAt ? (
-                        <Badge variant="secondary">En curso</Badge>
-                      ) : (
-                        <span>Por descubrir</span>
-                      )}
-                    </div>
-                    <h3 className="mt-3 font-semibold">{l.title}</h3>
-                    <p className="mt-2 flex-1 text-sm text-muted-foreground">
+                <Link
+                  key={l.id}
+                  href={`/training/${l.id}`}
+                  className="group flex items-start justify-between gap-4 rounded-lg border bg-card p-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <div className="min-w-0">
+                    <h3 className="text-base font-medium group-hover:underline">
+                      {l.title}
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
                       {l.description}
                     </p>
-                    <p className="mt-4 text-xs text-muted-foreground">
-                      {l.progress.completedSteps.length} de 3 pasos
+                    <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>{l.minutes} min de lectura</span>
+                      {l.needsUpdate ? (
+                        <span>Guía actualizada</span>
+                      ) : l.progress.completedAt ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Check className="h-3 w-3" aria-hidden="true" /> Leída
+                        </span>
+                      ) : null}
                     </p>
-                    <Button
-                      asChild
-                      variant="outline"
-                      className="mt-3 w-full justify-between"
-                    >
-                      <Link href={`/training/${l.id}`}>
-                        {l.progress.completedAt
-                          ? "Repasar lección"
-                          : l.progress.updatedAt
-                            ? "Continuar lección"
-                            : "Empezar lección"}
-                        <ArrowRight className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
+                  </div>
+                  <ArrowRight
+                    className="mt-1 h-4 w-4 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                </Link>
               ))}
             </div>
           </section>
@@ -335,7 +231,7 @@ function LessonView({
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
-  if (query.isLoading) return <p role="status">Cargando lección…</p>;
+  if (query.isLoading) return <p role="status">Cargando guía…</p>;
   if (!query.data || accessRejected(query.error))
     return (
       <div className="space-y-4">
@@ -346,49 +242,31 @@ function LessonView({
       </div>
     );
   if (!canAccessTraining(audience, query.data.access))
-    return <p>Esta lección ya no está disponible para tu cuenta.</p>;
+    return <p>Esta guía ya no está disponible para tu cuenta.</p>;
   return (
     <>
       <RefreshWarning
         visible={query.isError}
         retry={() => void query.refetch()}
       />
-      <LessonPlayer
-        key={`${lessonId}:${query.data.version}`}
-        lesson={query.data}
-      />
+      <Guide key={`${lessonId}:${query.data.version}`} lesson={query.data} />
     </>
   );
 }
 
-function LessonPlayer({ lesson }: { lesson: TrainingLesson }) {
+function Guide({ lesson }: { lesson: TrainingLesson }) {
   const { user } = useAuth();
   const client = useQueryClient();
-  const [step, setStep] = useState<TrainingStep>(
-    () =>
-      TRAINING_STEPS.find((s) => !lesson.progress.completedSteps.includes(s)) ??
-      "learn",
-  );
-  const [answers, setAnswers] = useState(lesson.progress.answers);
-  const [progress, setProgress] = useState(lesson.progress);
-  const [feedback, setFeedback] = useState<
-    TrainingSaveResult["feedback"] | null
-  >(null);
-  const [dirty, setDirty] = useState(false);
-  const heading = useRef<HTMLHeadingElement>(null);
   const save = useMutation({
-    mutationFn: (input: { step: TrainingStep; answer?: TrainingAnswer }) =>
+    mutationFn: () =>
       authFetchJson<TrainingSaveResult>(
         `/api/training/lessons/${lesson.id}/progress`,
         {
           method: "PUT",
-          body: JSON.stringify({ version: lesson.version, ...input }),
+          body: JSON.stringify({ version: lesson.version, step: "learn" }),
         },
       ),
     onSuccess: (result) => {
-      setProgress(result.progress);
-      setFeedback(result.feedback);
-      setDirty(false);
       void client.invalidateQueries({
         queryKey: ["training", user?.id, "catalog"],
       });
@@ -398,380 +276,116 @@ function LessonPlayer({ lesson }: { lesson: TrainingLesson }) {
       );
     },
   });
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
-  const changeStep = (next: TrainingStep) => {
-    setStep(next);
-    setFeedback(null);
-    save.reset();
-    setDirty(false);
-  };
-  useEffect(() => {
-    heading.current?.focus();
-  }, [step]);
-  const answer = step === "learn" ? undefined : answers[step];
-  const exercise = step === "learn" ? null : lesson[step];
-  const currentIndex = TRAINING_STEPS.indexOf(step);
-  const blockedNavigation = save.isPending || dirty || save.isError;
+  const read = Boolean(
+    lesson.progress.completedAt || save.data?.progress.completedAt,
+  );
   return (
-    <div className="mx-auto max-w-3xl space-y-5 pb-8">
-      <Button asChild variant="ghost" className="pl-0">
-        <Link
-          href="/training"
-          onClick={(event) => {
-            if (blockedNavigation) event.preventDefault();
-          }}
-          aria-disabled={blockedNavigation}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Todas las lecciones
-        </Link>
-      </Button>
-      <div>
-        <p className="text-sm font-medium text-indigo-700">
-          {lesson.module} · {lesson.minutes} min
+    <article className="mx-auto max-w-3xl space-y-6 pb-8">
+      <Link
+        href="/training"
+        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:underline"
+      >
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Todas las guías
+      </Link>
+      <header>
+        <p className="text-sm text-muted-foreground">
+          {lesson.module} · {lesson.minutes} min de lectura
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
           {lesson.title}
         </h1>
-        <p className="mt-2 text-muted-foreground">{lesson.description}</p>
-      </div>
-      <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-        Práctica con datos ficticios. Tus respuestas no modifican proyectos,
-        horas ni facturas reales.
-      </div>
-      <ol aria-label="Pasos de la lección" className="grid grid-cols-3 gap-2">
-        {TRAINING_STEPS.map((s, i) => (
-          <li key={s}>
-            <button
-              className={`flex w-full flex-wrap items-center justify-center gap-1 rounded-xl border px-2 py-3 text-sm ${s === step ? "border-indigo-600 bg-indigo-50 font-semibold text-indigo-900" : "bg-white text-muted-foreground"}`}
-              aria-current={s === step ? "step" : undefined}
-              disabled={blockedNavigation}
-              onClick={() => changeStep(s)}
-            >
-              {progress.completedSteps.includes(s) ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              ) : (
-                <span>{i + 1}.</span>
-              )}
-              {stepLabels[s]}
-            </button>
-          </li>
-        ))}
-      </ol>
-      <Card>
-        <CardContent className="space-y-5 p-5 sm:p-7">
-          <h2
-            ref={heading}
-            tabIndex={-1}
-            className="flex items-center gap-2 text-xl font-semibold outline-none"
-          >
-            <BookOpen className="h-5 w-5 text-indigo-600" />
-            {stepLabels[step]}
-          </h2>
-          {step === "learn" ? (
-            <>
-              <div className="space-y-4 leading-relaxed">
-                {lesson.explanation.map((paragraph, i) => (
-                  <p key={i}>{paragraph}</p>
-                ))}
-              </div>
-              <div className="rounded-xl bg-slate-50 p-4">
-                <h3 className="mb-2 font-semibold">Un ejemplo</h3>
-                <p className="text-sm leading-relaxed">{lesson.example}</p>
-              </div>
-            </>
-          ) : (
-            exercise && (
-              <Exercise
-                key={step}
-                exercise={exercise}
-                value={answer}
-                disabled={save.isPending}
-                onChange={(value) => {
-                  setAnswers((old) => ({ ...old, [step]: value }));
-                  setFeedback(null);
-                  setDirty(true);
-                  save.reset();
-                }}
-              />
-            )
-          )}
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              disabled={save.isPending}
-              onClick={() =>
-                save.mutate({
-                  step,
-                  ...(step === "learn"
-                    ? {}
-                    : {
-                        answer:
-                          answer ??
-                          (exercise?.kind === "order"
-                            ? exercise.items.map((i) => i.id)
-                            : ""),
-                      }),
-                })
-              }
-            >
-              {save.isPending
-                ? "Guardando…"
-                : save.isError
-                  ? "Reintentar guardado"
-                  : step === "learn"
-                    ? "Guardar explicación como leída"
-                    : "Comprobar respuesta"}
-            </Button>
-            {dirty && (
-              <span className="text-sm text-amber-800">
-                Respuesta pendiente de guardar
-              </span>
-            )}
-          </div>
-          {save.isError && (
-            <div
-              role="alert"
-              className="space-y-2 rounded-xl bg-red-50 p-4 text-sm text-red-800"
-            >
-              <p>
-                No se pudo guardar tu avance. Tu respuesta sigue en esta
-                pantalla.
-              </p>
-              <p>{save.error.message}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setAnswers(progress.answers);
-                  setDirty(false);
-                  save.reset();
-                }}
-              >
-                Descartar respuesta pendiente
-              </Button>
-            </div>
-          )}
-          {feedback && (
-            <div
-              role="status"
-              className={`rounded-xl p-4 text-sm ${feedback.correct ? "bg-emerald-50 text-emerald-900" : "bg-amber-50 text-amber-900"}`}
-            >
-              <p className="font-semibold">
-                {feedback.correct
-                  ? "¡Bien! Avance guardado."
-                  : "Revisemos la respuesta. Podés intentarlo nuevamente."}
-              </p>
-              <p className="mt-1">{feedback.explanation}</p>
-            </div>
-          )}
-          <div className="flex justify-between border-t pt-4">
-            <Button
-              variant="ghost"
-              disabled={currentIndex === 0 || blockedNavigation}
-              onClick={() => changeStep(TRAINING_STEPS[currentIndex - 1])}
-            >
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Anterior
-            </Button>
-            {currentIndex < 2 && (
-              <Button
-                variant="outline"
-                disabled={
-                  !progress.completedSteps.includes(step) ||
-                  blockedNavigation ||
-                  feedback?.correct === false
-                }
-                onClick={() => changeStep(TRAINING_STEPS[currentIndex + 1])}
-              >
-                Siguiente
-                <ArrowRight className="ml-1 h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-      {progress.completedAt && (
-        <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-emerald-900">
-            <CheckCircle2 className="h-5 w-5" />
-            Lección completada
-          </h2>
-          <p className="mt-2 text-sm text-emerald-900">
-            Tu avance está guardado. Repetir la lección conserva este logro.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button asChild disabled={blockedNavigation}>
-              <Link
-                href="/training"
-                onClick={(e) => {
-                  if (blockedNavigation) e.preventDefault();
-                }}
-              >
-                Seguir aprendiendo
-              </Link>
-            </Button>
-            <Button
-              variant="outline"
-              disabled={blockedNavigation}
-              onClick={() => {
-                setAnswers({});
-                changeStep("learn");
-              }}
-            >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Repetir lección
-            </Button>
-          </div>
-        </section>
-      )}
-      <section className="rounded-xl border p-4">
-        <h2 className="text-sm font-semibold">En la app</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Estos enlaces abren tus pantallas de trabajo reales.
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <p className="mt-3 text-muted-foreground">{lesson.description}</p>
+        <div className="mt-4 flex flex-wrap gap-2">
           {lesson.links.map((link) => (
             <Button
               asChild
               key={link.href}
-              variant="link"
-              className="h-auto whitespace-normal px-0 text-left"
+              variant="outline"
+              className="h-auto whitespace-normal text-left"
             >
-              <Link
-                href={link.href}
-                onClick={(event) => {
-                  if (blockedNavigation) event.preventDefault();
-                }}
-                aria-disabled={blockedNavigation}
-              >
+              <Link href={link.href}>
                 {link.label}
-                <ArrowRight className="ml-1 h-4 w-4 shrink-0" />
+                <ArrowRight
+                  className="ml-2 h-4 w-4 shrink-0"
+                  aria-hidden="true"
+                />
               </Link>
             </Button>
           ))}
         </div>
+      </header>
+      <section aria-labelledby="guide-instructions" className="border-t pt-6">
+        <h2 id="guide-instructions" className="text-lg font-semibold">
+          Paso a paso
+        </h2>
+        <ol className="mt-4 list-decimal space-y-4 pl-6 marker:font-semibold marker:text-muted-foreground">
+          {lesson.instructions.map((instruction, i) => (
+            <li key={i} className="pl-2 leading-relaxed">
+              {instruction}
+            </li>
+          ))}
+        </ol>
       </section>
-    </div>
-  );
-}
-
-function Exercise({
-  exercise,
-  value,
-  onChange,
-  disabled,
-}: {
-  exercise: TrainingExercise;
-  value?: TrainingAnswer;
-  onChange: (answer: TrainingAnswer) => void;
-  disabled: boolean;
-}) {
-  if (exercise.kind === "choice")
-    return (
-      <fieldset disabled={disabled} className="space-y-3">
-        <legend className="mb-3 font-medium">{exercise.prompt}</legend>
-        {exercise.options.map((option) => (
-          <label
-            key={option.id}
-            className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${value === option.id ? "border-indigo-500 bg-indigo-50" : ""}`}
+      <GuideScreenshots screenshots={lesson.screenshots ?? []} />
+      <section
+        className="rounded-lg border bg-muted/30 p-4"
+        aria-labelledby="guide-verification"
+      >
+        <h2 id="guide-verification" className="text-base font-semibold">
+          Qué revisar
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed">{lesson.verification}</p>
+      </section>
+      <section aria-labelledby="guide-example">
+        <h2 id="guide-example" className="text-base font-semibold">
+          Ejemplo
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed">{lesson.example}</p>
+      </section>
+      <details className="rounded-lg border p-4">
+        <summary className="cursor-pointer font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          Detalles y situaciones frecuentes
+        </summary>
+        <div className="mt-3 space-y-3 text-sm leading-relaxed">
+          {lesson.explanation.map((paragraph, i) => (
+            <p key={i}>{paragraph}</p>
+          ))}
+        </div>
+      </details>
+      <footer className="border-t pt-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="outline"
+            disabled={save.isPending || read}
+            onClick={() => save.mutate()}
           >
-            <input
-              className="mt-1 accent-indigo-600"
-              type="radio"
-              name="training-answer"
-              value={option.id}
-              checked={value === option.id}
-              onChange={() => onChange(option.id)}
-            />
-            <span className="text-sm">{option.label}</span>
-          </label>
-        ))}
-      </fieldset>
-    );
-  if (exercise.kind === "form") {
-    const fields =
-      value && typeof value === "object" && !Array.isArray(value) ? value : {};
-    return (
-      <fieldset disabled={disabled} className="space-y-4">
-        <legend className="mb-3 font-medium">{exercise.prompt}</legend>
-        {exercise.fields.map((field) => (
-          <div key={field.id}>
-            <label
-              htmlFor={`training-${field.id}`}
-              className="mb-1 block text-sm font-medium"
-            >
-              {field.label}
-            </label>
-            <Input
-              id={`training-${field.id}`}
-              type={field.type === "number" ? "text" : field.type}
-              inputMode={field.type === "number" ? "decimal" : undefined}
-              autoComplete="off"
-              placeholder={field.placeholder}
-              value={fields[field.id] ?? ""}
-              onChange={(e) =>
-                onChange({ ...fields, [field.id]: e.target.value })
-              }
-            />
+            {save.isPending
+              ? "Guardando…"
+              : read
+                ? "Guía leída"
+                : save.isError
+                  ? "Reintentar guardado"
+                  : "Marcar como leída"}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Opcional. Solo guarda tu referencia de lectura.
+          </span>
+        </div>
+        {save.isSuccess && (
+          <p role="status" className="mt-3 text-sm">
+            Guía marcada como leída en tu cuenta.
+          </p>
+        )}
+        {save.isError && (
+          <div role="alert" className="mt-3 space-y-1 text-sm text-red-700">
+            <p>
+              No se pudo guardar la marca de lectura. Podés reintentar o seguir
+              consultando las guías.
+            </p>
+            <p>{save.error.message}</p>
           </div>
-        ))}
-      </fieldset>
-    );
-  }
-  const ids = Array.isArray(value) ? value : exercise.items.map((i) => i.id);
-  const move = (index: number, delta: number) => {
-    const result = [...ids];
-    [result[index], result[index + delta]] = [
-      result[index + delta],
-      result[index],
-    ];
-    onChange(result);
-  };
-  return (
-    <div className="space-y-3">
-      <p className="font-medium">{exercise.prompt}</p>
-      <p className="text-sm text-muted-foreground">
-        Usá las flechas para ordenar los pasos.
-      </p>
-      <ol className="space-y-2">
-        {ids.map((id, index) => (
-          <li
-            key={id}
-            className="flex items-center gap-2 rounded-xl border p-3"
-          >
-            <span className="text-sm text-muted-foreground">{index + 1}.</span>
-            <span className="flex-1 text-sm">
-              {exercise.items.find((i) => i.id === id)?.label}
-            </span>
-            <Button
-              size="icon"
-              variant="ghost"
-              disabled={disabled || index === 0}
-              aria-label={`Subir paso ${index + 1}`}
-              onClick={() => move(index, -1)}
-            >
-              <ArrowUp className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              disabled={disabled || index === ids.length - 1}
-              aria-label={`Bajar paso ${index + 1}`}
-              onClick={() => move(index, 1)}
-            >
-              <ArrowDown className="h-4 w-4" />
-            </Button>
-          </li>
-        ))}
-      </ol>
-    </div>
+        )}
+      </footer>
+    </article>
   );
 }
