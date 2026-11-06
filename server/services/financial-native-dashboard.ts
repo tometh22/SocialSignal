@@ -100,7 +100,7 @@ async function loadNativeExecutiveDashboard(
 
 export async function getNativeProjectionSummary(year: number) {
   const periods = Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}`);
-  const [basis, costs, closed] = await Promise.all([
+  const [basis, costs, summaries] = await Promise.all([
     getRevenueByBasis(periods, { includePipeline: true, weightByProbability: true }),
     pool.query(`
       SELECT p.period_key,
@@ -109,18 +109,47 @@ export async function getNativeProjectionSummary(year: number) {
       LEFT JOIN fact_cost_month f ON f.period_key=p.period_key
       LEFT JOIN LATERAL (SELECT sum(monto_total_usd)::numeric estimated FROM fact_estimated_cost_month WHERE month_key=p.period_key) e ON true
     `, [periods]),
-    pool.query(`SELECT c.period_key,m.facturacion_total,m.costos_directos,m.costos_indirectos,m.ebit_operativo
-      FROM financial_close_periods c LEFT JOIN monthly_financial_summary m ON m.period_key=c.period_key
-      WHERE c.period_key=ANY($1::text[]) AND c.status='CLOSED'`, [periods]),
+    pool.query(`WITH cutover AS (
+        SELECT description AS period_key FROM system_config
+        WHERE config_key='app_mode_cutover_date' AND description IS NOT NULL
+      )
+      SELECT p.period_key,m.facturacion_total,m.costos_directos,m.costos_indirectos,m.ebit_operativo,
+        CASE WHEN c.status IS NOT NULL THEN c.status='CLOSED'
+          ELSE m.cierre_date IS NOT NULL END AS is_closed
+      FROM unnest($1::text[]) p(period_key)
+      LEFT JOIN financial_close_periods c ON c.period_key=p.period_key
+      LEFT JOIN monthly_financial_summary m ON m.period_key=p.period_key
+      WHERE c.status='CLOSED' OR (
+        m.period_key IS NOT NULL AND c.period_key IS NULL
+        AND (NOT EXISTS (SELECT 1 FROM cutover) OR p.period_key < (SELECT period_key FROM cutover))
+        AND NOT EXISTS (
+          SELECT 1 FROM revenue_events r
+          WHERE r.invoice_period=p.period_key AND r.source_tab='mind_intake'
+        )
+      )`, [periods]),
   ]);
   const costByPeriod = new Map(costs.rows.map((row: any) => [row.period_key, Number(row.total) || 0]));
-  const closedByPeriod = new Map(closed.rows.map((row: any) => [row.period_key, row]));
+  const summaryByPeriod = new Map(summaries.rows.map((row: any) => [row.period_key, row]));
   const months = basis.map((row) => {
-    const snapshot: any = closedByPeriod.get(row.periodKey);
-    const revenue = snapshot ? Number(snapshot.facturacion_total) || 0 : row.devengado;
-    const cost = snapshot ? (Number(snapshot.costos_directos) || 0) + (Number(snapshot.costos_indirectos) || 0) : costByPeriod.get(row.periodKey) ?? 0;
-    const result = snapshot ? Number(snapshot.ebit_operativo) || revenue - cost : revenue - cost;
-    return { periodKey: row.periodKey, monthLabel: row.periodKey, cierre: Boolean(snapshot), facturacion: revenue, costos: cost, resultado: result };
+    // El histórico importado no tiene necesariamente revenue_events ni un
+    // cierre nativo. Elegir una sola fuente por mes evita perderlo o duplicarlo.
+    const snapshot: any = summaryByPeriod.get(row.periodKey);
+    const snapshotRevenue = num(snapshot?.facturacion_total);
+    const snapshotResult = num(snapshot?.ebit_operativo);
+    const revenue = snapshotRevenue ?? row.facturacion;
+    // Ventas − EBIT conserva la base de costos del resumen histórico.
+    const snapshotCost = snapshotRevenue != null && snapshotResult != null
+      ? snapshotRevenue - snapshotResult
+      : snapshot?.costos_directos != null || snapshot?.costos_indirectos != null
+        ? (num(snapshot.costos_directos) ?? 0) + (num(snapshot.costos_indirectos) ?? 0)
+        : null;
+    const cost = snapshotCost ?? costByPeriod.get(row.periodKey) ?? 0;
+    const result = snapshotResult ?? revenue - cost;
+    const month = Number(row.periodKey.slice(5));
+    const monthName = new Intl.DateTimeFormat('es-AR', { month: 'short', timeZone: 'UTC' })
+      .format(new Date(Date.UTC(year, month - 1, 1)));
+    return { periodKey: row.periodKey, monthLabel: `${String(month).padStart(2, '0')} ${monthName}`, month,
+      cierre: Boolean(snapshot?.is_closed), facturacion: revenue, costos: cost, resultado: result };
   });
   const series = (key: "facturacion" | "costos" | "resultado") => {
     const ejecutado = months.filter((row) => row.cierre).reduce((sum, row) => sum + row[key], 0);

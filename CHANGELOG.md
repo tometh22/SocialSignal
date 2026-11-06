@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.28 — 2026-11-06
+
+- Proyección recupera la facturación del resumen histórico importado cuando no hay ingresos nativos para ese mes, respeta la fecha de corte y evita duplicar los importes.
+- Los períodos nativos usan la base de facturación; los cierres conservan su resultado, incluido un EBIT cero. Los costos del resumen se derivan de ventas menos EBIT.
+- Se corrigen los nombres de meses del gráfico y se aclaran las fuentes de la pantalla. Regresiones con PostgreSQL para histórico, corte, cancelaciones y reapertura de períodos.
+
 ## 1.14.27 — 2026-11-06
 
 - Capacitación pasa a ser una biblioteca de 37 guías de consulta con instrucciones numeradas, ejemplos, puntos de revisión y enlaces a las funciones. Se eliminan ejercicios, evaluaciones y recorridos obligatorios; la marca de lectura es opcional y conserva el historial anterior.
