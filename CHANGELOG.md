@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.29 — 2026-11-06
+
+- Proyección conserva los doce meses de la base anual importada del Máster, incluidos los posteriores al corte operativo. Corrige la exclusión de agosto a diciembre introducida al recuperar el histórico en 1.14.28.
+- Los ingresos y cierres de Mind reemplazan la base del mes correspondiente sin sumarse a ella. El detalle mensual indica si la facturación proviene del Máster importado, de ingresos de Mind o de un cierre de Mind.
+- Los totales se redondean a centavos. Regresiones con PostgreSQL para el año completo con corte configurado y la sustitución de un mes sin perder los meses siguientes.
+
 ## 1.14.28 — 2026-11-06
 
 - Proyección recupera la facturación del resumen histórico importado cuando no hay ingresos nativos para ese mes, respeta la fecha de corte y evita duplicar los importes.

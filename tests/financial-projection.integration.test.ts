@@ -68,13 +68,27 @@ describe.skipIf(!setup.url)("financial projection sources", () => {
     expect(result.meses[0]).toMatchObject({ month: 1, monthLabel: '01 ene', cierre: true });
   });
 
-  it("keeps history before cutover and uses invoicing, including weighted pipeline, from cutover onward", async () => {
+  it("keeps the full imported annual base even when an operational cutover is configured", async () => {
+    await pool.query(`
+      INSERT INTO system_config VALUES ('app_mode_cutover_date', '2026-08');
+      INSERT INTO monthly_financial_summary (period_key, facturacion_total, ebit_operativo)
+        SELECT '2026-' || lpad(month::text, 2, '0'), month * 1000 + 0.12, month * 100
+        FROM generate_series(1, 12) month;
+    `);
+    const result = await getNativeProjectionSummary(2026);
+    expect(result.facturacion.total).toBe(78001.44);
+    expect(result.meses.map(month => month.fuenteFacturacion)).toEqual(Array(12).fill('master'));
+    expect(result.meses[7].facturacion).toBe(8000.12);
+    expect(result.meses[11].facturacion).toBe(12000.12);
+  });
+
+  it("replaces only months with native revenue and retains later months of the annual base", async () => {
     await pool.query(`
       INSERT INTO system_config VALUES ('app_mode_cutover_date', '2026-08');
       INSERT INTO monthly_financial_summary VALUES
         ('2026-07', 10000, NULL, NULL, 5000, '2026-07-31'),
         ('2026-08', 999999, NULL, NULL, 999999, '2026-08-31'),
-        ('2026-09', 999999, NULL, NULL, 999999, NULL);
+        ('2026-09', 6500, NULL, NULL, 1500, NULL);
       INSERT INTO revenue_events (invoice_period, amount_usd, delivery_start, delivery_end, delivery_curve)
         VALUES ('2026-08', 12000, '2026-08', '2027-07', 'linear');
       INSERT INTO revenue_events (invoice_period, amount_usd, confirmed, probability)
@@ -84,9 +98,9 @@ describe.skipIf(!setup.url)("financial projection sources", () => {
       INSERT INTO fact_cost_month VALUES ('2026-08', 2000, 500);
     `);
     const result = await getNativeProjectionSummary(2026);
-    expect(result.facturacion).toEqual({ ejecutado: 10000, proyectado: 13000, total: 23000 });
-    expect(result.meses[7]).toMatchObject({ cierre: false, facturacion: 13000, costos: 2500, resultado: 10500 });
-    expect(result.meses[8].facturacion).toBe(0);
+    expect(result.facturacion).toEqual({ ejecutado: 10000, proyectado: 19500, total: 29500 });
+    expect(result.meses[7]).toMatchObject({ cierre: false, fuenteFacturacion: 'mind', facturacion: 13000, costos: 2500, resultado: 10500 });
+    expect(result.meses[8]).toMatchObject({ fuenteFacturacion: 'master', facturacion: 6500, costos: 5000, resultado: 1500 });
   });
 
   it("does not add historical totals to imported events or revive history after native cancellation", async () => {
@@ -116,7 +130,7 @@ describe.skipIf(!setup.url)("financial projection sources", () => {
       INSERT INTO fact_cost_month VALUES ('2026-02', 1000, 500);
     `);
     const result = await getNativeProjectionSummary(2026);
-    expect(result.meses[0]).toMatchObject({ cierre: true, facturacion: 10000, costos: 10000, resultado: 0 });
+    expect(result.meses[0]).toMatchObject({ cierre: true, fuenteFacturacion: 'cierre', facturacion: 10000, costos: 10000, resultado: 0 });
     expect(result.meses[1]).toMatchObject({ cierre: false, facturacion: 2000, costos: 1500, resultado: 500 });
     expect(result.facturacion).toEqual({ ejecutado: 10000, proyectado: 2000, total: 12000 });
   });
