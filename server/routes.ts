@@ -12,7 +12,8 @@ import { onAppEvent } from "./services/app-events";
 import { invalidateNativeDashboard } from "./services/financial-native-dashboard";
 import { publishAppEvent } from "./services/app-events";
 import { registerPerformanceRoutes } from "./middleware/performance";
-import { taskBucketSql } from "./domain/task-list";
+import { personalTaskAfter, personalTaskOrder, taskBucketSql } from "./domain/task-list";
+import { summarizeWeeklyHours } from "@shared/utils/weekly-hours";
 import { registerBiRoutes } from "./routes-bi";
 import { cursorPage, readPage, escapeLike } from "./utils/pagination";
 import { notifyQuotationApprovalRequests } from "./services/quotation-approval-notifications";
@@ -23487,9 +23488,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (statusCondition) conditions.push(statusCondition);
         if (bucket) conditions.push(sql`${taskBucket} = ${bucket}`);
-        if (page?.beforeId) conditions.push(lt(tasks.id, page.beforeId));
+        if (page?.beforeId) conditions.push(bucket === "done" ? lt(tasks.id, page.beforeId) : personalTaskAfter(page.beforeId));
         const taskQuery = db.select({ ...getTableColumns(tasks), asanaSource: sql<Record<string, unknown> | null>`${tasks.asanaSource} - 'raw' - 'csvRaw' - 'sourceDuplicates'` })
-          .from(tasks).where(and(...conditions)).orderBy(...(page ? [desc(tasks.id)] : [asc(tasks.dueDate), asc(tasks.position)])).$dynamic();
+          .from(tasks).where(and(...conditions)).orderBy(...(page ? (bucket === "done" ? [desc(tasks.id)] : personalTaskOrder()) : [asc(tasks.dueDate), asc(tasks.position)])).$dynamic();
         const taskRows = await (page ? taskQuery.limit(page.limit + 1) : taskQuery);
         if (page) { const result = cursorPage(taskRows, page.limit); myTasks = result.items; nextCursor = result.nextCursor; }
         else myTasks = taskRows;
@@ -23985,14 +23986,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const enriched = reconcileSectionHours(enrichedRaw.filter(e => e.source === "task"), enrichedRaw.filter(e => e.source === "legacy"), section);
 
-      // By week
-      const byWeekMap: Record<string, number> = {};
-      for (const e of enriched) {
-        const d = new Date(e.date);
-        const key = currentBuenosAiresWeek(new Date(`${hoursCivilDate(d)}T12:00:00Z`)).from;
-        byWeekMap[key] = (byWeekMap[key] || 0) + e.hours;
-      }
-      const byWeek = Object.entries(byWeekMap).map(([week, hours]) => ({ week, hours })).sort((a, b) => a.week.localeCompare(b.week));
+      // Use the same filtered estimates as the project totals, including weeks
+      // with planning but no recorded hours. Weekly plans are not prorated.
+      const byWeek = summarizeWeeklyHours(enriched, effectiveEstimates);
 
       // By project (real hours + estimated hours para comparar estimado vs real)
       const byProjectMap: Record<string, { projectId: number | null; name: string; hours: number; estimatedHours: number }> = {};
