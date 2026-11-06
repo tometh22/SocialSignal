@@ -164,7 +164,7 @@ export interface MonthData {
   cashflow60Dias: number | null;
 }
 
-function createSheetsClient() {
+export function createSheetsClient() {
   let privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
   if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
     privateKey = privateKey.slice(1, -1);

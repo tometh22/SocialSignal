@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Calculator, Search } from 'lucide-react';
 import { calculateFinancialScenario, matchesScenarioCost, type FinancialScenario } from '@shared/financial-scenario';
@@ -20,14 +20,18 @@ export function CostScenario({ year }: { year: number }) {
   const [onlySelected, setOnlySelected] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
-  const { data, isLoading, error, refetch } = useQuery<FinancialScenario>({
+  const [snapshot, setSnapshot] = useState<FinancialScenario>();
+  const { data: remoteData, isLoading, error, refetch } = useQuery<FinancialScenario>({
     queryKey: [`/api/v2/executive/proyeccion/escenario?year=${year}`], enabled: open,
-    refetchOnWindowFocus: false, staleTime: Infinity,
+    refetchOnWindowFocus: false, staleTime: Infinity, gcTime: 0, refetchOnReconnect: false,
   });
+  useEffect(() => { if (remoteData && !snapshot) setSnapshot(remoteData); }, [remoteData, snapshot]);
+  const data = snapshot ?? remoteData;
   const result = useMemo(() => data ? calculateFinancialScenario(data, selected) : null, [data, selected]);
   const filtered = useMemo(() => (data?.costs ?? []).filter(cost => matchesScenarioCost(cost, search)
     && (!onlySelected || selected.has(cost.id))), [data, search, onlySelected, selected]);
   const selectable = filtered.filter(cost => cost.amountUsd != null);
+  const matchedAmount = data ? calculateFinancialScenario(data, selectable.map(cost => cost.id)).excludedUsd : 0;
   const matchedSelected = selectable.filter(cost => selected.has(cost.id)).length;
   const currentPage = Math.min(page, Math.max(0, Math.ceil(filtered.length / pageSize) - 1));
   const visible = filtered.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
@@ -54,15 +58,17 @@ export function CostScenario({ year }: { year: number }) {
       </CardHeader>
       {open && <CardContent id="cost-scenario-content" className="space-y-5">
         {isLoading && <p role="status" className="text-sm text-muted-foreground">Buscando conceptos y movimientos del año…</p>}
-        {error && <div role="alert" className="flex items-center gap-3 text-sm text-red-600">
+        {error && !data && <div role="alert" className="flex items-center gap-3 text-sm text-red-600">
           No se pudieron cargar los costos. <Button variant="outline" size="sm" onClick={() => void refetch()}>Reintentar</Button>
         </div>}
         {data && result && <>
           <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground space-y-1">
             <p>Simulación en USD: suma al resultado los gastos excluidos, manteniendo los ingresos y los demás gastos. No recalcula tasas impositivas.</p>
-            <p>Los consumos detallados reemplazan el estimado del mismo concepto y mes; no se suman los pagos de caja. Se asume que los gastos seleccionados están incluidos en el resultado base del Máster o de Mind.</p>
+            <p>Para los meses del Máster se usa el detalle de Costos directos e indirectos o Costos estimados que coincide con Ventas menos EBIT. No se mezclan ambas bases ni se suman pagos de caja. IVA, impuestos y bonos respetan las fórmulas del Máster.</p>
           </div>
 
+          {data.sourceReadAt && <p className="text-xs text-muted-foreground">Máster consultado: {new Date(data.sourceReadAt).toLocaleString('es-AR')}. Los importes quedan fijos durante esta simulación.</p>}
+          {data.warnings?.map(warning => <p key={warning} role="alert" className="text-sm text-amber-800">{warning}</p>)}
           <MetricGrid minColumnWidth="190px" aria-live="polite">
             <MetricCard label="Gastos excluidos" value={money(result.excludedUsd)} data-testid="scenario-excluded"
               detail={`${result.selected.length} movimientos · ${new Set(result.selected.map(cost => cost.periodKey)).size} meses`} />
@@ -109,7 +115,7 @@ export function CostScenario({ year }: { year: number }) {
               </div>
               <Button variant="ghost" size="sm" disabled={!result.selected.length} onClick={() => { setSelected(new Set()); setOnlySelected(false); setPage(0); }}>Reincorporar todo</Button>
             </div>
-            <p className="text-sm text-muted-foreground" role="status">{filtered.length} coincidencias · {new Set(filtered.map(cost => cost.periodKey)).size} meses · {money(selectable.reduce((sum, cost) => sum + cost.amountUsd!, 0))}</p>
+            <p className="text-sm text-muted-foreground" role="status">{filtered.length} coincidencias · {new Set(filtered.map(cost => cost.periodKey)).size} meses · {money(matchedAmount)}</p>
           </div>
 
           <div className="overflow-x-auto rounded-lg border">
@@ -128,10 +134,10 @@ export function CostScenario({ year }: { year: number }) {
                   <td className="p-3 min-w-[220px] max-w-lg">
                     <div className="font-medium">{cost.concept}</div>
                     {cost.description && <div className="break-words text-muted-foreground">{cost.description}</div>}
-                    <div className="mt-1 text-xs text-muted-foreground">{cost.category}{cost.date ? ` · ${cost.date}` : ''}{cost.impact === 'net' ? ' · Solo afecta al neto' : ''}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{cost.category}{cost.date ? ` · ${cost.date}` : ''}{cost.impact === 'net' ? ' · Solo afecta al neto' : cost.impact === 'ebit' ? ' · Solo afecta a costos y EBIT' : ''}</div>
                     {cost.amountUsd == null && <div className="text-xs text-amber-700">Falta importe o tipo de cambio; no se puede excluir.</div>}
                   </td>
-                  <td className="p-3"><Badge variant="outline">{cost.source === 'ledger' ? 'Movimiento' : 'Estimado'}</Badge></td>
+                  <td className="p-3"><Badge variant="outline">{cost.source === 'ledger' ? 'Movimiento' : cost.source === 'master' ? 'Máster' : 'Estimado'}</Badge>{cost.sourceDetail && <div className="mt-1 text-xs text-muted-foreground">{cost.sourceDetail}</div>}</td>
                   <td className="p-3 text-right whitespace-nowrap tabular-nums">{money(cost.amountUsd)}</td>
                 </tr>)}
                 {!visible.length && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">

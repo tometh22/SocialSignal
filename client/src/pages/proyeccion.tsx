@@ -1,7 +1,7 @@
 /**
  * Proyección — ejecutado vs proyectado del ejercicio.
  *
- * Conserva la base anual importada del Máster hasta que cada mes tenga
+ * Conserva la base anual del Máster hasta que cada mes tenga
  * ingresos o cierres en Mind, sin sumar ambas fuentes.
  * Responde la pregunta que el board hace siempre:
  * cómo venimos contra lo que proyectamos.
@@ -86,7 +86,7 @@ export default function ProyeccionPage() {
     <PageShell>
       <CompactPageHeader
         title="Proyección"
-        description="Ejecutado contra proyectado del ejercicio, con la base anual importada del Máster"
+        description="Ejecutado contra proyectado del ejercicio, con la base anual del Máster"
       />
 
       <ToolbarPanel>
@@ -115,7 +115,7 @@ export default function ProyeccionPage() {
                   label: "Facturación total", icon: DollarSign,
                   value: fmt(data.facturacion.total),
                   detalle: `${fmt(data.facturacion.ejecutado)} ejecutada · ${fmt(data.facturacion.proyectado)} proyectada`,
-                  tip: "Suma de los doce meses, sin IVA. Se conserva la base anual importada del Máster; si un mes tiene ingresos o cierre en Mind, esos datos reemplazan su base importada. No se suman ambas fuentes.",
+                  tip: "Suma de los doce meses, sin IVA. Se conserva la base anual del Máster; si un mes tiene ingresos o cierre en Mind, esos datos reemplazan su base del Máster. No se suman ambas fuentes.",
                 },
                 {
                   label: "Costos totales", icon: TrendingUp,
@@ -225,7 +225,7 @@ export default function ProyeccionPage() {
                           </Badge>
                         </td>
                         <td className="py-1.5 px-2 text-muted-foreground">
-                          {m.fuenteFacturacion === "master" ? "Máster importado"
+                          {m.fuenteFacturacion === "master" ? "Máster"
                             : m.fuenteFacturacion === "cierre" ? "Cierre de Mind" : "Ingresos de Mind"}
                         </td>
                         <td className="text-right py-1.5 px-2 tabular-nums">{fmt(m.facturacion)}</td>
