@@ -55,6 +55,26 @@ describe('financial scenario calculation', () => {
     expect(result.months[0].adjustedCostUsd).toBe(-100);
   });
 
+  it('rounds once after aggregating source precision and exactly restores an empty selection', () => {
+    const data: FinancialScenario = { year: 2026,
+      months: Array.from({ length: 12 }, (_, i) => ({ periodKey: `2026-${String(i + 1).padStart(2, '0')}`,
+        monthLabel: String(i + 1), revenueUsd: 10.008, costUsd: 8.004, ebitUsd: 2.004, netProfitUsd: 1.004 })),
+      costs: Array.from({ length: 12 }, (_, i) => cost(String(i), 0.004, `2026-${String(i + 1).padStart(2, '0')}`)),
+    };
+    const empty = calculateFinancialScenario(data, []);
+    expect(empty.adjustedCostUsd).toBe(empty.baseCostUsd);
+    expect(empty.adjustedEbitUsd).toBe(empty.baseEbitUsd);
+    expect(empty.adjustedNetProfitUsd).toBe(empty.baseNetProfitUsd);
+    expect(empty.adjustedEbitUsd).toBe(24.05);
+    const selected = calculateFinancialScenario(data, data.costs.map(cost => cost.id));
+    expect(selected.excludedUsd).toBe(0.05);
+    expect(selected.adjustedCostUsd).toBe(96);
+    expect(selected.adjustedEbitUsd).toBe(24.1);
+    expect(selected.adjustedNetProfitUsd).toBe(12.1);
+    expect(selected.netChangeUsd).toBe(0.05);
+    expect(calculateFinancialScenario(data, []).adjustedEbitUsd).toBe(24.05);
+  });
+
   it('searches card details, accents and several comma-separated concepts', () => {
     expect(matchesScenarioCost(fixture.costs[0], 'api openai')).toBe(true);
     expect(matchesScenarioCost(fixture.costs[0], 'tecnologia')).toBe(true);
