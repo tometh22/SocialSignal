@@ -1,7 +1,8 @@
 /**
  * Proyección — ejecutado vs proyectado del ejercicio.
  *
- * Combina el histórico importado con los ingresos y cierres de Mind.
+ * Conserva la base anual importada del Máster hasta que cada mes tenga
+ * ingresos o cierres en Mind, sin sumar ambas fuentes.
  * Responde la pregunta que el board hace siempre:
  * cómo venimos contra lo que proyectamos.
  *
@@ -32,6 +33,7 @@ interface ProyeccionMes {
   monthLabel: string;
   month: number;
   cierre: boolean;
+  fuenteFacturacion: "master" | "mind" | "cierre";
   facturacion: number | null;
   costos: number | null;
   resultado: number | null;
@@ -83,7 +85,7 @@ export default function ProyeccionPage() {
     <PageShell>
       <CompactPageHeader
         title="Proyección"
-        description="Ejecutado contra proyectado del ejercicio, con el histórico importado y los datos de Mind"
+        description="Ejecutado contra proyectado del ejercicio, con la base anual importada del Máster"
       />
 
       <ToolbarPanel>
@@ -112,7 +114,7 @@ export default function ProyeccionPage() {
                   label: "Facturación total", icon: DollarSign,
                   value: fmt(data.facturacion.total),
                   detalle: `${fmt(data.facturacion.ejecutado)} ejecutada · ${fmt(data.facturacion.proyectado)} proyectada`,
-                  tip: "Suma de la facturación de los meses cerrados más la proyectada de los que faltan. Sin IVA.",
+                  tip: "Suma de los doce meses, sin IVA. Se conserva la base anual importada del Máster; si un mes tiene ingresos o cierre en Mind, esos datos reemplazan su base importada. No se suman ambas fuentes.",
                 },
                 {
                   label: "Costos totales", icon: TrendingUp,
@@ -204,6 +206,7 @@ export default function ProyeccionPage() {
                     <tr className="border-b text-muted-foreground">
                       <th className="text-left py-2 px-2 font-medium">Mes</th>
                       <th className="text-left py-2 px-2 font-medium">Estado</th>
+                      <th className="text-left py-2 px-2 font-medium">Fuente de facturación</th>
                       <th className="text-right py-2 px-2 font-medium">Facturación</th>
                       <th className="text-right py-2 px-2 font-medium">Costos</th>
                       <th className="text-right py-2 px-2 font-medium">EBIT</th>
@@ -217,6 +220,10 @@ export default function ProyeccionPage() {
                           <Badge variant={m.cierre ? "secondary" : "outline"} className="text-[10px]">
                             {m.cierre ? "cerrado" : "proyectado"}
                           </Badge>
+                        </td>
+                        <td className="py-1.5 px-2 text-muted-foreground">
+                          {m.fuenteFacturacion === "master" ? "Máster importado"
+                            : m.fuenteFacturacion === "cierre" ? "Cierre de Mind" : "Ingresos de Mind"}
                         </td>
                         <td className="text-right py-1.5 px-2 tabular-nums">{fmt(m.facturacion)}</td>
                         <td className="text-right py-1.5 px-2 tabular-nums">{fmt(m.costos)}</td>

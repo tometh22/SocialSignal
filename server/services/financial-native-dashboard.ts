@@ -109,11 +109,11 @@ export async function getNativeProjectionSummary(year: number) {
       LEFT JOIN fact_cost_month f ON f.period_key=p.period_key
       LEFT JOIN LATERAL (SELECT sum(monto_total_usd)::numeric estimated FROM fact_estimated_cost_month WHERE month_key=p.period_key) e ON true
     `, [periods]),
-    pool.query(`WITH cutover AS (
-        SELECT description AS period_key FROM system_config
-        WHERE config_key='app_mode_cutover_date' AND description IS NOT NULL
-      )
-      SELECT p.period_key,m.facturacion_total,m.costos_directos,m.costos_indirectos,m.ebit_operativo,
+    // El corte operativo no recorta el presupuesto anual ya importado del
+    // Máster. Se conserva como base hasta que el mes tenga ingresos o cierre
+    // nativos; no se vuelve a importar ni se suma a esos ingresos.
+    pool.query(`SELECT p.period_key,m.facturacion_total,m.costos_directos,m.costos_indirectos,m.ebit_operativo,
+        c.status='CLOSED' AS is_native_closed,
         CASE WHEN c.status IS NOT NULL THEN c.status='CLOSED'
           ELSE m.cierre_date IS NOT NULL END AS is_closed
       FROM unnest($1::text[]) p(period_key)
@@ -121,7 +121,6 @@ export async function getNativeProjectionSummary(year: number) {
       LEFT JOIN monthly_financial_summary m ON m.period_key=p.period_key
       WHERE c.status='CLOSED' OR (
         m.period_key IS NOT NULL AND c.period_key IS NULL
-        AND (NOT EXISTS (SELECT 1 FROM cutover) OR p.period_key < (SELECT period_key FROM cutover))
         AND NOT EXISTS (
           SELECT 1 FROM revenue_events r
           WHERE r.invoice_period=p.period_key AND r.source_tab='mind_intake'
@@ -131,12 +130,15 @@ export async function getNativeProjectionSummary(year: number) {
   const costByPeriod = new Map(costs.rows.map((row: any) => [row.period_key, Number(row.total) || 0]));
   const summaryByPeriod = new Map(summaries.rows.map((row: any) => [row.period_key, row]));
   const months = basis.map((row) => {
-    // El histórico importado no tiene necesariamente revenue_events ni un
-    // cierre nativo. Elegir una sola fuente por mes evita perderlo o duplicarlo.
+    // La base anual importada no tiene necesariamente revenue_events ni un
+    // cierre nativo. Elegir una sola fuente por mes evita perderla o duplicarla.
     const snapshot: any = summaryByPeriod.get(row.periodKey);
     const snapshotRevenue = num(snapshot?.facturacion_total);
     const snapshotResult = num(snapshot?.ebit_operativo);
     const revenue = snapshotRevenue ?? row.facturacion;
+    const fuenteFacturacion = snapshotRevenue != null
+      ? snapshot?.is_native_closed ? 'cierre' : 'master'
+      : 'mind';
     // Ventas − EBIT conserva la base de costos del resumen histórico.
     const snapshotCost = snapshotRevenue != null && snapshotResult != null
       ? snapshotRevenue - snapshotResult
@@ -149,12 +151,13 @@ export async function getNativeProjectionSummary(year: number) {
     const monthName = new Intl.DateTimeFormat('es-AR', { month: 'short', timeZone: 'UTC' })
       .format(new Date(Date.UTC(year, month - 1, 1)));
     return { periodKey: row.periodKey, monthLabel: `${String(month).padStart(2, '0')} ${monthName}`, month,
-      cierre: Boolean(snapshot?.is_closed), facturacion: revenue, costos: cost, resultado: result };
+      cierre: Boolean(snapshot?.is_closed), fuenteFacturacion, facturacion: revenue, costos: cost, resultado: result };
   });
   const series = (key: "facturacion" | "costos" | "resultado") => {
-    const ejecutado = months.filter((row) => row.cierre).reduce((sum, row) => sum + row[key], 0);
-    const proyectado = months.filter((row) => !row.cierre).reduce((sum, row) => sum + row[key], 0);
-    return { ejecutado, proyectado, total: ejecutado + proyectado };
+    const round = (value: number) => Math.round(value * 100) / 100;
+    const ejecutado = round(months.filter((row) => row.cierre).reduce((sum, row) => sum + row[key], 0));
+    const proyectado = round(months.filter((row) => !row.cierre).reduce((sum, row) => sum + row[key], 0));
+    return { ejecutado, proyectado, total: round(ejecutado + proyectado) };
   };
   return { year, facturacion: series("facturacion"), costos: series("costos"), resultado: series("resultado"), months, meses: months, mesesCerrados: months.filter((row) => row.cierre).length, mesesProyectados: months.filter((row) => !row.cierre).length };
 }
