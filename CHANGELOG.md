@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.36 — 2026-11-10
+
+- En la daily, Enter guarda y avanza; Shift+Enter agrega una línea. Se conserva Ctrl/⌘+Enter y se actualizan las ayudas.
+- Agrega sugerencias de mensajes con IA basadas en el estado actual y los últimos 30 comentarios y updates de la misma sala. El borrador se revisa y se aplica explícitamente; no se guarda automáticamente ni reemplaza ediciones posteriores a la solicitud.
+- Usa Claude Sonnet 4.6 con la conexión de Anthropic de Mind; permite configurar ANTHROPIC_STATUS_DRAFT_MODEL. Incluye pruebas del servicio y verificación en navegador de borradores y respuestas tardías. Sin nuevas migraciones.
+
 ## 1.14.35 — 2026-11-10
 
 - El conector MCP permite proponer cambios y agregar notas en Status con el nuevo alcance explícito `status:write`. Cada pedido presenta el antes/después en Mind y requiere confirmación de la misma cuenta antes de guardarse; los demás módulos siguen siendo de solo lectura.

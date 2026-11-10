@@ -1187,6 +1187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.all('/api/status-semanal/updates/:entryId', legacyRewrite((r, req) => `/api/reviews/${r}/updates/${req.params.entryId}`));
   // Note: /api/status-semanal/users is left as-is (old handler still registered below) — it's
   // used by CreateReviewDialog to list ALL users (no room membership implied).
+  app.all('/api/status-semanal/ai-draft', legacyRewrite((r) => `/api/reviews/${r}/ai-draft`));
   app.all('/api/status-semanal/ai-summary', legacyRewrite((r) => `/api/reviews/${r}/ai-summary`));
   app.all('/api/status-semanal/daily-sessions', legacyRewrite((r) => `/api/reviews/${r}/daily-sessions`));
   app.all('/api/status-semanal/daily-sessions/latest', legacyRewrite((r) => `/api/reviews/${r}/daily-sessions/latest`));
