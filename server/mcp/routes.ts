@@ -10,6 +10,7 @@ import { MindOAuthProvider, randomToken } from "./oauth";
 import { MindStatusReader } from "./status";
 import { createMindMcpServer } from "./tools";
 import { MindDataReader, MindDataError } from "./data";
+import { logMcpTokenFailure } from "./diagnostics";
 
 type BrowserUser = { id: number; firstName: string; lastName: string; isActive?: boolean | null;
   isAdmin?: boolean | null; role?: string; permissions?: string[] | null };
@@ -63,6 +64,7 @@ export function registerMindMcp(app: Express, pool: Pool, config: MindMcpConfig 
     next();
   });
   // The SDK supplies discovery, exact redirect validation, PKCE S256, client authentication and rate limits.
+  app.use("/token", logMcpTokenFailure);
   app.use(mcpAuthRouter({ provider, issuerUrl: new URL(config.origin), resourceServerUrl: new URL(config.resource),
     scopesSupported: MCP_SCOPES, resourceName: "Mind" }));
 
