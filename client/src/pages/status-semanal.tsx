@@ -2358,7 +2358,8 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   const entry = done ? null : queue[idx];
   const item = entry ? { ...entry.item, ...(local.get(entry.item.key) ?? {}) } as Item : null;
 
-  useEffect(() => { setDraft(item?.currentAction ?? ''); setPicker(null); if (!done) setTimeout(() => textareaRef.current?.focus(), 30); }, [idx, done]);
+  // The saved update belongs in the history, never in the new-message draft.
+  useEffect(() => { setDraft(''); setPicker(null); if (!done) setTimeout(() => textareaRef.current?.focus(), 30); }, [idx, done]);
 
   const record = (it: Item, text: string) => {
     setChanges(prev => {
@@ -2382,7 +2383,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   const next = async () => {
     if (!item) return;
     const t = draft.trim();
-    if (t !== (item.currentAction ?? '').trim()) {
+    if (t && t !== (item.currentAction ?? '').trim()) {
       try {
         await postUpdate(item, t);
         patchLocal(item, { currentAction: t });
@@ -2600,7 +2601,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
               <div className="text-[11px] text-slate-400 uppercase tracking-wide font-bold mb-3">Acciones</div>
               <div className="space-y-2 text-sm">
                 <button onClick={() => void next()} className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2.5 hover:border-indigo-300 transition-colors">
-                  <span>{draft.trim() !== (item.currentAction ?? '').trim() ? 'Guardar y siguiente' : 'Todo igual, siguiente'}</span><kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500">Ctrl/⌘ ⏎</kbd>
+                  <span>{draft.trim() && draft.trim() !== (item.currentAction ?? '').trim() ? 'Guardar y siguiente' : 'Todo igual, siguiente'}</span><kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500">Ctrl/⌘ ⏎</kbd>
                 </button>
                 <div className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2">
                   <span>Semáforo</span>
