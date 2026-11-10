@@ -16,7 +16,7 @@ export async function generateStatusDraft(context: StatusDraftContext): Promise<
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('IA no configurada');
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 30_000, maxRetries: 1 });
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: process.env.ANTHROPIC_STATUS_DRAFT_MODEL || 'claude-sonnet-4-6',
     max_tokens: 400,
     system: `Sos un asistente que propone el próximo mensaje para una daily de trabajo.
 Escribí en español argentino, directo y natural, en 1 a 3 oraciones, sin introducción ni markdown.
