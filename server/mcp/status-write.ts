@@ -44,6 +44,7 @@ export class MindStatusWriter {
     try {
       await db.query("BEGIN");
       await db.query("SET LOCAL statement_timeout='5s'");
+      await db.query("SET LOCAL TIME ZONE 'UTC'");
       const result = await fn(db);
       await db.query("COMMIT");
       return result;
