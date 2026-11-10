@@ -14,6 +14,7 @@ import AddProjectDialog from "@/components/review/AddProjectDialog";
 import AddItemButton, { type NewItemInput } from "@/components/review/AddStatusItemButton";
 import StatusText from "@/components/review/StatusText";
 import StatusFocusWorkspace from "@/components/review/StatusFocusWorkspace";
+import DailyDraftSuggestion from "@/components/review/DailyDraftSuggestion";
 import DailyStatusEditor from "@/components/review/DailyStatusEditor";
 import { useAutoResize } from "@/hooks/use-auto-resize-textarea";
 import RoomTitleEditor from "@/components/review/RoomTitleEditor";
@@ -2453,16 +2454,17 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   };
   useEffect(() => () => { recognitionRef.current?.stop?.(); }, []);
 
-  // Atajos: Enter fuera del textarea (o ⌘/Ctrl+Enter adentro) avanza.
+  // Atajos: Enter guarda y avanza; Shift+Enter agrega una línea en el editor.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing) return;
       const el = document.activeElement as HTMLElement | null;
       const inText = el?.tagName === 'TEXTAREA' || el?.tagName === 'INPUT' || el?.tagName === 'SELECT' || el?.isContentEditable;
       if (e.key === 'Escape') { e.preventDefault(); if (picker) setPicker(null); else if (listening) toggleListening(); else onExit(); return; }
       if (done) { if (e.key === 'Enter' && !inText) { e.preventDefault(); void finish(); } return; }
-      // Within the editor, Enter adds a line; Ctrl/⌘+Enter saves and advances.
+      // Keep Ctrl/⌘+Enter working too; Shift+Enter remains a newline.
       const inTextarea = el === textareaRef.current;
-      if (e.key === 'Enter' && (!inText || (inTextarea && (e.metaKey || e.ctrlKey)))) { e.preventDefault(); void next(); return; }
+      if (e.key === 'Enter' && !e.shiftKey && (!inText || inTextarea)) { e.preventDefault(); void next(); return; }
       if (inText) return;
       if (e.key === '1') { e.preventDefault(); setHealth('verde'); }
       else if (e.key === '2') { e.preventDefault(); setHealth('amarillo'); }
@@ -2587,6 +2589,9 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
               <div className="mt-5">
                 <DailyStatusEditor itemKey={item.key} value={draft} onChange={setDraft}
                   textareaRef={textareaRef} listening={listening} onToggleListening={toggleListening} />
+                <DailyDraftSuggestion key={item.key} kind={item.isCustom ? 'custom' : 'project'}
+                  targetId={(item.isCustom ? item.customId : item.projectId)!} draft={draft}
+                  onUse={text => { setDraft(text); textareaRef.current?.focus(); }} />
                 {changes.get(item.key)?.changes.length ? (
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {changes.get(item.key)!.changes.map((c, i) => <span key={i} className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5">{c}</span>)}
@@ -2600,7 +2605,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
               <div className="text-[11px] text-slate-400 uppercase tracking-wide font-bold mb-3">Acciones</div>
               <div className="space-y-2 text-sm">
                 <button onClick={() => void next()} className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2.5 hover:border-indigo-300 transition-colors">
-                  <span>{draft.trim() !== (item.currentAction ?? '').trim() ? 'Guardar y siguiente' : 'Todo igual, siguiente'}</span><kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500">Ctrl/⌘ ⏎</kbd>
+                  <span>{draft.trim() !== (item.currentAction ?? '').trim() ? 'Guardar y siguiente' : 'Todo igual, siguiente'}</span><kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500">Enter ⏎</kbd>
                 </button>
                 <div className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2">
                   <span>Semáforo</span>
