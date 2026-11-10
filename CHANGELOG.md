@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.34 — 2026-11-10
+
+- Agrega diagnóstico de errores OAuth al reconectar Mind desde ChatGPT: distingue rechazos de credenciales, PKCE, códigos y renovación. Registra únicamente categorías y presencia de parámetros, sin secretos, tokens, códigos ni descripciones arbitrarias.
+- Pruebas contra el handler OAuth del SDK verifican los rechazos y la exclusión de datos sensibles. No cambia las reglas de autenticación ni los permisos del conector.
+
 ## 1.14.33 — 2026-11-06
 
 - El Dashboard conserva los meses del Máster hasta que existan ingresos o un cierre nativo de Mind. Los movimientos importados ya no reemplazan el histórico con facturación cero. Ventas, resultados, saldos y cashflow usan la misma instantánea del Máster que Proyección; los cierres nativos permanecen inmutables.
