@@ -175,6 +175,10 @@ export default function ExecutiveDashboardV2() {
           </Button>
         </div>
       </ToolbarPanel>
+      {d?.fuenteDatos && <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <Badge variant="outline">Fuente: {d.fuenteDatos === 'master' ? 'Máster' : d.fuenteDatos === 'cierre' ? 'Cierre Mind' : d.fuenteDatos === 'mixta' ? 'Máster y Mind, según el mes' : 'Mind'}</Badge>
+        {data.sourceReadAt && (d.fuenteDatos === 'master' || d.fuenteDatos === 'mixta') && <span>Consultado: {new Date(data.sourceReadAt).toLocaleString('es-AR')}</span>}
+      </div>}
 
       {error ? <QueryError message="No se pudo actualizar el resumen financiero." retry={refetch} /> : isLoading ? (
         <div className="flex items-center justify-center min-h-[40vh]">
@@ -249,10 +253,10 @@ export default function ExecutiveDashboardV2() {
                 tooltip: "Dinero que realmente entró y salió de la cuenta en el período. Puede ser mayor al Beneficio Neto por cobros de facturas anteriores o anticipos de clientes.",
               },
               {
-                label: "Margen Neto",
+                label: d.beneficioNetoParcial ? "Margen Neto (parcial)" : "Margen Neto",
                 value: fmtPct(d.margenNeto), pct: null, color: kpiColor(d.margenNeto, 15), icon: BarChart3,
                 tone: d.margenNeto == null ? "neutral" as const : d.margenNeto >= 15 ? "success" as const : d.margenNeto >= 0 ? "warning" as const : "danger" as const,
-                tooltip: "Beneficio Neto / Ventas × 100. Porcentaje de cada dólar de venta que queda como ganancia final después de todos los costos e impuestos.",
+                tooltip: (d.beneficioNetoParcial ? "Usa únicamente las ventas y el neto de los meses con resultado válido. " : "") + "Beneficio Neto / Ventas × 100. Porcentaje de cada dólar de venta que queda como ganancia final después de todos los costos e impuestos.",
               },
               {
                 // El markup mide eficiencia de EJECUCIÓN, así que sólo cuenta
@@ -317,8 +321,8 @@ export default function ExecutiveDashboardV2() {
                   { label: viewMode === "quarter" ? "Ventas del trimestre" : viewMode === "year" ? "Ventas del año" : viewMode === "custom" ? "Ventas del período" : "Ventas del mes", value: d.ventasDelMes, bold: false, pct: 100, tooltip: "Total facturado sin IVA en el período." },
                   { label: "– Costos (implícito)", value: d.ventasDelMes != null && d.ebitOperativo != null ? -(d.ventasDelMes - d.ebitOperativo) : null, bold: false, pct: d.ventasDelMes ? ((d.ventasDelMes - (d.ebitOperativo || 0)) / d.ventasDelMes * 100) : null, negative: true, tooltip: "Ventas − EBIT. Incluye costos directos del equipo + costos indirectos de operación." },
                   { label: "= EBIT Operativo", value: d.ebitOperativo, bold: true, pct: d.margenOperativo, tooltip: "Earnings Before Interest & Taxes. Resultado operativo antes de impuestos." },
-                  { label: "– Impuestos (impl.)", value: d.ebitOperativo != null && d.beneficioNeto != null ? -(d.ebitOperativo - d.beneficioNeto) : null, bold: false, negative: true, tooltip: "EBIT − Beneficio Neto. Provisión impositiva del período (impuestos USA y locales)." },
-                  { label: "= Beneficio Neto", value: d.beneficioNeto, bold: true, pct: d.margenNeto, tooltip: "Ganancia final después de todos los costos e impuestos." },
+                  { label: !d.beneficioNetoParcial && d.beneficioNeto != null && d.ebitOperativo != null && d.beneficioNeto > d.ebitOperativo ? "+ Recuperos y ajustes al neto" : "– Ajustes al neto", value: !d.beneficioNetoParcial && d.ebitOperativo != null && d.beneficioNeto != null ? -(d.ebitOperativo - d.beneficioNeto) : null, bold: false, negative: true, tooltip: d.beneficioNetoParcial ? "No se calcula la diferencia: EBIT y neto cubren distintos meses." : "Diferencia entre EBIT y neto según la fuente: incluye impuestos, provisiones y el tratamiento de bonos." },
+                  { label: d.beneficioNetoParcial ? "= Beneficio Neto (parcial)" : "= Beneficio Neto", value: d.beneficioNeto, bold: true, pct: d.margenNeto, tooltip: "Ganancia final después de todos los costos e impuestos." },
                 ].map((row, i) => (
                   <div key={i} className={`flex items-center justify-between py-2 px-3 rounded ${row.bold ? "bg-slate-50 border font-semibold" : ""}`}>
                     <div className="flex items-center gap-1.5">
@@ -327,7 +331,7 @@ export default function ExecutiveDashboardV2() {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`text-sm tabular-nums ${row.negative ? "text-red-500" : kpiColor(row.value, 0)}`}>
-                        {row.value != null ? fmt(Math.abs(row.value)) : "—"}
+                        {row.value != null ? fmt(row.negative ? Math.abs(row.value) : row.value) : "—"}
                       </span>
                       {row.pct != null && (
                         <span className="text-xs text-muted-foreground w-16 text-right">{typeof row.pct === 'number' ? fmtPct(row.pct) : row.pct}</span>
@@ -432,10 +436,10 @@ export default function ExecutiveDashboardV2() {
           {trend.length > 2 && (() => {
             const chartData = trend.filter((m: any) => m.ventasDelMes != null).map((m: any) => ({
               period: `${MONTHS[(m.month || 1) - 1]} ${String(m.year).slice(2)}`,
-              ventas: m.ventasDelMes || 0,
-              ebit: m.ebitOperativo || 0,
-              beneficio: m.beneficioNeto || 0,
-              cashflow: m.cashflow || 0,
+              ventas: m.ventasDelMes,
+              ebit: m.ebitOperativo ?? null,
+              beneficio: m.beneficioNeto ?? null,
+              cashflow: m.cashflow ?? null,
               markup: m.markup || 0,
               margen: m.margenOperativo || 0,
             }));

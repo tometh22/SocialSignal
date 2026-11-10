@@ -14,13 +14,14 @@ vi.mock("../server/db", async () => {
 });
 
 import { pool } from "../server/db";
-import { getNativeProjectionSummary } from "../server/services/financial-native-dashboard";
+import { getNativeProjectionSummary, fetchNativeExecutiveDashboard, invalidateNativeDashboard } from "../server/services/financial-native-dashboard";
 import { getFinancialScenario } from "../server/services/financial-scenario";
 vi.mock('../server/services/financial-master-scenario', async importOriginal => ({
   ...await importOriginal<typeof import('../server/services/financial-master-scenario')>(),
   getMasterScenarioSnapshot: vi.fn(),
 }));
 import { getMasterScenarioSnapshot } from '../server/services/financial-master-scenario';
+import { dashboardSnapshot, dashboardRow, dashboardHeaders } from './fixtures/master-dashboard';
 import { getFinancialProjection } from '../server/services/financial-projection';
 import { calculateFinancialScenario } from "../shared/financial-scenario";
 
@@ -52,16 +53,82 @@ describe.skipIf(!setup.url)("financial projection sources", () => {
         payment_terms_days integer, confirmed boolean DEFAULT true, probability numeric,
         status text DEFAULT 'active', is_estimate boolean DEFAULT false, source_tab text DEFAULT 'mind_intake'
       );
+
+      ALTER TABLE monthly_financial_summary ADD COLUMN year integer, ADD COLUMN month_number integer,
+        ADD COLUMN month_label text, ADD COLUMN margen_operativo numeric, ADD COLUMN markup_promedio numeric,
+        ADD COLUMN proyeccion_resultado numeric, ADD COLUMN caja_total numeric, ADD COLUMN inversiones numeric,
+        ADD COLUMN cuentas_cobrar_usd numeric, ADD COLUMN total_activo numeric, ADD COLUMN impuestos_usa numeric,
+        ADD COLUMN pasivo_facturacion_adelantada numeric, ADD COLUMN cuentas_pagar_usd numeric,
+        ADD COLUMN total_pasivo numeric, ADD COLUMN balance_neto numeric, ADD COLUMN cashflow_neto numeric, ADD COLUMN balance_60_dias numeric;
+      ALTER TABLE pasivo_entries ADD COLUMN outstanding_amount numeric;
+      CREATE TABLE activo_entries (period_key text, voided_at timestamp, currency text, monto_usd numeric, outstanding_amount numeric, cotizacion numeric);
+      CREATE TABLE cashflow_transactions (period_key text, voided_at timestamp, tipo_movimiento text, transfer_group_id text, monto_usd numeric, monto_ars numeric, cotizacion numeric, source text);
+      CREATE TABLE provision_entries (period_key text, status text, currency text, remaining_amount numeric, monto_provision numeric);
+      CREATE TABLE fact_labor_month (period_key text, cost_usd numeric);
+      CREATE TABLE financial_accounts (currency text, opening_balance numeric, is_active boolean, opening_balance_date date);
+      CREATE TABLE exchange_rates (year integer, month integer, is_active boolean, rate_type text, rate numeric, updated_at timestamp, id serial);
     `);
   });
   beforeEach(async () => {
     await pool.query(`TRUNCATE system_config, financial_close_periods, monthly_financial_summary,
-      fact_cost_month, fact_estimated_cost_month, revenue_events, pasivo_entries`);
+      fact_cost_month, fact_estimated_cost_month, revenue_events, pasivo_entries, activo_entries, cashflow_transactions,
+      provision_entries, fact_labor_month, financial_accounts, exchange_rates`);
+    invalidateNativeDashboard();
+    vi.mocked(getMasterScenarioSnapshot).mockReset();
   });
   afterAll(async () => {
     await pool.end();
     await admin?.query(`DROP SCHEMA ${setup.schema} CASCADE`);
     await admin?.end();
+  });
+
+  it("keeps Master totals and balances before and after cutover despite imported native ledger rows", async () => {
+    vi.mocked(getMasterScenarioSnapshot).mockResolvedValue(dashboardSnapshot([dashboardRow(1), dashboardRow(8), dashboardRow(12)]));
+    await pool.query(`
+      INSERT INTO system_config VALUES ('app_mode_cutover_date','2026-08');
+      INSERT INTO monthly_financial_summary (period_key,facturacion_total,ebit_operativo) VALUES
+        ('2026-01',99999,99999), ('2026-08',99999,99999), ('2026-12',99999,99999);
+      INSERT INTO fact_cost_month VALUES ('2026-01',9000,5000,2000), ('2026-08',9000,5000,2000);
+      INSERT INTO activo_entries VALUES ('2026-01',NULL,'USD',99999,99999,1);
+      INSERT INTO pasivo_entries (period_key,monto_usd,outstanding_amount) VALUES ('2026-01',99999,99999);
+      INSERT INTO cashflow_transactions VALUES ('2026-01',NULL,'Egreso',NULL,99999,NULL,1,'excel');
+      INSERT INTO revenue_events (invoice_period,amount_usd,source_tab) VALUES ('2026-01',99999,'excel');
+    `);
+    const result = await fetchNativeExecutiveDashboard(2026,undefined,undefined,true);
+    expect(result.data).toHaveLength(3);
+    expect(result.filtered).toMatchObject({ ventasDelMes: 3000, ebitOperativo: 1200, beneficioNeto: 600,
+      activoLiquido: 100, clientesACobrar: 300, pasivoProveedores: 50, balanceNeto: 330, cashflow: -75, fuenteDatos: 'master' });
+    expect((await fetchNativeExecutiveDashboard(2026,8)).filtered?.ventasDelMes).toBe(1000);
+    expect((await fetchNativeExecutiveDashboard(2026,undefined,1)).filtered?.ventasDelMes).toBe(1000);
+    expect((await fetchNativeExecutiveDashboard(undefined,undefined,undefined,undefined,2026,1,2026,8)).filtered?.ventasDelMes).toBe(2000);
+    expect((await fetchNativeExecutiveDashboard(2024,1)).filtered).toBeNull();
+  });
+
+  it("keeps a native close immutable, uses native reopened/revenue months, and does not revive cancelled income", async () => {
+    vi.mocked(getMasterScenarioSnapshot).mockRejectedValue(new Error('Master should not be read'));
+    await pool.query(`
+      INSERT INTO monthly_financial_summary (period_key,year,month_number,facturacion_total,ebit_operativo,beneficio_neto)
+        VALUES ('2026-01',2026,1,800,300,250), ('2026-02',2026,2,99999,99999,99999),
+        ('2026-03',2026,3,99999,99999,99999), ('2026-04',2026,4,99999,99999,99999);
+      INSERT INTO financial_close_periods VALUES ('2026-01','CLOSED'), ('2026-02','OPEN');
+      INSERT INTO revenue_events (invoice_period,amount_usd,status) VALUES ('2026-01',99999,'active'),
+        ('2026-03',1500,'active'), ('2026-04',99999,'cancelled');
+      INSERT INTO fact_cost_month VALUES ('2026-03',500,100,50);
+    `);
+    const result = await fetchNativeExecutiveDashboard(2026,undefined,undefined,true);
+    expect(result.data.map(month => month.ventasDelMes)).toEqual([800,0,1500,0]);
+    expect(result.data[0]).toMatchObject({ fuenteDatos:'cierre', cierre:true, beneficioNeto:250 });
+    expect(result.data[2]).toMatchObject({ fuenteDatos:'mind', ebitOperativo:900, beneficioNeto:850 });
+    expect(result.filtered?.ventasDelMes).toBe(2300);
+    expect(getMasterScenarioSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a missing Master instead of silently replacing it with zero-native facts", async () => {
+    await pool.query("INSERT INTO monthly_financial_summary (period_key,facturacion_total) VALUES ('2026-01',1000)");
+    vi.mocked(getMasterScenarioSnapshot).mockRejectedValueOnce(new Error('Sheets unavailable'));
+    await expect(fetchNativeExecutiveDashboard(2026,1)).rejects.toThrow('Sheets unavailable');
+    vi.mocked(getMasterScenarioSnapshot).mockResolvedValueOnce(dashboardSnapshot([dashboardRow(1)]));
+    expect((await fetchNativeExecutiveDashboard(2026,1)).filtered?.ventasDelMes).toBe(1000);
   });
 
   it("recovers imported revenue and closures when there are no native events", async () => {
@@ -160,9 +227,9 @@ describe.skipIf(!setup.url)("financial projection sources", () => {
   });
 
   it("reconciles live Master detail and totals instead of imported liabilities or stale summaries", async () => {
-    const summaryHeader = ['Mes', 'Año', ...Array(11).fill(''), 'Ventas del mes', 'EBIT Utilidad operativa', 'Beneficio Neto'];
+    const summaryHeader = dashboardHeaders;
     vi.mocked(getMasterScenarioSnapshot).mockResolvedValue({
-      summary: [summaryHeader, ['01 ene', 2026, ...Array(11).fill(null), 1000, 900, 900]],
+      summary: [summaryHeader, dashboardRow(1,1000,900,900)],
       actual: [['Detalle', 'Subtipo de costo', 'Mes', 'Año Facturación', 'Año', ...Array(13).fill(''), 'Monto Total USD'],
         ['Tarjeta USA', 'Tarjeta', '01 ene', null, 2026, '', '', 'REPLIT PURCHASE', ...Array(10).fill(null), 100]],
       estimates: [['Mes', 'Año', '', 'Detalle', ...Array(8).fill(''), 'Monto Total USD'],
@@ -187,6 +254,28 @@ describe.skipIf(!setup.url)("financial projection sources", () => {
     expect((await getFinancialProjection(2026)).costos.total).toBe(100);
     vi.mocked(getMasterScenarioSnapshot).mockRejectedValueOnce(new Error('Sheets unavailable'));
     await expect(getFinancialScenario(2026)).rejects.toThrow('Sheets unavailable');
+  });
+
+  it("shares Master closing dates and rounds annual totals only after summing both execution groups", async () => {
+    const january = dashboardRow(1,1000.004,400.004,200);
+    const december = dashboardRow(12,1000.004,400.004,200);
+    january[2] = 46053; december[2] = 80000;
+    const snapshot = dashboardSnapshot([january,december]);
+    snapshot.actual = [Array(19).fill('')];
+    for (const [index,name] of [[0,'Detalle'],[2,'Mes'],[4,'Año'],[18,'Monto Total USD']] as const) snapshot.actual[0][index]=name;
+    snapshot.estimates = [Array(13).fill('')];
+    for (const [index,name] of [[0,'Mes'],[1,'Año'],[3,'Detalle'],[12,'Monto Total USD']] as const) snapshot.estimates[0][index]=name;
+    snapshot.liabilities = [Array(14).fill('')];
+    for (const [index,name] of [[0,'Detalle'],[2,'Mes'],[3,'Año'],[13,'Monto Total USD']] as const) snapshot.liabilities[0][index]=name;
+    vi.mocked(getMasterScenarioSnapshot).mockResolvedValue(snapshot);
+    await pool.query(`INSERT INTO monthly_financial_summary (period_key,facturacion_total,ebit_operativo)
+      VALUES ('2026-01',1000,400), ('2026-12',1000,400)`);
+    const projection = await getFinancialProjection(2026);
+    expect(projection.mesesCerrados).toBe(1);
+    expect(projection.meses[0].cierre).toBe(true);
+    expect(projection.meses[11].cierre).toBe(false);
+    expect(projection.facturacion).toEqual({ejecutado:1000,proyectado:1000,total:2000.01});
+    expect(projection.resultado.total).toBe(800.01);
   });
 
   it("uses net invoice amounts and period provisions for native months; missing FX stays unknown", async () => {

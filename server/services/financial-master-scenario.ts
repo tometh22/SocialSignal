@@ -19,7 +19,7 @@ export function getMasterScenarioSnapshot(): Promise<MasterScenarioSnapshot> {
   return cache.get('master', async () => {
     const response = await createSheetsClient().spreadsheets.values.batchGet({
       spreadsheetId,
-      ranges: ["'Resumen Ejecutivo'!A:R", "'Costos directos e indirectos'!A:S", "'Costos estimados'!A:N", "'Pasivo'!A:N"],
+      ranges: ["'Resumen Ejecutivo'!A:V", "'Costos directos e indirectos'!A:S", "'Costos estimados'!A:N", "'Pasivo'!A:N"],
       valueRenderOption: 'UNFORMATTED_VALUE',
     }, { timeout: 20_000 });
     const [summary, actual, estimates, liabilities] = response.data.valueRanges?.map(range => range.values ?? []) ?? [];

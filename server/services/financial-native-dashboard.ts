@@ -3,6 +3,8 @@ import { ReadCache } from "../utils/read-cache";
 import { onAppEvent } from "./app-events";
 import { pool } from "../db";
 import { aggregateMonths, type MonthData } from "./direct-sheets-dashboard";
+import { getMasterScenarioSnapshot } from './financial-master-scenario';
+import { buildMasterDashboard } from './financial-master-dashboard';
 import { getRevenueByBasis } from "./revenue-basis";
 
 const num = (value: unknown): number | null => value == null ? null : Number(value);
@@ -37,31 +39,33 @@ function selectDashboardRows(
   } else if (filterYear && filterMonth) {
     filtered = allData.find((row) => row.periodKey === `${filterYear}-${String(filterMonth).padStart(2, "0")}`) ?? null;
   }
-  if (!filtered && allData.length) filtered = allData.at(-1) ?? null;
+  if (!filtered && !filterYear && !filterStartYear && allData.length) filtered = allData.at(-1) ?? null;
   return { data: allData, filtered, available };
 }
 
-/** Mismo contrato del dashboard histórico, pero alimentado sólo por Mind. */
+/** One source per month: closed Mind snapshot, explicit native activity, or Master. */
 async function loadNativeExecutiveDashboard(
   filterYear?: number, filterMonth?: number, filterQuarter?: number, filterYearTotal?: boolean,
   filterStartYear?: number, filterStartMonth?: number, filterEndYear?: number, filterEndMonth?: number,
 ) {
   const { rows } = await pool.query(`
-    WITH cutover AS (
-      SELECT description AS period_key FROM system_config WHERE config_key='app_mode_cutover_date' AND description IS NOT NULL
-    )
-    SELECT m.*, COALESCE(c.status='CLOSED', false) AS is_closed
+    SELECT m.*, c.status AS native_close_status, COALESCE(c.status='CLOSED', false) AS is_closed,
+      EXISTS (SELECT 1 FROM revenue_events r WHERE r.invoice_period=m.period_key AND r.source_tab='mind_intake') AS has_native_revenue
     FROM monthly_financial_summary m
     LEFT JOIN financial_close_periods c ON c.period_key=m.period_key
-    WHERE NOT EXISTS (SELECT 1 FROM cutover)
-       OR m.period_key < (SELECT period_key FROM cutover)
-       OR c.status='CLOSED'
     ORDER BY m.period_key
   `);
   const { rows: liveRows } = await pool.query(NATIVE_DASHBOARD_SQL);
-  const dataByPeriod = new Map<string, MonthData>(rows.map((row: any) => [row.period_key, {
+  // Imported liabilities/cash/facts do not prove that a month has migrated to Mind.
+  // Keep the same source boundary as Projection, including cancelled native revenue.
+  const masterPeriods = rows.filter(row => row.native_close_status == null && !row.has_native_revenue
+    && row.facturacion_total != null).map(row => row.period_key);
+  const masterSnapshot = masterPeriods.length ? await getMasterScenarioSnapshot() : null;
+  const masterRows = masterSnapshot ? buildMasterDashboard(masterSnapshot, masterPeriods) : [];
+  const masterSet = new Set(masterPeriods);
+  const dataByPeriod = new Map<string, MonthData>(rows.filter(row => row.is_closed).map((row: any) => [row.period_key, {
     periodKey: row.period_key, year: Number(row.year), month: Number(row.month_number),
-    monthLabel: row.month_label || row.period_key, cierre: Boolean(row.is_closed || row.cierre_date),
+    monthLabel: row.month_label || row.period_key, cierre: Boolean(row.is_closed), fuenteDatos: 'cierre',
     ventasDelMes: num(row.facturacion_total), ebitOperativo: num(row.ebit_operativo), beneficioNeto: num(row.beneficio_neto),
     margenOperativo: num(row.margen_operativo), margenNeto: num(row.margen_neto), markup: num(row.markup_promedio),
     proyeccionResultado: num(row.proyeccion_resultado), activoLiquido: num(row.caja_total), activoMedPlazo: num(row.inversiones),
@@ -69,8 +73,14 @@ async function loadNativeExecutiveDashboard(
     pasivoFacturacionAdelantada: num(row.pasivo_facturacion_adelantada), pasivoProveedores: num(row.cuentas_pagar_usd),
     pasivoTotal: num(row.total_pasivo), balanceNeto: num(row.balance_neto), cashflow: num(row.cashflow_neto), cashflow60Dias: num(row.balance_60_dias),
   }]));
+  const nativePeriodsPresent = new Set(liveRows.map(row => row.period_key));
+  for (const row of rows) {
+    if (!row.is_closed && !masterSet.has(row.period_key) && !nativePeriodsPresent.has(row.period_key)) {
+      liveRows.push({ period_key: row.period_key, is_closed: false });
+    }
+  }
   for (const row of liveRows) {
-    if (row.is_closed && dataByPeriod.has(row.period_key)) continue;
+    if (masterSet.has(row.period_key) || (row.is_closed && dataByPeriod.has(row.period_key))) continue;
     const revenue = Number(row.facturacion_total) || 0;
     const direct = Number(row.costos_directos) || 0;
     const operationalDirect = Number(row.costos_directos_operativos) || 0;
@@ -84,7 +94,7 @@ async function loadNativeExecutiveDashboard(
     const benefit = ebit - provisionExpense;
     const [year, month] = row.period_key.split("-").map(Number);
     dataByPeriod.set(row.period_key, {
-      periodKey: row.period_key, year, month, monthLabel: row.period_key, cierre: Boolean(row.is_closed),
+      periodKey: row.period_key, year, month, monthLabel: row.period_key, cierre: Boolean(row.is_closed), fuenteDatos: 'mind',
       ventasDelMes: revenue, ebitOperativo: ebit, beneficioNeto: benefit,
       margenOperativo: revenue ? ebit / revenue * 100 : null, margenNeto: revenue ? benefit / revenue * 100 : null,
       markup: operationalDirect ? revenue / operationalDirect : null, proyeccionResultado: benefit,
@@ -94,8 +104,9 @@ async function loadNativeExecutiveDashboard(
       balanceNeto: cash + receivables - payables - provisionLiability, cashflow: Number(row.cashflow_neto) || 0, cashflow60Dias: null,
     });
   }
+  for (const month of masterRows) dataByPeriod.set(month.periodKey, month);
   const data = [...dataByPeriod.values()].sort((a, b) => a.periodKey.localeCompare(b.periodKey));
-  return selectDashboardRows(data, filterYear, filterMonth, filterQuarter, filterYearTotal, filterStartYear, filterStartMonth, filterEndYear, filterEndMonth);
+  return { ...selectDashboardRows(data, filterYear, filterMonth, filterQuarter, filterYearTotal, filterStartYear, filterStartMonth, filterEndYear, filterEndMonth), sourceReadAt: masterSnapshot?.readAt };
 }
 
 export async function getNativeProjectionSummary(year: number) {
@@ -157,7 +168,7 @@ export async function getNativeProjectionSummary(year: number) {
     const round = (value: number) => Math.round(value * 100) / 100;
     const ejecutado = round(months.filter((row) => row.cierre).reduce((sum, row) => sum + row[key], 0));
     const proyectado = round(months.filter((row) => !row.cierre).reduce((sum, row) => sum + row[key], 0));
-    return { ejecutado, proyectado, total: round(ejecutado + proyectado) };
+    return { ejecutado, proyectado, total: round(months.reduce((sum, month) => sum + month[key], 0)) };
   };
   return { year, facturacion: series("facturacion"), costos: series("costos"), resultado: series("resultado"), months, meses: months, mesesCerrados: months.filter((row) => row.cierre).length, mesesProyectados: months.filter((row) => !row.cierre).length };
 }
@@ -168,5 +179,5 @@ onAppEvent(event => { if (event.topic === "cache") invalidateNativeDashboard(); 
 export function fetchNativeExecutiveDashboard(...args: Parameters<typeof loadNativeExecutiveDashboard>) {
   // The SQL data is independent of the selected period: share its work across filters.
   return dashboardCache.get("native", () => loadNativeExecutiveDashboard()).then(result =>
-    selectDashboardRows(result.data, ...args));
+    ({ ...selectDashboardRows(result.data, ...args), sourceReadAt: result.sourceReadAt }));
 }

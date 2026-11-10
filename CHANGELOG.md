@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.14.34 — 2026-11-10
+
+- Agrega diagnóstico de errores OAuth al reconectar Mind desde ChatGPT: distingue rechazos de credenciales, PKCE, códigos y renovación. Registra únicamente categorías y presencia de parámetros, sin secretos, tokens, códigos ni descripciones arbitrarias.
+- Pruebas contra el handler OAuth del SDK verifican los rechazos y la exclusión de datos sensibles. No cambia las reglas de autenticación ni los permisos del conector.
+
+## 1.14.33 — 2026-11-06
+
+- El Dashboard conserva los meses del Máster hasta que existan ingresos o un cierre nativo de Mind. Los movimientos importados ya no reemplazan el histórico con facturación cero. Ventas, resultados, saldos y cashflow usan la misma instantánea del Máster que Proyección; los cierres nativos permanecen inmutables.
+- Se identifica la fuente por período. El agregado anual toma el último balance completo y muestra su fecha; el neto y su margen señalan cobertura parcial y usan los mismos meses. No se infieren ajustes entre un EBIT anual y un neto parcial, ni se grafican faltantes como cero. Las pérdidas conservan su signo en el estado de resultados.
+- Proyección toma las fechas de cierre del Máster para separar ejecutado y proyectado. Totales y exclusiones conservan la precisión original hasta la suma final: quitar todas las exclusiones recupera exactamente los importes iniciales y elimina los desvíos de centavos.
+- Regresiones con PostgreSQL para fuentes, cancelaciones, cierres y reaperturas, fechas de cierre, rangos y errores de lectura; pruebas de precisión y recorridos de navegador. Cotejo independiente de los 12 meses, 1.863 conceptos y ocho escenarios contra el Máster. Sin migraciones ni modificaciones de datos contables.
+
 ## 1.14.32 — 2026-11-06
 
 - Mis tareas prioriza los vencimientos más próximos también al cargar más páginas. Mantiene un orden estable para fechas iguales y deja las tareas sin vencimiento al final; Finalizadas conserva su orden anterior.

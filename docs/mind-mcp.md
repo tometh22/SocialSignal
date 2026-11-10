@@ -176,6 +176,21 @@ Referencias oficiales:
 
 ## Verificación local y CI
 
+### Reconexión rechazada después del consentimiento
+
+Si Mind acepta el consentimiento pero ChatGPT muestra un error al volver, buscar
+`[MCP] OAuth token exchange failed` en los logs del servidor para ese intento.
+`unknown_client`, `missing_client_secret` e `incorrect_client_secret` identifican
+problemas con la configuración OAuth del cliente. `pkce_mismatch` identifica un
+verificador que no corresponde al código. `authorization_exchange_rejected`
+requiere revisar callback, vigencia del código y permisos del usuario;
+`resource_mismatch` identifica un recurso diferente al `/mcp` configurado.
+
+El diagnóstico registra categorías fijas y presencia de parámetros, nunca sus
+valores ni descripciones arbitrarias del error. No copiar secretos al chat ni
+activar logs de cuerpos/encabezados para investigar. Este registro no corrige por
+sí mismo la causa de la reconexión fallida.
+
 ```sh
 npm ci
 TEST_MCP_DATABASE_URL=postgres://usuario:clave@localhost:5432/mind_test npm test
