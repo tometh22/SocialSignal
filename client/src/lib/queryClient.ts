@@ -48,6 +48,7 @@ export function rewriteReviewUrl(url: string): string {
   if (path === '/api/status-semanal') return `${base}/items${qs}`;
   if (path === '/api/status-semanal/custom') return `${base}/items/custom${qs}`;
   if (path === '/api/status-semanal/users') return `${base}/assignable-users?scope=all${qs ? `&${qs.slice(1)}` : ''}`;
+  if (path === '/api/status-semanal/ai-draft') return `${base}/ai-draft${qs}`;
   if (path === '/api/status-semanal/ai-summary') return `${base}/ai-summary${qs}`;
   if (path === '/api/status-semanal/daily-sessions') return `${base}/daily-sessions${qs}`;
   if (path === '/api/status-semanal/daily-sessions/latest') return `${base}/daily-sessions/latest${qs}`;

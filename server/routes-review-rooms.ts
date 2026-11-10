@@ -20,7 +20,7 @@ import {
   users,
   insertReviewRoomSchema,
 } from "@shared/schema";
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { getTableColumns, and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { requireRoomMember } from "./middleware/requireRoomMember";
 import { uploadPostProposal, deleteOldFile } from "./upload";
 import { createUserNotifications } from "./services/user-notifications";
@@ -1683,6 +1683,52 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
   // ═══════════════════════════════════════════════════════════════════════════
   // AI summary (scoped a la sala)
   // ═══════════════════════════════════════════════════════════════════════════
+
+  router.post('/:roomId/ai-draft', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
+    const { kind, targetId } = req.body ?? {};
+    if (!['project', 'custom'].includes(kind) || !Number.isSafeInteger(targetId) || targetId <= 0) {
+      return res.status(400).json({ message: 'Ítem inválido' });
+    }
+    try {
+      const roomId = req.roomMember!.roomId;
+      const [item] = kind === 'custom'
+        ? await db.select().from(weeklyStatusItems).where(and(eq(weeklyStatusItems.roomId, roomId), eq(weeklyStatusItems.id, targetId)))
+        : await db.select({ ...getTableColumns(projectStatusReviews), title: quotations.projectName })
+          .from(projectStatusReviews)
+          .innerJoin(activeProjects, eq(activeProjects.id, projectStatusReviews.projectId))
+          .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
+          .where(and(eq(projectStatusReviews.roomId, roomId), eq(projectStatusReviews.projectId, targetId)));
+      if (!item) return res.status(404).json({ message: 'Ítem no encontrado en esta sala' });
+      if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ message: 'La IA no está configurada' });
+      const [notes, updates, owners] = await Promise.all([
+        db.select({ content: projectReviewNotes.content, createdAt: projectReviewNotes.createdAt,
+          authorName: sql<string>`${users.firstName} || ' ' || ${users.lastName}` })
+          .from(projectReviewNotes).leftJoin(users, eq(users.id, projectReviewNotes.authorId))
+          .where(and(eq(projectReviewNotes.roomId, roomId), kind === 'custom'
+            ? eq(projectReviewNotes.weeklyStatusItemId, targetId) : eq(projectReviewNotes.projectId, targetId)))
+          .orderBy(desc(projectReviewNotes.createdAt)).limit(30),
+        db.select({ content: statusUpdateEntries.content, createdAt: statusUpdateEntries.createdAt,
+          authorName: sql<string>`${users.firstName} || ' ' || ${users.lastName}` })
+          .from(statusUpdateEntries).leftJoin(users, eq(users.id, statusUpdateEntries.authorId))
+          .where(and(eq(statusUpdateEntries.roomId, roomId), kind === 'custom'
+            ? eq(statusUpdateEntries.weeklyStatusItemId, targetId) : eq(statusUpdateEntries.projectId, targetId)))
+          .orderBy(desc(statusUpdateEntries.createdAt)).limit(30),
+        item.ownerId ? db.select({ name: sql<string>`${users.firstName} || ' ' || ${users.lastName}` }).from(users).where(eq(users.id, item.ownerId)) : Promise.resolve([]),
+      ]);
+      const { generateStatusDraft } = await import('./services/ai-status-draft');
+      const suggestion = await generateStatusDraft({
+        title: item.title ?? 'Proyecto', currentAction: item.currentAction, mainRisk: item.mainRisk,
+        nextMilestone: item.nextMilestone, healthStatus: item.healthStatus, decisionNeeded: item.decisionNeeded,
+        deadline: item.deadline, ownerName: owners[0]?.name ?? null,
+        thread: [...notes.map(n => ({ ...n, kind: 'comentario' })), ...updates.map(u => ({ ...u, kind: 'update' }))]
+          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).slice(-30),
+      });
+      res.json({ suggestion });
+    } catch (error) {
+      console.error('POST ai-draft error:', error);
+      res.status(500).json({ message: 'No se pudo generar la sugerencia. Intentá de nuevo.' });
+    }
+  });
 
   router.post('/:roomId/ai-summary', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
     try {

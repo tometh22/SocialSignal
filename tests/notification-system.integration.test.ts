@@ -62,6 +62,7 @@ import {
 } from "../server/services/notification-email-events";
 import { saveNotificationPreferences } from "../server/services/notification-preferences";
 import { sendTransactionalEmail } from "../server/services/email-transport";
+import { notifyMcpStatusNote } from "../server/services/mcp-status-notifications";
 const tables = [
   schema.users,
   schema.personnel,
@@ -70,6 +71,7 @@ const tables = [
   schema.taskProjectMembers,
   schema.reviewRooms,
   schema.reviewRoomMembers,
+  schema.projectReviewNotes,
   schema.quotations,
   schema.quotationApprovals,
   schema.quotationRevisions,
@@ -234,6 +236,23 @@ describe.skipIf(!fixture.url)(
         await admin.query(`DROP SCHEMA ${fixture.schema} CASCADE`);
         await admin.end();
       }
+    });
+    it("queues MCP note notifications on the same transaction, respecting thread, author and access", async () => {
+      await query(`INSERT INTO project_review_notes(room_id,project_id,content,author_id) VALUES
+        (1,1,'Anterior',2),(1,1,'Inactivo',6),(1,1,'Sin permiso',3),(2,1,'Otra sala',5)`);
+      const client = await pool.connect();
+      try {
+        for (const commit of [false, true]) {
+          await client.query("BEGIN");
+          const { rows } = await client.query("INSERT INTO project_review_notes(room_id,project_id,content,author_id) VALUES(1,1,'Confirmada',1) RETURNING id");
+          const event = { id: rows[0].id, roomId: 1, kind: "project" as const, itemId: 1, userId: 1, title: "Proyecto" };
+          await notifyMcpStatusNote(client, event);
+          await notifyMcpStatusNote(client, event);
+          await client.query(commit ? "COMMIT" : "ROLLBACK");
+          expect((await query("SELECT user_id FROM user_notifications")).rows.map(r => r.user_id)).toEqual(commit ? [2] : []);
+          expect((await query("SELECT * FROM user_notification_email_deliveries")).rowCount).toBe(commit ? 1 : 0);
+        }
+      } finally { client.release(); }
     });
     it("filters candidates by module, active account and actual membership, even for administrators", async () => {
       await createUserNotifications([1, 2, 3, 4, 5, 6, 7], input);

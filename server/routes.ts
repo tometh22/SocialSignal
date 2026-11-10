@@ -233,6 +233,7 @@ import { requireRole, requireProvider, requireProviderCanAccessProject } from ".
 import { requirePermission } from "./middleware/requirePermission";
 import { createReviewRoomsRouter } from "./routes-review-rooms";
 import { registerMindMcp } from "./mcp/routes";
+import { notifyMcpStatusNote } from "./services/mcp-status-notifications";
 import { readMcpConfig } from "./mcp/config";
 import { createLedgerRouter } from "./routes-ledger";
 import { createFinancialIntelligenceRouter } from "./routes-financial-intelligence";
@@ -1111,7 +1112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
-  registerMindMcp(app, pool, readMcpConfig(), (id) => storage.getUser(id));
+  registerMindMcp(app, pool, readMcpConfig(), (id) => storage.getUser(id), notifyMcpStatusNote);
   // Apply personal-hour visibility to every task read, including detail and estimates.
   app.use(["/api/tasks", "/api/tasks-projects", "/api/tasks-personnel"], requireAuth, requirePermission("projects", "operations", "task_manager"), async (req, res, next) => {
     if (req.method !== "GET" || isOperationsRequest(req) || /\/(my-hours|hours-summary)(?:\?|$)/.test(req.originalUrl)) return next();
@@ -1186,6 +1187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.all('/api/status-semanal/updates/:entryId', legacyRewrite((r, req) => `/api/reviews/${r}/updates/${req.params.entryId}`));
   // Note: /api/status-semanal/users is left as-is (old handler still registered below) — it's
   // used by CreateReviewDialog to list ALL users (no room membership implied).
+  app.all('/api/status-semanal/ai-draft', legacyRewrite((r) => `/api/reviews/${r}/ai-draft`));
   app.all('/api/status-semanal/ai-summary', legacyRewrite((r) => `/api/reviews/${r}/ai-summary`));
   app.all('/api/status-semanal/daily-sessions', legacyRewrite((r) => `/api/reviews/${r}/daily-sessions`));
   app.all('/api/status-semanal/daily-sessions/latest', legacyRewrite((r) => `/api/reviews/${r}/daily-sessions/latest`));
