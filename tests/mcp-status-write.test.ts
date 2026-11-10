@@ -77,6 +77,25 @@ describe.skipIf(!process.env.TEST_MCP_DATABASE_URL)("Status editing with browser
     method: "POST", headers: { cookie, ...(origin ? { Origin: origin } : {}) }, body: new URLSearchParams({ csrf, decision }),
   });
 
+  it("requires explicit OAuth consent for Status editing and explains the confirmation step", async () => {
+    const cookie = await login(1);
+    const params = new URLSearchParams({ client_id: config.clientId, redirect_uri: config.redirectUris[0], response_type: "code",
+      code_challenge: "a".repeat(43), code_challenge_method: "S256", scope: "mind:read status:write offline_access", state: "consent-test" });
+    expect((await request(`/authorize?${params}`, { headers: { cookie } })).status).toBe(303);
+    const consent = await request("/mcp/consent", { headers: { cookie } });
+    const html = await consent.text();
+    expect(html).toContain("Autorizar lectura y edición de Status");
+    expect(html).toContain("Cada cambio requiere que lo revises y confirmes");
+    const csrf = html.match(/name="csrf" value="([^"]+)"/)![1];
+    const accepted = await request("/mcp/consent", { method: "POST", headers: { cookie, Origin: config.origin },
+      body: new URLSearchParams({ csrf, decision: "allow" }) });
+    expect(accepted.status).toBe(303);
+    expect((await pool.query("SELECT scopes FROM mcp_oauth_grants")).rows[0].scopes).toEqual(["mind:read", "status:write", "offline_access"]);
+    await pool.query("UPDATE users SET permissions=ARRAY['crm'] WHERE id=1");
+    await request(`/authorize?${params}`, { headers: { cookie } });
+    expect((await request("/mcp/consent", { headers: { cookie } })).status).toBe(403);
+  });
+
   it("prepares without changing Status, binds request IDs and commits once with audit and room isolation", async () => {
     const identity = await issue(), input = edit();
     const results = await Promise.all([writer.prepare(identity, input), writer.prepare(identity, input)]);
