@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.37 — 2026-11-10
+
+- El campo de escritura del daily comienza vacío al entrar o volver a un tema. El último mensaje guardado permanece en Comentarios y antecedentes, sin copiarse como borrador.
+- Avanzar con el campo vacío o solo espacios no publica una actualización ni borra el estado anterior. Un fallo de guardado conserva el texto para reintentar.
+- Regresión de navegador para apertura, navegación, guardado, reingreso y recuperación de errores. Se conservan las sugerencias de IA y el guardado con Enter de 1.14.36; sin migraciones.
+
 ## 1.14.36 — 2026-11-10
 
 - En la daily, Enter guarda y avanza; Shift+Enter agrega una línea. Se conserva Ctrl/⌘+Enter y se actualizan las ayudas.
