@@ -233,6 +233,7 @@ import { requireRole, requireProvider, requireProviderCanAccessProject } from ".
 import { requirePermission } from "./middleware/requirePermission";
 import { createReviewRoomsRouter } from "./routes-review-rooms";
 import { registerMindMcp } from "./mcp/routes";
+import { notifyMcpStatusNote } from "./services/mcp-status-notifications";
 import { readMcpConfig } from "./mcp/config";
 import { createLedgerRouter } from "./routes-ledger";
 import { createFinancialIntelligenceRouter } from "./routes-financial-intelligence";
@@ -1111,7 +1112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
-  registerMindMcp(app, pool, readMcpConfig(), (id) => storage.getUser(id));
+  registerMindMcp(app, pool, readMcpConfig(), (id) => storage.getUser(id), notifyMcpStatusNote);
   // Apply personal-hour visibility to every task read, including detail and estimates.
   app.use(["/api/tasks", "/api/tasks-projects", "/api/tasks-personnel"], requireAuth, requirePermission("projects", "operations", "task_manager"), async (req, res, next) => {
     if (req.method !== "GET" || isOperationsRequest(req) || /\/(my-hours|hours-summary)(?:\?|$)/.test(req.originalUrl)) return next();

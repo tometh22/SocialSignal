@@ -17,9 +17,50 @@ instala automáticamente en ChatGPT.
 | `get_status` | Proyectos y temas adicionales visibles: semáforos, riesgos, acciones, responsables, hitos, fechas y decisiones pendientes. |
 | `get_status_activity` | Notas, actualizaciones y cambios de campos de ambos tipos de tema, con autor y fecha. |
 
-Todas son de lectura. No crean ni modifican datos, no marcan elementos como
-leídos y no llaman a un proveedor de IA: el dot interpreta los datos devueltos.
+Estas herramientas son de lectura. No marcan elementos como leídos ni llaman
+a un proveedor de IA: el dot interpreta los datos devueltos.
 No requieren `OPENAI_API_KEY` ni `ANTHROPIC_API_KEY`.
+
+## Editar Status con confirmación
+
+El alcance adicional `status:write` habilita exclusivamente estas herramientas:
+
+| Herramienta | Resultado |
+| --- | --- |
+| `prepare_status_edit` | Propone cambios de semáforo, margen, carga, riesgo, estado actual, responsable, hito, fechas o decisión en un ítem existente. |
+| `prepare_status_note` | Propone agregar una nota a un proyecto o tema existente. |
+| `get_status_change` | Consulta si la propuesta sigue pendiente, se guardó, se canceló o venció. |
+
+Después de actualizar las herramientas del plugin, reconectar solicitando
+`mind:read status:write offline_access`. El consentimiento explica la edición;
+los tokens anteriores siguen siendo de lectura y no pueden ampliar sus alcances
+mediante refresh. No cambia la URL ni el Client ID/Secret.
+
+El agente muestra el antes/después y `confirmationUrl`. El usuario abre ese enlace,
+inicia sesión con la misma cuenta de Mind, revisa y pulsa **Confirmar y guardar**.
+No existe una herramienta MCP que confirme por el usuario. Solo `state: applied`
+significa guardado; abrir el enlace o crear la propuesta no modifica Status.
+Las propuestas duran 15 minutos y requieren una nueva revisión si el ítem cambió.
+El retorno del login admite exclusivamente las rutas conocidas de confirmación.
+
+Se exige permiso de Status, cuenta activa y membresía owner/editor de una sala
+activa, incluso para administradores. Se revalida la autorización al confirmar.
+No se editan ítems ocultos ni otras salas. Los responsables deben ser usuarios
+activos; `ownerId: null` quita la asignación. Las fechas son ISO 8601 con zona horaria;
+`nextMilestoneDate` existe solo para proyectos, `deadline` también para temas.
+Los campos omitidos se conservan. Cada pedido usa un `requestId` UUID que debe
+reutilizarse al reintentar el mismo contenido.
+
+Cambios, autor e historial se guardan atómicamente. Editar `currentAction` también
+agrega su entrada de avance, igual que en Mind. Las notas conservan su autor y
+fecha en el historial habitual y generan los avisos habituales para participantes
+anteriores del hilo, según sus permisos y preferencias, dentro de la misma transacción.
+No se permite crear/borrar/mover/ocultar ítems,
+editar notas anteriores, administrar salas o miembros ni escribir otros módulos.
+La migración `0095_mcp_status_actions.sql` se aplica al arrancar y guarda las
+propuestas privadas; no se publican mediante el catálogo. Las propuestas de un
+usuario vencidas hace más de un día se purgan al crear otra, sin borrar el historial
+de Status. Un pedido purgado ya no puede consultarse por su ID.
 
 Las respuestas contienen `retrievedAt` y la URL de Mind (o de la sala para Status). `updated_at`
 indica cuándo se actualizó cada tema; consultar el conector no actualiza ese dato.
@@ -120,7 +161,7 @@ campo completo después de aplicar redacción de secretos.
    endpoints son `/authorize`, `/token` y `/revoke` en el origen de Mind; discovery
    los anuncia. Sin `offline_access`, el acceso vence en una hora y requiere
    reconexión.
-5. Iniciar sesión en Mind y pulsar **Autorizar lectura**. Las credenciales de Mind
+5. Iniciar sesión en Mind y pulsar **Autorizar lectura** (o **Autorizar lectura y edición de Status** si se solicitó `status:write`). Las credenciales de Mind
    se ingresan en Mind, no en la conversación. El consentimiento describe el acceso
    a todos los módulos autorizados, incluida información comercial y financiera.
 6. Instalar/habilitar el plugin para la cuenta que usa el dot. El acceso también

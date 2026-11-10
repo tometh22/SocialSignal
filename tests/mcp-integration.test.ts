@@ -191,10 +191,10 @@ describe.skipIf(!process.env.TEST_MCP_DATABASE_URL)("Mind MCP: PostgreSQL + OAut
     const client = new Client({ name: "integration-test", version: "1" });
     await client.connect(new StreamableHTTPClientTransport(new URL(config.resource), { requestInit: { headers: { Authorization: `Bearer ${grant.access_token}` } } }));
     try {
-      const { tools } = await client.listTools(); expect(tools).toHaveLength(7);
+      const { tools } = await client.listTools(); expect(tools).toHaveLength(10);
       const denied = await client.callTool({ name: "list_mind_resources", arguments: {} });
       expect(denied.isError).toBe(true); expect(JSON.stringify(denied)).toContain("mind:read");
-      expect(tools.every(t => t.annotations?.readOnlyHint === true && t.annotations?.destructiveHint === false)).toBe(true);
+      expect(tools.filter(t => !t.name.startsWith("prepare_status_")).every(t => t.annotations?.readOnlyHint === true && t.annotations?.destructiveHint === false)).toBe(true);
       const rooms = await client.callTool({ name: "list_status_rooms", arguments: { query: "Vick" } });
       expect((rooms.structuredContent as any).items.map((r: any) => r.id)).toEqual([10]);
       const status = await client.callTool({ name: "get_status", arguments: { roomId: 10 } });

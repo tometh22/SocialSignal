@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.35 — 2026-11-10
+
+- El conector MCP permite proponer cambios y agregar notas en Status con el nuevo alcance explícito `status:write`. Cada pedido presenta el antes/después en Mind y requiere confirmación de la misma cuenta antes de guardarse; los demás módulos siguen siendo de solo lectura.
+- Valida permiso de Status, membresía de la sala, usuario activo, alcance y vigencia de la autorización tanto al proponer como al confirmar. Las autorizaciones anteriores no adquieren escritura al renovarse.
+- Guarda cambios, avances e historial en una transacción; rechaza propuestas vencidas o desactualizadas y evita duplicados al reintentar. No permite borrar, ocultar, mover ítems ni administrar miembros desde el conector.
+- Migración idempotente `0095_mcp_status_actions` y pruebas con PostgreSQL y cliente MCP para consentimiento, aislamiento, CSRF, revocación, conflictos, reintentos y rollback.
+
 ## 1.14.34 — 2026-11-10
 
 - Agrega diagnóstico de errores OAuth al reconectar Mind desde ChatGPT: distingue rechazos de credenciales, PKCE, códigos y renovación. Registra únicamente categorías y presencia de parámetros, sin secretos, tokens, códigos ni descripciones arbitrarias.

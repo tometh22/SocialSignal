@@ -156,7 +156,7 @@ export async function sendUserWebPushTest(userId: number, endpoint: string, test
 }
 
 
-type NotificationTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type NotificationTransaction = Pick<Parameters<Parameters<typeof db.transaction>[0]>[0], "select" | "insert" | "execute">;
 export async function createUserNotifications(userIds: number[], input: UserNotificationInput, transaction?: NotificationTransaction): Promise<boolean> {
   const candidates = [...new Set(userIds.filter(id => Number.isInteger(id) && id > 0))];
   if (!candidates.length) return true;
