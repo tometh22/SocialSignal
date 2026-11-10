@@ -5,7 +5,7 @@ import type { OAuthServerProvider, AuthorizationParams } from "@modelcontextprot
 import type { OAuthClientInformationFull, OAuthTokens, OAuthTokenRevocationRequest } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { InvalidGrantError, InvalidScopeError, InvalidTargetError, InvalidTokenError, InvalidRequestError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
-import { MIND_SCOPE, MCP_SCOPES, validMcpScopes, type MindMcpConfig } from "./config";
+import { MIND_SCOPE, MCP_SCOPES, STATUS_WRITE_SCOPE, validMcpScopes, type MindMcpConfig } from "./config";
 
 export const tokenHash = (value: string) => createHash("sha256").update(value).digest("hex");
 export const randomToken = () => randomBytes(32).toString("base64url");
@@ -16,7 +16,8 @@ const activeMindUserSql = `u.is_active IS NOT FALSE AND u.role IS DISTINCT FROM 
   (u.is_admin IS TRUE OR u.role='admin' OR u.permissions && ARRAY['crm','quotations','projects','operations','status','dashboard','finance','task_manager','admin']::text[])`;
 // Old Status grants retain their original scope; broader access needs fresh consent.
 const activeGrantUserSql = `((${activeMindUserSql} AND 'mind:read'=ANY(g.scopes)) OR
-  (${activeStatusUserSql} AND 'status:read'=ANY(g.scopes) AND NOT ('mind:read'=ANY(g.scopes))))`;
+  (${activeStatusUserSql} AND 'status:read'=ANY(g.scopes) AND NOT ('mind:read'=ANY(g.scopes))))
+  AND (NOT ('status:write'=ANY(g.scopes)) OR (${activeStatusUserSql} AND u.role IS DISTINCT FROM 'external_provider'))`;
 
 export interface PendingMcpAuthorization {
   clientId: string; redirectUri: string; codeChallenge: string; resource: string;
@@ -27,6 +28,7 @@ declare module "express-session" {
   interface SessionData {
     mcpAuthorization?: PendingMcpAuthorization;
     mcpConnectionsCsrf?: string;
+    mcpStatusCsrf?: string;
   }
 }
 
@@ -50,7 +52,7 @@ export class MindOAuthProvider implements OAuthServerProvider {
     this.checkResource(params.resource);
     const scopes = params.scopes?.length ? [...new Set(params.scopes)] : [MIND_SCOPE];
     if (!validMcpScopes(scopes)) {
-      throw new InvalidScopeError("Se permite mind:read, status:read y offline_access");
+      throw new InvalidScopeError("Se permite mind:read, status:read, status:write y offline_access; incluí un alcance de lectura.");
     }
     if (!this.config.redirectUris.includes(params.redirectUri) || !/^[A-Za-z0-9_-]{43}$/.test(params.codeChallenge)
       || (params.state?.length ?? 0) > 2048) throw new InvalidRequestError("Solicitud OAuth inválida");
@@ -68,7 +70,8 @@ export class MindOAuthProvider implements OAuthServerProvider {
     const result = await this.pool.query(`INSERT INTO mcp_oauth_grants
       (id, user_id, client_id, resource, scopes, redirect_uri, code_challenge, code_hash, code_expires_at)
       SELECT $1,u.id,$3,$4,$5,$6,$7,$8,now()+interval '5 minutes' FROM users u
-      WHERE u.id=$2 AND ${pending.scopes.includes(MIND_SCOPE) ? activeMindUserSql : activeStatusUserSql} RETURNING id`,
+      WHERE u.id=$2 AND ${pending.scopes.includes(MIND_SCOPE) ? activeMindUserSql : activeStatusUserSql}
+      ${pending.scopes.includes(STATUS_WRITE_SCOPE) ? `AND ${activeStatusUserSql} AND u.role IS DISTINCT FROM 'external_provider'` : ""} RETURNING id`,
     [randomUUID(), userId, pending.clientId, pending.resource, pending.scopes, pending.redirectUri, pending.codeChallenge, tokenHash(code)]);
     if (!result.rowCount) throw new InvalidGrantError("Usuario sin acceso al alcance solicitado");
     return code;
@@ -123,7 +126,7 @@ export class MindOAuthProvider implements OAuthServerProvider {
   }
 
   async verifyAccessToken(token: string): Promise<AuthInfo> {
-    const { rows } = await this.pool.query(`SELECT g.user_id,g.client_id,g.scopes,g.access_expires_at,g.resource
+    const { rows } = await this.pool.query(`SELECT g.id,g.user_id,g.client_id,g.scopes,g.access_expires_at,g.resource
       FROM mcp_oauth_grants g JOIN users u ON u.id=g.user_id
       WHERE g.access_token_hash=$1 AND g.revoked_at IS NULL AND g.access_expires_at>now()
       AND g.client_id=$2 AND g.resource=$3 AND ${activeGrantUserSql}`,
@@ -131,7 +134,7 @@ export class MindOAuthProvider implements OAuthServerProvider {
     const grant = rows[0];
     if (!grant) throw new InvalidTokenError("Acceso inválido, vencido o revocado");
     return { token, clientId: grant.client_id, scopes: grant.scopes, resource: new URL(grant.resource),
-      expiresAt: Math.floor(new Date(grant.access_expires_at).getTime()/1000), extra: { userId: grant.user_id } };
+      expiresAt: Math.floor(new Date(grant.access_expires_at).getTime()/1000), extra: { userId: grant.user_id, grantId: grant.id } };
   }
 
   async revokeToken(client: OAuthClientInformationFull, request: OAuthTokenRevocationRequest) {

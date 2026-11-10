@@ -10,6 +10,7 @@ export const excludedMindTables = {
   "user_notification_thread_mutes": "Preferencias privadas de cada conversación",
   "capacity_group_estimates": "Planificación semanal por persona; se consulta en Capacidad con validación de titularidad",
   "mcp_oauth_grants": "Credenciales OAuth",
+  "mcp_status_actions": "Solicitudes privadas de confirmación de cambios",
   "password_reset_tokens": "Tokens de recuperación",
   "user_notification_push_subscriptions": "Credenciales push",
   "system_config": "Configuración interna que puede contener secretos; no se expone como datos de negocio"
