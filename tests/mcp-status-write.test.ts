@@ -196,8 +196,9 @@ describe.skipIf(!process.env.TEST_MCP_DATABASE_URL)("Status editing with browser
     const p = await writer.prepare(identity, { ...edit({ ownerId: 2, deadline: "2026-11-20T10:00:00-03:00", mainRisk: null }), kind: "custom", itemId: 200 });
     expect(p.changes.find((c: any) => c.field === "ownerId").afterName).toBe("Vicky Test");
     await writer.decide(1, p.id, true);
-    expect((await pool.query("SELECT owner_id,deadline FROM weekly_status_items WHERE id=200")).rows[0])
+    expect((await pool.query("SELECT owner_id,deadline AT TIME ZONE 'UTC' AS deadline FROM weekly_status_items WHERE id=200")).rows[0])
       .toEqual({ owner_id: 2, deadline: new Date("2026-11-20T13:00:00Z") });
+    await expect(writer.prepare(identity, { ...edit({ deadline: "2026-11-20T13:00:00Z" }), kind: "custom", itemId: 200 })).rejects.toThrow("no hay cambios");
   });
 
   it("rolls back state and proposal if the audit insert fails", async () => {

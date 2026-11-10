@@ -29,6 +29,7 @@ export type StatusNoteNotifier = (db: PoolClient, note: { id: number; roomId: nu
 const columns: Record<string, string> = { healthStatus: "health_status", marginStatus: "margin_status", teamStrain: "team_strain",
   mainRisk: "main_risk", currentAction: "current_action", nextMilestone: "next_milestone", nextMilestoneDate: "next_milestone_date",
   deadline: "deadline", ownerId: "owner_id", decisionNeeded: "decision_needed" };
+const dateFields = new Set(["deadline", "nextMilestoneDate"]);
 export const statusFieldLabels: Record<string, string> = { healthStatus: "Semáforo", marginStatus: "Margen", teamStrain: "Carga del equipo",
   mainRisk: "Riesgo principal", currentAction: "Estado actual / avance", nextMilestone: "Próximo hito", nextMilestoneDate: "Fecha del hito",
   deadline: "Fecha límite", ownerId: "Responsable", decisionNeeded: "Decisión pendiente" };
@@ -108,8 +109,13 @@ export class MindStatusWriter {
       await this.validateOwner(db, action);
       const changes = [];
       if (action.operation === "edit") for (const [field, raw] of Object.entries(action.changes)) {
-        const value = field === "currentAction" ? raw ?? "" : raw;
-        const before = item.row[columns[field]] ?? null;
+        let value = field === "currentAction" ? raw ?? "" : raw;
+        let before = item.row[columns[field]] ?? null;
+        if (dateFields.has(field)) {
+          if (value != null) value = new Date(String(value)).toISOString();
+          // Existing Status columns are timestamp WITHOUT time zone, stored as UTC in production.
+          if (before != null) before = new Date(`${before}Z`).toISOString();
+        }
         if (before === value) continue;
         changes.push({ field, label: statusFieldLabels[field], before, after: value,
           ...(field === "ownerId" ? { beforeName: await this.ownerName(db, before), afterName: await this.ownerName(db, value as number | null) } : {}) });
@@ -165,7 +171,8 @@ export class MindStatusWriter {
           await this.notifyNote?.(db, { id: note.rows[0].id, roomId: action.roomId, kind: action.kind, itemId: action.itemId, userId, title: item.title });
         } else {
           const changes: { field: string; before: any; after: any }[] = row.preview.changes;
-          const assignments = changes.map((c, i) => `${columns[c.field]}=$${i + 4}`).join(",");
+          const assignments = changes.map((c, i) => `${columns[c.field]}=${dateFields.has(c.field)
+            ? `($${i + 4}::timestamptz AT TIME ZONE 'UTC')` : `$${i + 4}`}`).join(",");
           await db.query(`UPDATE ${item.table} SET ${assignments},updated_at=now(),updated_by=$3
             WHERE room_id=$1 AND ${item.key}=$2`, [action.roomId, action.itemId, userId, ...changes.map(c => c.after)]);
           for (const c of changes) {
