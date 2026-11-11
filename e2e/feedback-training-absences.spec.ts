@@ -168,3 +168,28 @@ test("retired guides disappear from navigation and search; merged guide links an
   await page.screenshot({ path: ".context/feedback-training-invoices-mobile.png", fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test("capacity retains completed estimates and isolates changes to another week", async ({ page }) => {
+  await login(page.request, "operations");
+  const projectId = (await pool.query("INSERT INTO active_projects(name,client_id) SELECT 'Historical capacity regression',id FROM clients LIMIT 1 RETURNING id")).rows[0].id;
+  try {
+    await pool.query("INSERT INTO task_project_members(project_id,personnel_id,role) VALUES($1,$2,'member')", [projectId, personId]);
+    const taskId = (await pool.query("INSERT INTO tasks(title,project_id,assignee_id,status) VALUES('Completed estimate',$1,$2,'done') RETURNING id", [projectId, personId])).rows[0].id;
+    await pool.query("INSERT INTO task_weekly_estimates(task_id,week_start,estimated_hours) VALUES($1,'2026-11-02',12)", [taskId]);
+    const getWeek = async (week: string) => {
+      const response = await page.request.get(`/api/capacity/weekly?weekStart=${week}`);
+      expect(response.ok()).toBe(true); return response.json();
+    };
+    const before = await getWeek('2026-11-02');
+    expect(before.planning.tasks.find((t: any) => t.id === taskId)).toMatchObject({ estimatedHours: 12, status: 'done' });
+    const personBefore = before.personnel.find((p: any) => p.personnelId === personId);
+    expect((await page.request.put(`/api/capacity/projects/${projectId}/mode`, { data: {mode:'project',weekStart:'2026-11-09'} })).ok()).toBe(true);
+    expect((await page.request.put('/api/capacity/group-estimates', { data: {projectId,personnelId:personId,weekStart:'2026-11-09',scope:'project',sectionName:'',estimatedHours:30} })).ok()).toBe(true);
+    const after = await getWeek('2026-11-02');
+    expect(after.personnel.find((p: any) => p.personnelId === personId).estimatedTaskHours).toBe(personBefore.estimatedTaskHours);
+    expect(after.planning.projects.find((p: any) => p.id === projectId).mode).toBe('task');
+    await pool.query('DELETE FROM task_weekly_estimates WHERE task_id=$1', [taskId]);
+    const removed = await getWeek('2026-11-02');
+    expect(personBefore.estimatedTaskHours - removed.personnel.find((p: any) => p.personnelId === personId).estimatedTaskHours).toBe(12);
+  } finally { await pool.query('DELETE FROM active_projects WHERE id=$1', [projectId]); }
+});

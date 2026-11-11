@@ -18,19 +18,20 @@ export function effectiveCapacityEstimatesQuery(range: EstimateRange = {}) {
 export async function loadCapacityPlanning(weekStart: string, actor: CapacityActor): Promise<CapacityPlanning> {
   capacityWeekSchema.parse(weekStart);
   const result = await db.execute(sql`SELECT p.id, COALESCE(p.name, q.project_name, 'Proyecto') AS name,
-    c.name AS "clientName", p.capacity_estimation_mode AS mode, p.task_section_names AS "sectionNames",
+    c.name AS "clientName", COALESCE(wm.mode,p.capacity_estimation_mode) AS mode, p.task_section_names AS "sectionNames",
     ARRAY(SELECT m.personnel_id FROM task_project_members m WHERE m.project_id=p.id) AS "memberIds"
     FROM active_projects p LEFT JOIN quotations q ON q.id=p.quotation_id LEFT JOIN clients c ON c.id=p.client_id
+    LEFT JOIN capacity_week_modes wm ON wm.project_id=p.id AND wm.week_start=${weekStart}
     WHERE p.status='active' AND (${actor.isOperations} OR EXISTS(SELECT 1 FROM task_project_members m WHERE m.project_id=p.id AND m.personnel_id=${actor.personnelId}))
     ORDER BY c.name, name, p.id`);
   const projects = result.rows as CapacityProject[];
   if (!projects.length) return { projects: [], tasks: [], groups: [] };
   const projectIds = projects.map(project => project.id);
   const [taskResult, groupResult] = await Promise.all([
-    db.execute(sql`SELECT t.id, t.project_id AS "projectId", t.assignee_id AS "personnelId", t.title,
+    db.execute(sql`SELECT t.id, t.project_id AS "projectId", t.assignee_id AS "personnelId", t.title, t.status,
       t.section_name AS "sectionName", COALESCE(e.estimated_hours,0)::float8 AS "estimatedHours", COALESCE(e.is_extra,false) AS "isExtra"
       FROM tasks t LEFT JOIN task_weekly_estimates e ON e.task_id=t.id AND e.week_start=${weekStart}
-      WHERE t.project_id=ANY(${sql.param(projectIds)}::int[]) AND t.assignee_id IS NOT NULL AND t.status NOT IN ('done','cancelled')
+      WHERE t.project_id=ANY(${sql.param(projectIds)}::int[]) AND t.assignee_id IS NOT NULL AND t.status <> 'cancelled' AND (t.status <> 'done' OR e.id IS NOT NULL)
         AND (${actor.isOperations} OR t.assignee_id=${actor.personnelId})
         AND (e.id IS NOT NULL OR (t.start_date IS NULL AND t.due_date IS NULL)
           OR (COALESCE(t.start_date,t.due_date)::date <= ${weekStart}::date+6 AND COALESCE(t.due_date,t.start_date)::date >= ${weekStart}::date))
@@ -54,12 +55,14 @@ async function lockProject(tx: any, projectId: number, actor: CapacityActor, per
   return project;
 }
 
-export async function saveCapacityMode(projectId: number, modeInput: unknown, actor: CapacityActor) {
+export async function saveCapacityMode(projectId: number, modeInput: unknown, actor: CapacityActor, weekStart: string) {
   if (!actor.isOperations) fail("La modalidad de estimación corresponde a Operaciones");
   const mode = capacityModeSchema.parse(modeInput);
+  capacityWeekSchema.parse(weekStart);
   await db.transaction(async tx => {
     await lockProject(tx, projectId, actor);
-    await tx.update(activeProjects).set({ capacityEstimationMode: mode }).where(eq(activeProjects.id, projectId));
+    await tx.execute(sql`INSERT INTO capacity_week_modes(project_id,week_start,mode) VALUES(${projectId},${weekStart},${mode})
+      ON CONFLICT(project_id,week_start) DO UPDATE SET mode=EXCLUDED.mode`);
   });
 }
 
@@ -67,7 +70,8 @@ export async function saveCapacityGroup(input: unknown, actor: CapacityActor) {
   const value = capacityGroupSchema.parse(input);
   return db.transaction(async tx => {
     const project = await lockProject(tx, value.projectId, actor, value.personnelId);
-    if (project.capacityEstimationMode !== value.scope) fail("La modalidad cambió. Actualizá la pantalla", 409);
+    const modes = await tx.execute(sql`SELECT mode FROM capacity_week_modes WHERE project_id=${value.projectId} AND week_start=${value.weekStart}`);
+    if ((modes.rows[0]?.mode ?? project.capacityEstimationMode) !== value.scope) fail("La modalidad cambió. Actualizá la pantalla", 409);
     if (value.scope === "section" && value.estimatedHours > 0) {
       const rows = await tx.select({ name: tasks.sectionName }).from(tasks).where(eq(tasks.projectId, value.projectId));
       const names = new Set([...(project.taskSectionNames ?? []), ...rows.map(row => row.name || "General")]);

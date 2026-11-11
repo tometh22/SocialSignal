@@ -15,7 +15,7 @@ export const capacityGroupSchema = z.object({
 }).strict().refine(value => value.scope === "project" ? value.sectionName === "" : value.sectionName.length > 0,
   "Elegí una sección para la estimación por sección");
 
-export type CapacityTask = { id: number; projectId: number; personnelId: number; title: string; sectionName: string | null; estimatedHours: number; isExtra: boolean };
+export type CapacityTask = { id: number; projectId: number; personnelId: number; title: string; status?: string; sectionName: string | null; estimatedHours: number; isExtra: boolean };
 export type CapacityGroup = { projectId: number; personnelId: number; scope: "section" | "project"; sectionName: string; estimatedHours: number };
 export type CapacityProject = { id: number; name: string; clientName: string; mode: CapacityMode; sectionNames: string[]; memberIds: number[] };
 export type CapacityPlanning = { projects: CapacityProject[]; tasks: CapacityTask[]; groups: CapacityGroup[] };
