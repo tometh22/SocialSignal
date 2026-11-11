@@ -1,3 +1,4 @@
+import { canonicalTrainingId } from "../shared/training-policy";
 import {
   Router,
   type Express,
@@ -184,7 +185,7 @@ export function registerTrainingRoutes(
     );
   });
   route("get", "/lessons/:lessonId", async (req, res) => {
-    const lesson = trainingLessons.find((l) => l.id === req.params.lessonId);
+    const lesson = trainingLessons.find((l) => l.id === canonicalTrainingId(req.params.lessonId));
     if (!lesson || !canAccessTraining(await audienceFor(req), lesson.access)) {
       res
         .status(404)

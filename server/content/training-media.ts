@@ -122,7 +122,7 @@ export const trainingScreenshots: Record<string, AuthoredTrainingScreenshot[]> =
         alt: "Carpetas de clientes y proyectos de tareas",
         caption:
           "Desplegá el cliente y elegí Ver tareas en el proyecto. El botón Kanban abre la vista de estados de los proyectos.",
-        step: 2,
+        step: 1,
         width: 1176,
         height: 520,
       },
@@ -234,6 +234,15 @@ export const trainingScreenshots: Record<string, AuthoredTrainingScreenshot[]> =
         width: 1176,
         height: 888,
       },
+      {
+        id: "cancelacion",
+        fileName: "ausencias-cancelacion.jpg",
+        alt: "Confirmación de cancelación por Operaciones con motivo y declaración de días no tomados",
+        caption: "Revisá persona, fechas y días. Indicá el motivo y confirmá que ninguno fue tomado antes de confirmar la cancelación.",
+        step: 4,
+        width: 512,
+        height: 358,
+      },
     ],
     "cierre-equipo": [
       {
@@ -244,7 +253,7 @@ export const trainingScreenshots: Record<string, AuthoredTrainingScreenshot[]> =
           "Contrastá persona, horas y valor hora antes de guardar una base. Los importes pendientes requieren revisión antes de publicar.",
         step: 2,
         width: 1128,
-        height: 505,
+        height: 504,
       },
     ],
     "tarifas-servicios": [

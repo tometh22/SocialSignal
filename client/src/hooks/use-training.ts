@@ -1,3 +1,4 @@
+import { isPublishedTrainingGuide } from "@shared/training-policy";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./use-auth";
 import { authFetchJson } from "@/lib/queryClient";
@@ -13,7 +14,7 @@ export function useTrainingCatalog() {
       return {
         ...catalog,
         lessons: catalog.lessons.filter((l) =>
-          canAccessTraining(catalog.audience, l.access),
+          isPublishedTrainingGuide(l) && canAccessTraining(catalog.audience, l.access),
         ),
       };
     },

@@ -149,7 +149,6 @@ export default function ProposalStudio() {
             <Tabs value={studioMode} onValueChange={(value) => setStudioMode(value as StudioMode)}><TabsList><TabsTrigger value="narrative">Narrativa</TabsTrigger><TabsTrigger value="design">Diseño</TabsTrigger><TabsTrigger value="qa">QA</TabsTrigger><TabsTrigger value="export">Exportar</TabsTrigger></TabsList></Tabs>
             <Tabs value={locale} onValueChange={(value) => { setDraft(null); setLocale(value as "es" | "en"); }}><TabsList><TabsTrigger value="es">ES</TabsTrigger><TabsTrigger value="en">EN</TabsTrigger></TabsList></Tabs>
             <Button variant="outline" onClick={() => reconcile.mutate()} disabled={reconcile.isPending}><RefreshCw className="mr-2 h-4 w-4" /> Reconciliar</Button>
-            <Button variant="ghost" onClick={() => navigate("/operations/service-blueprints")}><BookOpenCheck className="mr-2 h-4 w-4" /> Catálogo</Button>
             <Button variant="outline" onClick={() => qa.mutate()} disabled={qa.isPending || Boolean(draft)}><FileCheck2 className="mr-2 h-4 w-4" /> Ejecutar QA</Button>
             <Button onClick={() => save.mutate()} disabled={!draft || save.isPending}><Save className="mr-2 h-4 w-4" /> Guardar</Button>
           </div>

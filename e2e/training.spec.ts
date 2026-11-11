@@ -183,9 +183,7 @@ test("provider has relevant procedures and keyboard access without exercises", a
   await expect(
     page.getByRole("heading", { name: "Paso a paso", exact: true }),
   ).toBeVisible();
-  const details = page.locator("summary");
-  await details.focus();
-  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Aclaraciones y situaciones frecuentes" })).toBeVisible();
   await expect(
     page.getByText(
       "Consultá el estado de la factura y los motivos de devolución.",
@@ -211,8 +209,7 @@ test("admin can find instructions by area and clear search filters", async ({
   await signIn(page, "admin");
   await page.goto("/training");
   for (const name of [
-    "Cargar datos",
-    "Cartera de proyectos",
+    "Cartera y gestión del proyecto",
     "Personal, roles y tarifas",
   ])
     await expect(
@@ -220,9 +217,9 @@ test("admin can find instructions by area and clear search filters", async ({
     ).toBeVisible();
   await page
     .getByRole("combobox", { name: "Filtrar por área" })
-    .selectOption("Finanzas");
+    .selectOption("Operaciones");
   await expect(
-    page.getByRole("heading", { name: "Cargar datos", exact: true }),
+    page.getByRole("heading", { name: "Cierre del equipo", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", {

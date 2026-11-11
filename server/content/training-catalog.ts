@@ -1,3 +1,4 @@
+import { isPublishedTrainingGuide } from "../../shared/training-policy";
 import { screenshotsForLesson } from "./training-media";
 import type { TrainingLesson } from "../../shared/training";
 import { emptyTrainingProgress } from "../../shared/training";
@@ -10,12 +11,12 @@ export type AuthoredLesson = Omit<
   covers: string[];
 };
 
-// Stable ids preserve version 1 exercise history. Version 2 is a reference guide:
-// reading is optional, with no assessments or prerequisites.
-export const trainingLessons: AuthoredLesson[] = [
+// Stable ids preserve exercise and read history from earlier versions.
+// Version 3 consolidates feedback; reading stays optional, without prerequisites.
+const authoredTrainingLessons: AuthoredLesson[] = [
   {
     id: "bienvenida",
-    version: 2,
+    version: 3,
     module: "Primeros pasos",
     title: "Conocer Mind",
     access: {
@@ -48,7 +49,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "inicio",
-    version: 2,
+    version: 3,
     module: "Primeros pasos",
     title: "Inicio",
     access: {
@@ -81,16 +82,16 @@ export const trainingLessons: AuthoredLesson[] = [
       },
     ],
     instructions: [
-      "Abrí Inicio desde el menú y revisá las tareas y pendientes de tu resumen personal.",
-      "Elegí el pendiente que vas a atender y abrí su detalle para consultar fechas, responsable y estado.",
-      "Resolvé la acción en su pantalla y verificá el estado resultante antes de volver al resumen.",
+      "Abrí Inicio y revisá el resumen de tus tareas y pendientes para identificar qué requiere atención hoy.",
+      "Consultá las horas cargadas del mes y de la semana. Abrí el detalle de horas si necesitás completar o corregir un registro.",
+      "Revisá los próximos cumpleaños del equipo para anticipar las fechas.",
+      "Usá los accesos a los módulos habilitados para tu perfil. Abrí un pendiente cuando necesites trabajar en él y verificá después su estado."
     ],
-    verification:
-      "Inicio reúne accesos; la resolución ocurre en el detalle del pendiente.",
+    verification: "El resumen y los accesos dependen de tus permisos. Las horas del mes y de la semana representan períodos distintos: verificá cuál estás consultando.",
   },
   {
     id: "notificaciones",
-    version: 2,
+    version: 3,
     module: "Primeros pasos",
     title: "Notificaciones",
     access: {
@@ -112,16 +113,17 @@ export const trainingLessons: AuthoredLesson[] = [
       },
     ],
     instructions: [
-      "Abrí la campana de la barra superior o la pantalla Notificaciones.",
-      "Buscá el aviso que necesitás; usá los filtros si es anterior o ya fue leído.",
-      "Abrí su contexto y revisá la tarea, solicitud o registro asociado. Realizá allí la acción pendiente.",
-      "Marcá el aviso como leído. Para cambiar cómo recibís avisos, revisá los canales y categorías en la configuración de notificaciones.",
+      "Abrí la campana de la barra superior o la pantalla Notificaciones y revisá tus avisos.",
+      "Abrí el contexto del aviso para consultar la tarea, solicitud o registro asociado y resolver allí la acción pendiente.",
+      "Marcá el aviso como leído cuando lo hayas revisado. Esta marca no aprueba solicitudes ni completa tareas.",
+      "En Cómo querés recibirlas, elegí los canales disponibles y ajustá las categorías de avisos que querés recibir.",
+      "En Tu actividad, usá Todas o Sin leer para volver a encontrar avisos anteriores, incluidos los leídos."
     ],
     verification: "Lectura y resolución son acciones diferentes.",
   },
   {
     id: "ausencias-personales",
-    version: 2,
+    version: 3,
     module: "Gestión personal",
     title: "Mis ausencias",
     access: {
@@ -165,7 +167,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "facturas-personales",
-    version: 2,
+    version: 3,
     module: "Gestión personal",
     title: "Mis facturas",
     access: {
@@ -180,7 +182,7 @@ export const trainingLessons: AuthoredLesson[] = [
     ],
     example:
       "Operaciones ya incluyó ARS 5.000 de adicionales. Tu reintegro nuevo es ARS 800: declarás solo 800 y explicás el motivo.",
-    minutes: 1,
+    minutes: 4,
     links: [
       {
         label: "Abrir Mis facturas",
@@ -188,18 +190,20 @@ export const trainingLessons: AuthoredLesson[] = [
       },
     ],
     instructions: [
-      "Entrá a Mis facturas, elegí el período y revisá la base publicada por Operaciones.",
-      "Revisá adicionales y modalidad de cobro. Declará solo extras nuevos con su motivo, sin repetir los que ya están incluidos.",
-      "Completá los datos que pide la etapa habilitada y enviá el importe para autorización. Si hay un tramo USD, ingresá el tipo de cambio bancario solicitado.",
-      "Cuando se habilite la presentación, adjuntá el comprobante y verificá importe, moneda y período.",
-      "Seguí el estado. En la modalidad USD/ARS, confirmá la recepción del cobro y el segundo tipo de cambio antes de avanzar al tramo ARS.",
+      "Operaciones prepara y publica tu base del mes: horas, tarifa, porcentaje a cobrar en USD y adicionales. Cuando recibas el aviso, abrí Mis facturas y elegí ese período. Si falta la base, pedí su revisión a Operaciones.",
+      "Revisá la base publicada, la modalidad de cobro y los bonos o extras ya incluidos. Si detectás una diferencia, consultala antes de enviar importes.",
+      "Si hay tramo USD y emitís factura, ingresá el tipo de cambio comprador más bajo de tu banco del día en que vas a facturar. Si tu modalidad no exige factura, usá el TC de conversión indicado para la liquidación. Revisá el importe calculado y pulsá Enviar importe a Operaciones.",
+      "Esperá la autorización de Operaciones. Si el importe es devuelto, corregí los datos y reenviá. Cuando esté autorizado y tu modalidad requiera factura, adjuntá el comprobante en la moneda y por el importe autorizado y pulsá Enviar a Administración.",
+      "Administración revisa el documento. Consultá su estado y, si lo devuelve, corregí esa presentación con Reemplazar y reenviar para evitar duplicados. La autorización del importe y la aprobación del documento son pasos distintos.",
+      "En una modalidad mixta, después de recibir los USD y de completar la aprobación del tramo anterior, marcá Ya recibí los USD en mi cuenta e ingresá el TC comprador más bajo de tu banco de ese día. Declarar este segundo TC permite calcular el saldo ARS.",
+      "En el tramo ARS, agregá únicamente extras nuevos y comisiones que correspondan, con su motivo. No repitas los adicionales incluidos por Operaciones. Revisá el importe y envialo a Operaciones; después de su autorización, presentá la factura en pesos si corresponde.",
+      "Si cobrás solo ARS, comenzá directamente por Tu factura en pesos o Tu liquidación en pesos: no se requieren los dos TC. Si tu modalidad no exige factura, completá las autorizaciones de liquidación sin emitir ni adjuntar documentos."
     ],
-    verification:
-      "Los 5.000 ya están incluidos; volver a declararlos duplicaría el adicional.",
+    verification: "Usá el período correcto, un TC positivo y la moneda de cada tramo. Un saldo negativo requiere revisión de Operaciones antes de emitir. Los adicionales ya incluidos nunca se vuelven a declarar.",
   },
   {
     id: "crm",
-    version: 2,
+    version: 3,
     module: "Comercial",
     title: "CRM",
     access: {
@@ -232,7 +236,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "clientes",
-    version: 2,
+    version: 3,
     module: "Comercial",
     title: "Clientes",
     access: {
@@ -265,7 +269,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "cotizaciones",
-    version: 2,
+    version: 3,
     module: "Comercial",
     title: "Cotizaciones",
     access: {
@@ -280,13 +284,14 @@ export const trainingLessons: AuthoredLesson[] = [
     ],
     description: "Prepará un presupuesto y verificá moneda, equipo y alcance.",
     explanation: [
-      "Desde Cotizaciones creá o abrí una cotización. Definí cliente, alcance y modalidad; revisá el equipo, roles y horas antes de evaluar el precio.",
-      "Verificá moneda y tipo de cambio de la cotización. Las variantes permiten comparar cambios de equipo, horas o configuración; revisá cada resultado.",
-      "Guardá el borrador y comprobá su estado. Un borrador todavía no es una aprobación ni una aceptación del cliente. Usá el historial y las acciones disponibles para seguir el proceso comercial.",
+      "Las recetas aportan un punto de partida de roles y horas. Los ajustes de alcance deben reflejar el trabajo real; una receta no reemplaza la revisión del equipo.",
+      "La calibración histórica existente compara proyectos de la misma receta y tipo y requiere al menos dos muestras para proponer la mediana de horas reales. La propuesta ajusta el borrador de la receta: no publica cambios automáticamente ni modifica cotizaciones ya emitidas. Si no hay muestras comparables, mantené una estimación revisada por el equipo.",
+      "Costos adicionales reúne gastos que no son horas del equipo y se incorpora al cálculo de la cotización. Verificá moneda y precio resultante después de agregar o modificar un costo.",
+      "Guardar un borrador no equivale a obtener aprobación interna o aceptación del cliente. Verificá la revisión vigente antes de crear un proyecto comercial."
     ],
     example:
       "Preparás una propuesta en USD. Revisás el TC y las tarifas en la moneda de la cotización antes de comparar dos variantes de alcance.",
-    minutes: 1,
+    minutes: 3,
     links: [
       {
         label: "Abrir Cotizaciones",
@@ -294,18 +299,19 @@ export const trainingLessons: AuthoredLesson[] = [
       },
     ],
     instructions: [
-      "Entrá a Cotizaciones y creá una cotización o abrí el borrador que necesitás editar.",
-      "Definí cliente, alcance y modalidad del servicio.",
-      "Revisá los roles, las personas y las horas del equipo. Ajustá los recursos al alcance acordado.",
-      "Comprobá moneda, tipo de cambio y precio. Si usás variantes, revisá cada alternativa por separado.",
-      "Guardá el borrador y verificá su estado antes de continuar con la propuesta y sus aprobaciones.",
+      "Entrá a Cotizaciones y creá una cotización o abrí el borrador que necesitás editar. Definí cliente y datos esenciales.",
+      "En Servicio, elegí la receta correspondiente. En Alcance, ajustá modalidad, volumen y cobertura al trabajo acordado.",
+      "En Equipo, revisá roles, personas y horas sugeridas por la receta. Ajustalos al alcance real y contrastá con horas históricas de trabajos comparables cuando estén disponibles.",
+      "En la revisión financiera, abrí Costos adicionales para sumar gastos ajenos al equipo: IA, software, licencias, comisiones o encuestas. Revisá la moneda y el total para no omitirlos ni duplicarlos en las horas.",
+      "Comprobá moneda, tipo de cambio, margen y precio final. Si usás variantes, revisá el alcance, equipo y costos de cada alternativa por separado.",
+      "Guardá el borrador y verificá su estado antes de continuar con la propuesta, la aprobación interna y la aceptación del cliente."
     ],
     verification:
       "El presupuesto debe partir del alcance y los recursos, con una moneda coherente.",
   },
   {
     id: "propuestas",
-    version: 2,
+    version: 3,
     module: "Comercial",
     title: "Propuestas y aprobaciones",
     access: {
@@ -345,9 +351,9 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "proyectos-tareas",
-    version: 2,
+    version: 3,
     module: "Proyectos y tareas",
-    title: "Proyectos de tareas y kanban",
+    title: "Proyectos de tareas: lista y kanban",
     access: {
       audience: "internal",
       any: ["projects", "operations", "task_manager"],
@@ -359,9 +365,9 @@ export const trainingLessons: AuthoredLesson[] = [
     ],
     description: "Ubicá tu proyecto y organizá el trabajo.",
     explanation: [
-      "Abrí Proyectos de tareas o Mis proyectos para encontrar los proyectos a los que tenés acceso. El kanban reúne su estado operativo; abrí un proyecto para ver sus tareas y miembros.",
-      "Dentro del proyecto, usá las secciones para ordenar tareas. Renombrar una sección cambia su organización; no cambia por sí solo la finalización de sus tareas.",
-      "Usá los filtros antes de concluir que falta un proyecto. Si no tenés acceso, solicitá que revisen tu asignación.",
+      "La lista permite encontrar y abrir proyectos de tareas. El kanban de proyectos agrupa esos proyectos por etapa operativa; no es una vista de estados de las tareas individuales.",
+      "Dentro del proyecto, las secciones organizan las tareas. El completado se registra sobre cada tarea y no depende del nombre de su sección.",
+      "Cartera de proyectos es la vista de gestión económica y requiere permisos de Proyectos y Operaciones. Si no aparece, solicitá una revisión de permisos; los filtros o asignaciones también pueden limitar la lista de tareas."
     ],
     example:
       "Buscás la campaña de Acme. Revisás filtros, abrís el proyecto y ubicás las tareas en su sección correspondiente.",
@@ -377,17 +383,18 @@ export const trainingLessons: AuthoredLesson[] = [
       },
     ],
     instructions: [
-      "Entrá a Proyectos de tareas o Mis proyectos y buscá el proyecto. Revisá los filtros si no aparece.",
-      "Abrí el proyecto para consultar sus tareas y miembros; usá el kanban para ver el estado operativo del conjunto.",
-      "Dentro del proyecto, organizá las tareas en las secciones correspondientes y abrí cada tarea para revisar su detalle.",
-      "Para completar trabajo, usá el control de completado de la tarea. Renombrar una sección no completa sus tareas.",
+      "Entrá a Proyectos de tareas o Mis proyectos. La lista sirve para buscar un proyecto y abrir sus tareas; revisá filtros y asignaciones si no lo encontrás.",
+      "Abrí el kanban de proyectos para consultar la etapa operativa de cada proyecto. Sus columnas representan etapas de proyectos, no tareas individuales ni rentabilidad financiera.",
+      "Dentro de un proyecto, revisá sus miembros y tareas y organizá el trabajo en secciones. Abrí cada tarea para revisar responsable, vencimiento y estado.",
+      "Completá una tarea usando su control de completado. Cambiar el nombre de una sección o la etapa de un proyecto no completa automáticamente sus tareas.",
+      "Si necesitás presupuesto, costos o rentabilidad, usá Cartera de proyectos cuando tu perfil tenga Proyectos y Operaciones. Sus datos financieros se consultan aparte del kanban de tareas."
     ],
     verification:
       "La lista depende de filtros y de los proyectos habilitados para tu cuenta.",
   },
   {
     id: "tareas",
-    version: 2,
+    version: 3,
     module: "Proyectos y tareas",
     title: "Tareas y responsables",
     access: {
@@ -421,7 +428,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "horas",
-    version: 2,
+    version: 3,
     module: "Proyectos y tareas",
     title: "Registrar y revisar horas",
     access: {
@@ -460,8 +467,8 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "status",
-    version: 2,
-    module: "Status y objetivos",
+    version: 3,
+    module: "Status",
     title: "Status",
     access: {
       audience: "internal",
@@ -494,8 +501,8 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "objetivos",
-    version: 2,
-    module: "Status y objetivos",
+    version: 3,
+    module: "Status",
     title: "Objetivos",
     access: {
       audience: "internal",
@@ -528,9 +535,9 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "cartera",
-    version: 2,
+    version: 3,
     module: "Operaciones",
-    title: "Cartera de proyectos",
+    title: "Cartera y gestión del proyecto",
     access: {
       audience: "internal",
       all: ["projects", "operations"],
@@ -541,16 +548,20 @@ export const trainingLessons: AuthoredLesson[] = [
       "/active-projects/:id",
       "/active-projects/:id/edit",
       "/project-settings/:id",
+      "/active-projects/:id/financial-management",
+      "/active-projects/:id/time-entries",
+      "/time-entries/project/:projectId",
+      "/operations/portfolio-import"
     ],
-    description: "Administrá proyectos, configuración y estados.",
+    description: "Creá proyectos desde cotizaciones aprobadas y revisá sus horas, costos y resultados.",
     explanation: [
-      "Abrí Cartera de proyectos para revisar la gestión y rentabilidad. Elegí un proyecto para consultar su detalle y configuración.",
-      "Al crear o editar, verificá cliente, modalidad, alcance y responsables. Si el proyecto nace de una cotización, comprobá que esté aprobada.",
-      "Antes de cerrar o cambiar el estado, revisá trabajo pendiente y registros relacionados. La gestión de cartera requiere los accesos de Proyectos y Operaciones.",
+      "Esta guía reúne Cartera y gestión financiera del proyecto. Las antiguas guías de gestión financiera y entregables abren esta referencia común, centrada en los recorridos disponibles.",
+      "Los proyectos comerciales nuevos requieren una cotización aprobada del mismo cliente. La excepción interna conserva su categoría propia; no debe usarse para evitar la aprobación de un proyecto comercial.",
+      "Los resultados dependen del período, moneda y origen de las horas y costos. Las estimaciones no sustituyen los registros reales. Las pantallas históricas y sus datos se conservan, sin presentar calidad, NPS o recurrencia como pasos obligatorios del circuito actual."
     ],
     example:
       "Acme aceptó una propuesta. Revisás que la cotización esté aprobada y creás el proyecto con el alcance acordado.",
-    minutes: 1,
+    minutes: 3,
     links: [
       {
         label: "Abrir Cartera de proyectos",
@@ -558,16 +569,18 @@ export const trainingLessons: AuthoredLesson[] = [
       },
     ],
     instructions: [
-      "Entrá a Cartera de proyectos y buscá el proyecto o iniciá su creación.",
-      "Revisá cliente, modalidad, alcance y responsables. Si nace de una cotización, verificá que esté aprobada.",
-      "Guardá y abrí el detalle para comprobar la información y su configuración.",
-      "Antes de cerrar o cambiar el estado, revisá tareas pendientes y registros relacionados.",
+      "Entrá a Cartera de proyectos; la pantalla se titula Vista de proyectos. Buscá el proyecto: esta vista de gestión económica es distinta de la lista y el kanban de proyectos de tareas.",
+      "Para crear un proyecto comercial, seleccioná una cotización aprobada y verificá cliente, alcance, modalidad y responsables. Un borrador no habilita el alta. Los proyectos internos se registran como internos y no requieren cotización comercial.",
+      "Guardá y abrí el detalle del proyecto para revisar su configuración, presupuesto y equipo. Conservá la relación con la cotización aprobada.",
+      "Consultá la gestión financiera y los registros de horas del proyecto. Seleccioná el período y compará ingresos, costos y horas en la misma moneda, distinguiendo estimaciones de registros reales.",
+      "Si un importe no coincide, identificá su fuente y corregí el registro correspondiente. No dupliques cargas para forzar el total.",
+      "Antes de cerrar o cambiar el estado, revisá tareas pendientes y registros relacionados. La organización diaria de tareas se gestiona en Proyectos de tareas."
     ],
-    verification: "El proyecto debe reflejar el acuerdo aprobado.",
+    verification: "Verificá cotización aprobada, cliente, período y moneda. La creación del proyecto y su seguimiento financiero no reemplazan la planificación de tareas.",
   },
   {
     id: "finanzas-proyecto",
-    version: 2,
+    version: 3,
     module: "Operaciones",
     title: "Gestión financiera del proyecto",
     access: {
@@ -605,7 +618,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "entregables",
-    version: 2,
+    version: 3,
     module: "Proyectos y tareas",
     title: "Entregables, calidad y recurrencia",
     access: {
@@ -647,7 +660,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "capacidad-calendario",
-    version: 2,
+    version: 3,
     module: "Operaciones",
     title: "Capacidad y calendario",
     access: {
@@ -685,7 +698,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "ausencias-equipo",
-    version: 2,
+    version: 3,
     module: "Operaciones",
     title: "Gestión de ausencias y feriados",
     access: {
@@ -702,7 +715,7 @@ export const trainingLessons: AuthoredLesson[] = [
     ],
     example:
       "Una solicitud consume 3 días y la persona tiene 2. No la aprobás como si hubiera saldo suficiente; revisás la situación con Administración.",
-    minutes: 1,
+    minutes: 3,
     links: [
       {
         label: "Abrir Gestión de ausencias y feriados",
@@ -714,17 +727,18 @@ export const trainingLessons: AuthoredLesson[] = [
       },
     ],
     instructions: [
-      "Entrá a Gestión de ausencias y ubicá la persona, período y solicitud que necesitás revisar.",
-      "Comprobá tipo de ausencia, fechas, saldo y cobertura del equipo antes de aprobar o rechazar.",
-      "Revisá también las solicitudes de cancelación; una ausencia aprobada sigue descontando saldo hasta que se confirme su cancelación.",
-      "Consultá Feriados para verificar los días no laborables que afectan el cómputo y la planificación.",
+      "Entrá a Gestión de ausencias, seleccioná el año y ubicá la persona y la solicitud que necesitás revisar.",
+      "Comprobá tipo, fechas, días hábiles, saldo y cobertura antes de aprobar o rechazar. Vacaciones y días Epical tienen cupos separados; los feriados configurados no consumen días hábiles.",
+      "Si una ausencia pendiente o aprobada no se va a tomar, pulsá Cancelar ausencia. Si la persona pidió cancelación, usá Confirmar cancelación. Revisá persona, rango completo y cantidad de días en el diálogo.",
+      "Ingresá el motivo y confirmá que ninguno de esos días fue tomado. Si hubo días tomados, revisá las fechas antes de cancelar: no corresponde devolver el período completo. Confirmá la operación una sola vez y esperá el resultado.",
+      "Comprobá el estado Cancelada, el motivo y la fecha en el historial de solicitudes. Se recalculan saldo y disponibilidad; una solicitud de cancelación todavía pendiente sigue descontando.",
+      "Si el período tiene un cierre financiero, corte de horas o liquidación publicada, coordiná su revisión y reapertura antes de cancelar. Consultá Feriados para validar los días no laborables de la planificación."
     ],
-    verification:
-      "El saldo quedaría en 3 días, siempre que corresponda al mismo tipo y año.",
+    verification: "La cancelación conserva el registro y su autor. No borra la ausencia ni devuelve días que efectivamente se tomaron; los períodos bloqueados requieren revisión previa.",
   },
   {
     id: "cierre-equipo",
-    version: 2,
+    version: 3,
     module: "Operaciones",
     title: "Cierre del equipo",
     access: {
@@ -740,7 +754,7 @@ export const trainingLessons: AuthoredLesson[] = [
     ],
     example:
       "Falta una tarifa para una persona. Corregís la fuente y volvés a preparar la base antes de publicarla.",
-    minutes: 1,
+    minutes: 4,
     links: [
       {
         label: "Abrir Cierre del equipo",
@@ -748,18 +762,21 @@ export const trainingLessons: AuthoredLesson[] = [
       },
     ],
     instructions: [
-      "Entrá a Cierre del equipo y seleccioná el mes de Base a cobrar y Facturación y seguimiento.",
-      "Prepará las bases y revisá horas, tarifas y alertas del borrador.",
-      "Resolvé las alertas y comprobá bonos, adicionales y porcentaje USD antes de publicar.",
-      "Publicá las bases revisadas y seguí los importes que declara cada persona en Mis facturas.",
-      "Autorizá los importes que correspondan. La revisión del comprobante continúa en Facturas equipo para quienes tienen acceso a Finanzas.",
+      "Entrá a Cierre del equipo y seleccioná el mes compartido por Base a cobrar y Facturación y seguimiento.",
+      "En Base a cobrar, prepará los borradores y revisá horas, tarifas y alertas. Corregí la tarifa de origen si falta; la preparación todavía no publica ni autoriza importes.",
+      "Comprobá horas de la base, porcentaje USD, bonos y adicionales de cada persona. Publicá únicamente las bases revisadas: la persona recibe un aviso y las ve en Mis facturas.",
+      "En Facturación y seguimiento, esperá que la persona envíe los datos del tramo habilitado. En USD declara el TC de conversión; en ARS declara recepción y segundo TC si cobró USD, además de extras nuevos con motivo.",
+      "Revisá el importe calculado y sus datos y autorizá el tramo o devolvelo indicando qué corregir. Operaciones autoriza importes; Administración revisa comprobantes en Facturas equipo con acceso a Finanzas.",
+      "Después de la autorización, la persona presenta el documento si su modalidad lo exige. Si Administración lo devuelve, la persona reemplaza y reenvía esa presentación. No se crea otro importe ni se duplica la base.",
+      "En modalidad mixta, seguí primero USD y después ARS, una vez confirmado el cobro y la aprobación que habilita el segundo tramo. En solo ARS no se exige TC; sin obligación de factura se completan las autorizaciones sin adjuntar comprobantes.",
+      "Verificá el estado de cada etapa antes de dar el seguimiento por terminado. Si una base publicada necesita correcciones, revisá el circuito de reapertura y las autorizaciones existentes; preparar otro borrador no sustituye ese control."
     ],
     verification:
       "La preparación genera borradores que deben revisarse antes de publicar.",
   },
   {
     id: "tarifas-servicios",
-    version: 2,
+    version: 3,
     module: "Operaciones",
     title: "Tarifas y servicios",
     access: {
@@ -806,7 +823,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "carga-financiera",
-    version: 2,
+    version: 3,
     module: "Finanzas",
     title: "Cargar datos",
     access: {
@@ -839,7 +856,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "facturas-equipo",
-    version: 2,
+    version: 3,
     module: "Finanzas",
     title: "Facturas equipo",
     access: {
@@ -873,7 +890,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "cierre-financiero",
-    version: 2,
+    version: 3,
     module: "Finanzas",
     title: "Cierre financiero",
     access: {
@@ -907,7 +924,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "cashflow",
-    version: 2,
+    version: 3,
     module: "Finanzas",
     title: "Cashflow",
     access: {
@@ -940,7 +957,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "activo-pasivo",
-    version: 2,
+    version: 3,
     module: "Finanzas",
     title: "Activo y Pasivo",
     access: {
@@ -978,7 +995,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "provisiones",
-    version: 2,
+    version: 3,
     module: "Finanzas",
     title: "Provisiones",
     access: {
@@ -1011,7 +1028,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "reportes",
-    version: 2,
+    version: 3,
     module: "Finanzas",
     title: "Resumen financiero y reportes",
     access: {
@@ -1067,7 +1084,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "analisis-financiero",
-    version: 2,
+    version: 3,
     module: "Finanzas",
     title: "Análisis por cliente y proyecto",
     access: {
@@ -1104,7 +1121,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "administracion",
-    version: 2,
+    version: 3,
     module: "Administración",
     title: "Configuración y usuarios",
     access: {
@@ -1138,7 +1155,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "personal-tarifas",
-    version: 2,
+    version: 3,
     module: "Administración",
     title: "Personal, roles y tarifas",
     access: {
@@ -1173,7 +1190,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "configuracion-precios",
-    version: 2,
+    version: 3,
     module: "Administración",
     title: "Multiplicadores y tipos de cambio",
     access: {
@@ -1207,7 +1224,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "admin-proveedores",
-    version: 2,
+    version: 3,
     module: "Administración",
     title: "Proveedores",
     access: {
@@ -1240,7 +1257,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "fuentes-definiciones",
-    version: 2,
+    version: 3,
     module: "Administración",
     title: "Fuentes de datos y definiciones",
     access: {
@@ -1283,7 +1300,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "proveedor-panel",
-    version: 2,
+    version: 3,
     module: "Proveedores",
     title: "Mi panel de proveedor",
     access: {
@@ -1316,7 +1333,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "proveedor-horas",
-    version: 2,
+    version: 3,
     module: "Proveedores",
     title: "Cargar horas como proveedor",
     access: {
@@ -1350,7 +1367,7 @@ export const trainingLessons: AuthoredLesson[] = [
   },
   {
     id: "proveedor-facturas",
-    version: 2,
+    version: 3,
     module: "Proveedores",
     title: "Mis facturas de proveedor",
     access: {
@@ -1382,6 +1399,11 @@ export const trainingLessons: AuthoredLesson[] = [
       "El documento debe corresponder al período y a la etapa habilitada.",
   },
 ];
+
+// Keep archived authorship and progress records for compatibility; never expose
+// retired or unvalidated guides through the catalog, media or progress API.
+export const archivedTrainingLessons = authoredTrainingLessons.filter(lesson => !isPublishedTrainingGuide(lesson));
+export const trainingLessons = authoredTrainingLessons.filter(isPublishedTrainingGuide);
 
 export function publicLesson(lesson: AuthoredLesson): TrainingLesson {
   const { covers: _covers, ...publicFields } = lesson;

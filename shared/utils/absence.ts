@@ -5,7 +5,7 @@ export type AbsenceStatus = typeof ABSENCE_STATUSES[number];
 
 export const ABSENCE_ACTIONS = [
   "approve", "reject", "cancel_pending", "request_cancellation",
-  "approve_cancellation", "reject_cancellation",
+  "approve_cancellation", "reject_cancellation", "cancel_by_operations",
 ] as const;
 export type AbsenceAction = typeof ABSENCE_ACTIONS[number];
 
@@ -17,12 +17,12 @@ export function absenceConsumesAllowance(type: AbsenceType): "vacation" | "epica
 
 export function transitionAbsence(status: AbsenceStatus, action: AbsenceAction): AbsenceStatus {
   const transitions: Partial<Record<AbsenceStatus, Partial<Record<AbsenceAction, AbsenceStatus>>>> = {
-    pending: { approve: "approved", reject: "rejected", cancel_pending: "cancelled" },
-    approved: { request_cancellation: "cancellation_requested" },
-    cancellation_requested: { approve_cancellation: "cancelled", reject_cancellation: "approved" },
+    pending: { approve: "approved", reject: "rejected", cancel_pending: "cancelled", cancel_by_operations: "cancelled" },
+    approved: { request_cancellation: "cancellation_requested", cancel_by_operations: "cancelled" },
+    cancellation_requested: { approve_cancellation: "cancelled", reject_cancellation: "approved", cancel_by_operations: "cancelled" },
   };
   const next = transitions[status]?.[action];
-  if (!next) throw new Error(`Transición inválida: ${status} → ${action}`);
+  if (!next) throw Object.assign(new Error(`Transición inválida: ${status} → ${action}`), { status: 409 });
   return next;
 }
 

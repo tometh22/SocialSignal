@@ -30,7 +30,7 @@ const submit = (
   answer?: unknown,
   user = "1",
   id = "bienvenida",
-  version = 2,
+  version = 3,
 ) =>
   req(`/lessons/${id}/progress`, user, {
     step,
@@ -83,7 +83,7 @@ describe.skipIf(!url)("training API / PostgreSQL", () => {
   });
   beforeEach(async () => {
     await pool.query(
-      "TRUNCATE training_progress,training_preferences; UPDATE users SET permissions='{task_manager}' WHERE id=1; UPDATE active_projects SET closed_at=NULL; UPDATE provider_project_access SET can_log_hours=TRUE; UPDATE external_providers SET active=TRUE, personnel_id=1",
+      "TRUNCATE training_progress,training_preferences; UPDATE users SET permissions='{task_manager}',is_admin=FALSE WHERE id=1; UPDATE active_projects SET closed_at=NULL; UPDATE provider_project_access SET can_log_hours=TRUE; UPDATE external_providers SET active=TRUE, personnel_id=1",
     );
   });
   afterAll(async () => {
@@ -246,4 +246,32 @@ describe.skipIf(!url)("training API / PostgreSQL", () => {
     expect(rows.rows[0].state).toEqual(legacy);
     expect(rows.rows.every((row) => row.completed_at)).toBe(true);
   });
+  it("hides retired and unvalidated guides even for administrators, while merged links preserve authorization", async () => {
+    await pool.query("UPDATE users SET is_admin=TRUE,permissions='{}' WHERE id=1");
+    const catalog = await (await req()).json();
+    expect(catalog.lessons.some((l: any) => l.module === "Finanzas")).toBe(false);
+    for (const id of ["objetivos", "tarifas-servicios", "carga-financiera", "facturas-equipo", "cierre-financiero", "cashflow", "activo-pasivo", "provisiones", "reportes", "analisis-financiero"]) {
+      expect(catalog.lessons.some((l: any) => l.id === id)).toBe(false);
+      expect((await req(`/lessons/${id}`)).status).toBe(404);
+      expect((await req(`/lessons/${id}/media/referencia`)).status).toBe(404);
+      expect((await submit("learn", undefined, "1", id)).status).toBe(404);
+    }
+    for (const id of ["finanzas-proyecto", "entregables"]) {
+      expect(catalog.lessons.some((l: any) => l.id === id)).toBe(false);
+      expect((await (await req(`/lessons/${id}`)).json()).id).toBe("cartera");
+      expect((await req(`/lessons/${id}`, "2")).status).toBe(404);
+      expect((await submit("learn", undefined, "1", id)).status).toBe(404);
+    }
+  });
+  it("preserves version 2 read markers and retired guide history when version 3 is published", async () => {
+    await pool.query(`INSERT INTO training_progress(user_id,lesson_id,version,state,completed_at) VALUES
+      (1,'bienvenida',2,'{"completedSteps":["learn"],"answers":{}}',NOW()),
+      (1,'objetivos',2,'{"completedSteps":["learn"],"answers":{}}',NOW())`);
+    expect((await (await req("/lessons/bienvenida")).json()).needsUpdate).toBe(true);
+    expect((await submit("learn", undefined, "1", "bienvenida", 2)).status).toBe(409);
+    expect((await submit("learn")).status).toBe(200);
+    expect((await pool.query("SELECT * FROM training_progress WHERE version=2")).rows).toHaveLength(2);
+    expect((await (await req("/lessons/bienvenida")).json()).needsUpdate).toBe(false);
+  });
+
 });

@@ -1,3 +1,4 @@
+import { guardAbsenceCancellation } from "./services/absence-cancellation";
 import { registerNotificationRoutes } from "./routes-notifications";
 import { registerTrainingRoutes } from "./routes-training";
 import { getTransactionalEmailConfig, sendTransactionalEmail } from "./services/email-transport";
@@ -11754,7 +11755,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validatedData.internalType = validatedData.internalType || "otro";
       }
 
-      // Quotation is optional — projects can be created without one (demos, internal, etc.)
+      if (validatedData.projectCategory !== "internal" && !validatedData.quotationId) {
+        return res.status(400).json({ message: "Los proyectos comerciales requieren una cotización aprobada. Para trabajo interno, seleccioná la categoría Interno." });
+      }
+      // Only internal projects may be created without an approved quotation.
       const quotation = validatedData.quotationId
         ? await storage.getQuotation(Number(validatedData.quotationId))
         : null;
@@ -11812,7 +11816,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const project = await db.transaction(async (tx) => {
         if (validatedData.quotationId) {
-          await tx.execute(sql`SELECT id FROM quotations WHERE id = ${Number(validatedData.quotationId)} FOR UPDATE`);
+          const [lockedQuotation] = await tx.select().from(quotations).where(eq(quotations.id, Number(validatedData.quotationId))).for("update");
+          if (!lockedQuotation || lockedQuotation.status !== "approved" || lockedQuotation.clientId !== validatedData.clientId || lockedQuotation.acceptedVariantId !== quotation?.acceptedVariantId) {
+            throw Object.assign(new Error("La cotización cambió. Actualizá la pantalla y revisá su aprobación antes de crear el proyecto."), { statusCode: 409 });
+          }
           const [existingProject] = await tx.select({ id: activeProjects.id }).from(activeProjects)
             .where(eq(activeProjects.quotationId, Number(validatedData.quotationId))).limit(1);
           if (existingProject) throw Object.assign(new Error("La cotización ya fue materializada en un proyecto"), { statusCode: 409, projectId: existingProject.id });
@@ -26915,6 +26922,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }).strict();
   const absenceActionSchema = z.object({
     action: z.enum(ABSENCE_ACTIONS),
+    confirmUnusedDays: z.boolean().optional().default(false),
     reason: z.string().trim().max(4000).optional(),
     allowNegativeBalance: z.boolean().optional().default(false),
   }).strict();
@@ -27141,6 +27149,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (input.allowNegativeBalance && (!access.isAdmin || !input.reason)) {
         return res.status(403).json({ message: "El override requiere Admin y un motivo obligatorio" });
       }
+      const managedCancellation = ["cancel_by_operations", "approve_cancellation"].includes(input.action);
+      if (managedCancellation && (!input.reason || !input.confirmUnusedDays)) {
+        return res.status(400).json({ message: "Indicá un motivo y confirmá que ninguno de los días fue tomado. Si hubo días tomados, revisá el período antes de cancelar." });
+      }
+      // A retry after a committed cancellation must not duplicate events or notifications.
+      if (managedCancellation && current.status === "cancelled") return res.json(current);
       const nextStatus = transitionAbsence(current.status as AbsenceStatus, input.action);
       const holidayDates = await holidaysForRange(current.startDate, current.endDate);
       const requestedByYear = businessDaysByYear(current.startDate, current.endDate, holidayDates);
@@ -27148,6 +27162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allowanceType = absencePerson?.contractType === "freelance" ? null : absenceConsumesAllowance(current.type as AbsenceType);
 
       const updated = await db.transaction(async (tx) => {
+        if (managedCancellation) await guardAbsenceCancellation(tx, current.personnelId, current.startDate, current.endDate);
         await tx.execute(sql`SELECT pg_advisory_xact_lock(291, ${current.personnelId})`);
         if (input.action === "approve") {
           const [overlap] = await tx.select({ id: personnelAbsences.id }).from(personnelAbsences).where(and(
@@ -27224,7 +27239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const changes: any = { status: nextStatus, updatedAt: now };
         if (["approve", "reject"].includes(input.action)) Object.assign(changes, { reviewedBy: access.userId, reviewedAt: now, reviewReason: input.reason || null });
         if (input.action === "request_cancellation") Object.assign(changes, { cancellationRequestedAt: now, cancellationReason: input.reason || null });
-        if (input.action === "approve_cancellation" || input.action === "cancel_pending") Object.assign(changes, { cancelledBy: access.userId, cancelledAt: now, cancellationReason: input.reason || current.cancellationReason });
+        if (managedCancellation || input.action === "cancel_pending") Object.assign(changes, { cancelledBy: access.userId, cancelledAt: now, cancellationReason: input.reason || current.cancellationReason });
         const [row] = await tx.update(personnelAbsences).set(changes).where(and(
           eq(personnelAbsences.id, absenceId), eq(personnelAbsences.status, current.status), sql`xmin::text = ${current.rowVersion}`,
         )).returning();
@@ -27234,7 +27249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eventKey: `${input.action}:${absenceId}:${new Date(current.updatedAt).toISOString()}`,
           action: input.action,
           fromStatus: current.status, toStatus: nextStatus, reason: input.reason || null, actorUserId: access.userId,
-          metadata: { allowNegativeBalance: input.allowNegativeBalance, daysByYear: requestedByYear },
+          metadata: { allowNegativeBalance: input.allowNegativeBalance, daysByYear: requestedByYear, confirmUnusedDays: input.confirmUnusedDays },
         }).onConflictDoNothing();
         if (input.action === "request_cancellation") {
           await createUserNotifications(await operationsNotificationUserIds(tx), {
@@ -27249,6 +27264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             approve: "Ausencia aprobada",
             reject: "Ausencia rechazada",
             approve_cancellation: "Cancelación confirmada",
+            cancel_by_operations: "Ausencia cancelada por Operaciones",
             reject_cancellation: "Cancelación rechazada",
           };
           if(owner) await createUserNotifications([owner.id], {

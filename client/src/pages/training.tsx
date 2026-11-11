@@ -1,5 +1,6 @@
+import { canonicalTrainingId } from "@shared/training-policy";
 import { useState } from "react";
-import { Link, useRoute } from "wouter";
+import { Link, Redirect, useRoute } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, BookOpen, Check, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -78,7 +79,9 @@ export default function TrainingPage() {
     return <LoadError retry={() => void catalog.refetch()} />;
   const lessons = catalog.data.lessons;
   if (params?.lessonId) {
-    const summary = lessons.find((l) => l.id === params.lessonId);
+    const canonicalId = canonicalTrainingId(params.lessonId);
+    const summary = lessons.find((l) => l.id === canonicalId);
+    if (summary && canonicalId !== params.lessonId) return <Redirect to={`/training/${canonicalId}`} replace />;
     return summary ? (
       <>
         <RefreshWarning
@@ -95,7 +98,7 @@ export default function TrainingPage() {
       <div className="space-y-4 p-6">
         <h1 className="text-2xl font-semibold">Guía no disponible</h1>
         <p>
-          Esta guía no está disponible para tu cuenta o tus permisos cambiaron.
+          Esta guía fue retirada, está pendiente de validación o no está habilitada para tu cuenta. Consultá el catálogo para ver las guías disponibles.
         </p>
         <Button asChild variant="outline">
           <Link href="/training">Volver a Capacitación</Link>
@@ -332,9 +335,9 @@ function Guide({ lesson }: { lesson: TrainingLesson }) {
         aria-labelledby="guide-verification"
       >
         <h2 id="guide-verification" className="text-base font-semibold">
-          Qué revisar
+          Aclaraciones y situaciones frecuentes
         </h2>
-        <p className="mt-2 text-sm leading-relaxed">{lesson.verification}</p>
+        <div className="mt-3 space-y-3 text-sm leading-relaxed">{[...new Set([lesson.verification, ...lesson.explanation])].map(paragraph => <p key={paragraph}>{paragraph}</p>)}</div>
       </section>
       <section aria-labelledby="guide-example">
         <h2 id="guide-example" className="text-base font-semibold">
@@ -342,16 +345,6 @@ function Guide({ lesson }: { lesson: TrainingLesson }) {
         </h2>
         <p className="mt-2 text-sm leading-relaxed">{lesson.example}</p>
       </section>
-      <details className="rounded-lg border p-4">
-        <summary className="cursor-pointer font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          Detalles y situaciones frecuentes
-        </summary>
-        <div className="mt-3 space-y-3 text-sm leading-relaxed">
-          {lesson.explanation.map((paragraph, i) => (
-            <p key={i}>{paragraph}</p>
-          ))}
-        </div>
-      </details>
       <footer className="border-t pt-5">
         <div className="flex flex-wrap items-center gap-3">
           <Button
