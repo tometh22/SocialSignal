@@ -40,7 +40,7 @@ export default function CapacityProjectPlanning({ planning, personnelId, weekSta
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] }),
     ]);
   };
-  const mode = useMutation({ mutationFn: ({ id, value }: { id: number; value: string }) => apiRequest(`/api/capacity/projects/${id}/mode`, "PUT", { mode: value }),
+  const mode = useMutation({ mutationFn: ({ id, value }: { id: number; value: string }) => apiRequest(`/api/capacity/projects/${id}/mode`, "PUT", { mode: value, weekStart }),
     onSuccess: refresh, onError: (error: Error) => toast({ title: "No se pudo cambiar la modalidad", description: error.message, variant: "destructive" }) });
   const extra = useMutation({ mutationFn: ({ taskId, value }: { taskId: number; value: boolean }) => apiRequest(`/api/capacity/tasks/${taskId}/extra`, "PUT", { weekStart, isExtra: value }),
     onSuccess: refresh, onError: (error: Error) => toast({ title: "No se pudo cambiar el extra", description: error.message, variant: "destructive" }) });
@@ -74,12 +74,12 @@ export default function CapacityProjectPlanning({ planning, personnelId, weekSta
           </label> : <span className="text-xs text-muted-foreground">{modeLabels[project.mode]}</span>}
         </div>
         {!collapsed && <div className="mt-3 space-y-2">
-          {isOperations && <p className="text-xs text-muted-foreground">La modalidad se comparte con todo el equipo del proyecto. Las estimaciones de las otras modalidades se conservan y no se suman.</p>}
+          {isOperations && <p className="text-xs text-muted-foreground">La modalidad se aplica a esta semana y se comparte con todo el equipo del proyecto. Cambiarla no modifica otras semanas. Las estimaciones de las otras modalidades se conservan y no se suman.</p>}
           {project.mode === "project" && <div className="flex flex-wrap items-center justify-between gap-2 rounded bg-muted/30 p-2"><span>Base del proyecto · esta persona</span><CapacityHoursEditor key={`${weekStart}:project`} label={`Horas base de ${project.name}`} hours={groups.find(group => group.scope === "project")?.estimatedHours ?? 0} onSave={hours => saveGroup("", hours)} /></div>}
           {project.mode === "section" && (sections.length ? sections.map(section => <div key={section} className="flex flex-wrap items-center justify-between gap-2 rounded bg-muted/30 p-2"><span className="min-w-0 break-words">{section}</span><CapacityHoursEditor key={`${weekStart}:${section}`} label={`Horas de ${section} en ${project.name}`} hours={groups.find(group => group.scope === "section" && group.sectionName === section)?.estimatedHours ?? 0} onSave={hours => saveGroup(section, hours)} /></div>) : <p className="text-xs text-muted-foreground">Agregá una sección en el proyecto para estimarla.</p>)}
           {project.mode !== "task" && <p className="pt-2 text-xs text-muted-foreground">Extras por tarea: sólo las marcadas como Extra se suman a la base de esta semana. Al estimar una tarea aquí se agrega como extra.</p>}
           {tasks.map(task => <div key={task.id} className="flex flex-wrap items-center gap-2 border-t py-1 text-xs" data-testid="capacity-task-row">
-            <span className="min-w-0 flex-1 basis-48 break-words">{task.title}<span className="ml-2 text-muted-foreground">{task.sectionName || "General"}</span></span>
+            <span className="min-w-0 flex-1 basis-48 break-words">{task.title}{task.status === "done" && <span className="ml-2 text-muted-foreground">Finalizada</span>}<span className="ml-2 text-muted-foreground">{task.sectionName || "General"}</span></span>
             {project.mode !== "task" && <label className="flex items-center gap-1"><input type="checkbox" aria-label={`Extra: ${task.title}`} checked={task.isExtra} disabled={!task.estimatedHours || extra.isPending} onChange={event => extra.mutate({ taskId: task.id, value: event.target.checked })} />Extra</label>}
             <CapacityHoursEditor key={`${weekStart}:${project.mode}:${task.id}`} label={`${project.mode === "task" ? "Estimar" : "Estimar extra"}: ${task.title}`} hours={task.estimatedHours} onSave={async estimatedHours => {
               if (estimatedHours === 0) await apiRequest(`/api/tasks/${task.id}/weekly-estimates/${weekStart}`, "DELETE");
@@ -87,7 +87,7 @@ export default function CapacityProjectPlanning({ planning, personnelId, weekSta
               await refresh();
             }} />
           </div>)}
-          {project.mode === "task" && !tasks.length && <p className="text-xs text-muted-foreground">Sin tareas activas para esta persona en la semana elegida.</p>}
+          {project.mode === "task" && !tasks.length && <p className="text-xs text-muted-foreground">Sin tareas para esta persona en la semana elegida.</p>}
         </div>}
       </div>;
     })}

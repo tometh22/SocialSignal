@@ -2557,6 +2557,12 @@ export const insertTaskWeeklyEstimateSchema = createInsertSchema(taskWeeklyEstim
   });
 export type TaskWeeklyEstimate = typeof taskWeeklyEstimates.$inferSelect;
 
+export const capacityWeekModes = pgTable("capacity_week_modes", {
+  projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: "cascade" }),
+  weekStart: text("week_start").notNull(),
+  mode: text("mode").notNull(),
+}, table => ({ key: primaryKey({ columns: [table.projectId, table.weekStart] }) }));
+
 export const capacityGroupEstimates = pgTable("capacity_group_estimates", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: "cascade" }),

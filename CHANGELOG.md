@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.39 — 2026-11-11
+
+- Capacidad conserva la modalidad por proyecto y semana: modificar una semana no altera la planificación histórica. Recupera las bases históricas inequívocas sin sumar modalidades alternativas.
+- Las tareas finalizadas mantienen sus horas planificadas y aparecen identificadas en el detalle. Las canceladas siguen excluidas.
+- La primera carga fija la modalidad semanal también desde el detalle de tareas; migración idempotente y regresiones de recuperación, aislamiento entre semanas, permisos y cálculo HTTP.
+
 ## 1.14.38 — 2026-11-11
 
 - Operaciones puede cancelar ausencias pendientes o aprobadas con motivo y confirmación de días no tomados. Se conservan autor, fecha e historial; saldo, disponibilidad y capacidad se actualizan sin duplicar devoluciones ni notificaciones al reintentar.

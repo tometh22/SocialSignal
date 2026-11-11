@@ -27425,8 +27425,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/capacity/projects/:id/mode", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const id = z.coerce.number().int().positive().parse(req.params.id);
-      const { mode } = z.object({ mode: z.unknown() }).strict().parse(req.body);
-      await saveCapacityMode(id, mode, await capacityActor(req));
+      const { mode, weekStart } = z.object({ mode: z.unknown(), weekStart: capacityWeekSchema }).strict().parse(req.body);
+      await saveCapacityMode(id, mode, await capacityActor(req), weekStart);
       res.json({ success: true });
     } catch (error) { capacityError(res, error); }
   });
@@ -27500,7 +27500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT personnel_id, SUM(estimated_hours)::float AS estimated_hours
         FROM capacity_effective_weekly_estimates
         WHERE week_start = ${weekStartISO} AND project_status='active'
-          AND personnel_id IS NOT NULL AND (task_status IS NULL OR task_status NOT IN ('done','cancelled'))
+          AND personnel_id IS NOT NULL AND (task_status IS NULL OR task_status <> 'cancelled')
           AND (${actor.isOperations} OR personnel_id=${actor.personnelId})
         GROUP BY personnel_id
       `);
