@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.14.38 — 2026-11-11
+
+- Operaciones puede cancelar ausencias pendientes o aprobadas con motivo y confirmación de días no tomados. Se conservan autor, fecha e historial; saldo, disponibilidad y capacidad se actualizan sin duplicar devoluciones ni notificaciones al reintentar.
+- La cancelación respeta cierres financieros, cortes de horas y liquidaciones publicadas, incluso en rangos de varios meses o años. Usa los mismos bloqueos que el cierre y mantiene estado, auditoría y notificación en una transacción.
+- Capacitación unifica las aclaraciones y amplía los pasos de Inicio, Notificaciones, Mis facturas, Cotizaciones y Cierre del equipo. Distingue lista, kanban y Cartera; reúne las guías de gestión financiera del proyecto y entregables en Cartera y actualiza las capturas.
+- Retira las guías y accesos de Objetivos y Tarifas/servicios, conservando sus funciones, datos y rutas históricas. Oculta las guías de Finanzas hasta su validación, también en búsquedas y acceso directo. Conserva el progreso anterior y publica las guías vigentes como versión 3.
+- Los proyectos comerciales nuevos requieren una cotización aprobada del mismo cliente, revalidada bajo bloqueo antes del alta. Los proyectos internos conservan su excepción sin cotización. Regresiones PostgreSQL y de navegador para permisos, cierres, concurrencia, saldos, capacidad, compatibilidad y navegación móvil; sin nuevas migraciones.
+
 ## 1.14.37 — 2026-11-10
 
 - El campo de escritura del daily comienza vacío al entrar o volver a un tema. El último mensaje guardado permanece en Comentarios y antecedentes, sin copiarse como borrador.

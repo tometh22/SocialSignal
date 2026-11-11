@@ -1,3 +1,5 @@
+import { capacityPlanningMigrationSql } from "../server/migrations/capacity-planning";
+import { teamSettlementWorkflowMigrationSql } from "../server/migrations/team-settlement-workflow";
 import { db, pool } from "../server/db";
 import * as schema from "../shared/schema";
 import { hashPassword } from "../server/auth";
@@ -71,5 +73,7 @@ try {
       await db.insert(schema.providerProjectAccess).values({ providerId: provider.id, projectId: project.id, canLogHours: true });
     }
   }
+  await pool.query(capacityPlanningMigrationSql);
+  await pool.query(teamSettlementWorkflowMigrationSql);
   console.log(JSON.stringify({ people, projectId: project.id, taskId: tasks[0].id, today }));
 } finally { await pool.end(); }

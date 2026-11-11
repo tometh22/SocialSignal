@@ -7,6 +7,7 @@ import {
 } from "../shared/training";
 import {
   trainingLessons,
+  archivedTrainingLessons,
   publicLesson,
 } from "../server/content/training-catalog";
 import { trainingScreenshots } from "../server/content/training-media";
@@ -62,7 +63,7 @@ describe("training access and curriculum", () => {
     expect(ids({ ...provider, providerCanLogHours: true })).toContain(
       "proveedor-horas",
     );
-    expect(ids({ permissions: ["dashboard"] })).toContain("reportes");
+    expect(ids({ permissions: ["dashboard"] })).not.toContain("reportes");
     expect(ids({ permissions: ["dashboard"] })).not.toContain(
       "carga-financiera",
     );
@@ -71,9 +72,9 @@ describe("training access and curriculum", () => {
     expect(new Set(trainingLessons.map((l) => l.id)).size).toBe(
       trainingLessons.length,
     );
-    expect(new Set(trainingLessons.map((l) => l.module)).size).toBe(9);
+    expect(new Set(trainingLessons.map((l) => l.module)).size).toBe(8);
     for (const lesson of trainingLessons) {
-      expect(lesson.version).toBe(2);
+      expect(lesson.version).toBe(3);
       expect(lesson.instructions.length).toBeGreaterThanOrEqual(3);
       expect(lesson.instructions.every((step) => step.length > 30)).toBe(true);
       expect(lesson.verification.length).toBeGreaterThan(20);
@@ -99,7 +100,7 @@ describe("training access and curriculum", () => {
   });
   it("ships real private screenshots for every guide, tied to an existing instruction", () => {
     expect(Object.keys(trainingScreenshots).sort()).toEqual(
-      trainingLessons.map((lesson) => lesson.id).sort(),
+      [...trainingLessons, ...archivedTrainingLessons].map((lesson) => lesson.id).sort(),
     );
     for (const lesson of trainingLessons) {
       const media = publicLesson(lesson).screenshots;
@@ -141,9 +142,11 @@ describe("training access and curriculum", () => {
       "/project/:id",
       "/currency-demo",
     ]);
+    // Retired surfaces retain legacy routes; they are intentionally not advertised.
+    const deferred = new Set(archivedTrainingLessons.flatMap(l => l.covers));
     const covered = new Set(trainingLessons.flatMap((l) => l.covers));
     expect(
-      patterns.filter((path) => !covered.has(path) && !exclusions.has(path)),
+      patterns.filter((path) => !covered.has(path) && !exclusions.has(path) && !deferred.has(path)),
     ).toEqual([]);
     // Every link is a real route and does not depend on a fabricated record id.
     for (const lesson of trainingLessons)

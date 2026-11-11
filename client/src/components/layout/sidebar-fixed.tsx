@@ -27,7 +27,6 @@ import {
   Building2,
   Settings,
   Target,
-  Flag,
   Users,
   CheckSquare,
   BarChart2,
@@ -153,7 +152,6 @@ export default function SidebarFixed({ mobileMode = false, onNavigate }: Sidebar
       items: [
         { href: "/", title: "Inicio", icon: Home, description: "Resumen personal", anyPermissions: HOME_ACCESS_SECTIONS },
         { href: "/training", title: "Capacitación", icon: GraduationCap, description: "Guías de uso según tus permisos" },
-        { href: "/review/objectives", title: "Objetivos", icon: Flag, description: "Plan del año y acciones de la semana", permission: 'operations' as AppSection },
         { href: "/absences", title: "Mis ausencias", icon: UserX, description: "Solicitudes y saldos", anyPermissions: HOME_ACCESS_SECTIONS },
         { href: "/my-invoices", title: "Mis facturas", icon: Receipt, description: "Tu cierre y comprobantes", anyPermissions: HOME_ACCESS_SECTIONS },
         ...(!isOperations ? [{ href: "/tasks/hours-dashboard", title: "Mis horas", icon: BarChart2, description: "Tu carga por período y proyecto", anyPermissions: HOURS_DASHBOARD_ACCESS_SECTIONS }] : []),
