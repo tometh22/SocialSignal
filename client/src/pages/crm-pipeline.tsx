@@ -816,14 +816,16 @@ export default function Pipeline() {
             {snapshot ? "Corte guardado" : "Cartera actual"}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <Button
             variant="outline"
-            className="h-9 gap-2 text-sm"
+            className="h-9 shrink-0 gap-2 text-sm"
+            aria-label="Resumen para Fede"
             onClick={() => navigate("Cierre mensual")}
           >
             <ClipboardCheck className="h-4 w-4" />
-            Resumen para Fede
+            <span className="sm:hidden">Resumen</span>
+            <span className="hidden sm:inline">Resumen para Fede</span>
           </Button>
           <Button
             variant="outline"
