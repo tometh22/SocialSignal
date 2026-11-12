@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.48 — 2026-11-12
+
+- Pipeline comercial con acceso propio en el menú (Comercial → Pipeline comercial). "Resumen para Fede" pasa a llamarse Status: "Copiar Status" copia el texto desde cualquier vista del pipeline.
+- Enlaces de solo lectura para compartir el pipeline abierto sin cuenta en Mind (Compartir): muestra indicadores, etapas y oportunidades con importes respaldados; nunca notas, evidencia, fuentes, contactos, identificadores ni facturación. Vencen a los 7, 30 o 90 días (o sin vencimiento), se pueden revocar, registran vistas y quedan auditados en el Registro. Solo se guarda el hash del token, que viaja en el fragmento de la URL. Migración aditiva 0098.
+
 ## 1.14.47 — 2026-11-12
 
 - El alta de usuarios por API conserva `isActive: false`: crea la cuenta desactivada, sin enlace ni envío de correo. Permite activarla e invitarla luego desde administración y evita habilitar una cuenta que se pidió dejar inactiva.
