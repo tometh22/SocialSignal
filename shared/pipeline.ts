@@ -220,6 +220,8 @@ export function summarize(
       : null;
   return {
     ...m,
+    scopeCounts: Object.fromEntries(scopes.map(scope => [scope, rows.filter(row => row.scope === scope).length])),
+    alertCounts: Object.fromEntries(["Sin próximo paso", "Sin valor USD", "Sin probabilidad respaldada", "Evidencia desactualizada", "Sin fecha objetivo"].map(label => [label, rows.filter(row => alerts(row, day).includes(label)).length])),
     alerted: rows.filter(
       (r) => r.scope === "Pipeline" && r.eligible && alerts(r, day).length,
     ).length,

@@ -187,9 +187,9 @@ function Panel({
       {title && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-5 py-4">
           <div>
-            <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
+            <h2 className="text-base font-semibold tracking-tight">{title}</h2>
             {description && (
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {description}
               </p>
             )}
@@ -228,7 +228,7 @@ function EmptyState({
 function Coverage({ n = 0, total = 0 }: { n?: number; total?: number }) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between text-[11px]">
+      <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">
           {total
             ? n === total
@@ -272,12 +272,12 @@ function Metric({
   return (
     <div
       className={cn(
-        "relative flex min-h-[160px] flex-col rounded-2xl border bg-card p-5 shadow-sm",
+        "relative flex min-h-[132px] flex-col rounded-2xl border bg-card p-5 shadow-sm",
         highlight ? "border-amber-200 bg-amber-50/40" : "border-slate-200/80",
       )}
     >
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <p className="text-xs font-medium text-muted-foreground">{title}</p>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-sm font-medium text-muted-foreground">{title}</p>
         <Icon
           className={cn(
             "h-4 w-4",
@@ -288,11 +288,11 @@ function Metric({
       <p className="text-3xl font-semibold tracking-tight tabular-nums">
         {value}
       </p>
-      <div className="mt-auto pt-4">
+      <div className="mt-auto pt-3">
         {coverage ? (
           <Coverage {...coverage} />
         ) : (
-          <p className="text-xs text-muted-foreground">{subtitle}</p>
+          <p className="text-sm text-muted-foreground">{subtitle}</p>
         )}
       </div>
       {onClick && (
@@ -325,7 +325,7 @@ function Picker({
           role="combobox"
           aria-expanded={open}
           aria-label={label}
-          className="h-9 justify-between gap-3 bg-background px-3 text-xs font-normal"
+          className="h-9 justify-between gap-3 bg-background px-3 text-sm font-normal"
         >
           <span className="max-w-[180px] truncate">
             {options.find((o) => o.value === value)?.label ?? (value || label)}
@@ -380,7 +380,7 @@ function Picker({
 }
 function StageBadge({ stage }: { stage: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-700">
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-sm font-medium text-slate-700">
       <span
         className={cn(
           "h-1.5 w-1.5 rounded-full",
@@ -404,8 +404,8 @@ function OpportunityTable({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs">
-        <thead className="bg-slate-50/80 text-[10px] uppercase tracking-wider text-slate-500">
+      <table className="w-full text-left text-sm">
+        <thead className="bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
           <tr>
             <th className="min-w-[240px] px-5 py-3 font-medium">
               Cuenta y oportunidad
@@ -432,6 +432,9 @@ function OpportunityTable({
                 Responsable
               </th>
             )}
+            {!compact && (
+              <th className="min-w-[180px] px-3 py-3 font-medium">Fuente</th>
+            )}
             <th className="w-12 px-3 py-3">
               <span className="sr-only">Abrir ficha</span>
             </th>
@@ -441,7 +444,7 @@ function OpportunityTable({
           {loading
             ? Array.from({ length: 4 }, (_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: compact ? 5 : 8 }, (_, j) => (
+                  {Array.from({ length: compact ? 5 : 9 }, (_, j) => (
                     <td className="px-5 py-5" key={j}>
                       <div className="h-4 animate-pulse rounded bg-slate-100" />
                     </td>
@@ -453,7 +456,7 @@ function OpportunityTable({
                   className="group transition-colors hover:bg-slate-50/80"
                   key={r.id ?? r.importKey}
                 >
-                  <td className="px-5 py-4">
+                  <td className="px-5 py-3">
                     <button
                       onClick={() => onOpen(r)}
                       className="block max-w-[340px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -466,18 +469,18 @@ function OpportunityTable({
                       </span>
                     </button>
                     {!compact && (
-                      <span className="mt-1.5 block text-[10px] text-slate-400">
+                      <span className="mt-1.5 block text-xs text-slate-400">
                         {r.contact || "Contacto pendiente"}
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-4">
+                  <td className="px-3 py-3">
                     <StageBadge stage={r.stage} />
-                    <p className="mt-1.5 text-[10px] text-muted-foreground">
+                    <p className="mt-1.5 text-xs text-muted-foreground">
                       {r.status} · {r.scope}
                     </p>
                     {!compact && (
-                      <span className="mt-1 inline-block text-[10px] text-slate-400">
+                      <span className="mt-1 inline-block text-xs text-slate-400">
                         Confianza {r.confidence?.toLowerCase()}
                       </span>
                     )}
@@ -501,7 +504,7 @@ function OpportunityTable({
                         ? r.next || "Definir próximo paso"
                         : civilDate(r.closeDate)}
                     </p>
-                    <p className="mt-1 text-[10px] text-muted-foreground">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {compact
                         ? civilDate(r.nextDate)
                         : `Evidencia: ${civilDate(r.evidenceDate)}`}
@@ -509,7 +512,7 @@ function OpportunityTable({
                     {r.alerts?.length > 0 && (
                       <button
                         onClick={() => onOpen(r)}
-                        className="mt-1.5 inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
+                        className="mt-1.5 inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700"
                         title={r.alerts.join(" · ")}
                       >
                         <AlertCircle className="h-3 w-3" />
@@ -519,9 +522,9 @@ function OpportunityTable({
                     )}
                   </td>
                   {!compact && (
-                    <td className="px-3 py-4">
+                    <td className="px-3 py-3">
                       <span className="inline-flex items-center gap-2">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[9px] font-semibold text-slate-500">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">
                           {r.owner
                             ? r.owner
                                 .split(" ")
@@ -534,7 +537,31 @@ function OpportunityTable({
                       </span>
                     </td>
                   )}
-                  <td className="px-3 py-4">
+                  {!compact && (
+                    <td className="max-w-[220px] px-3 py-3">
+                      {r.sources?.[0] ? (
+                        <>
+                          <a
+                            className="inline-flex items-start gap-1 text-sm font-medium text-primary hover:underline"
+                            href={r.sources[0].url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {r.sources[0].title}
+                            <ArrowUpRight className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          </a>
+                          {r.sources.length > 1 && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              +{r.sources.length - 1} en detalle
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">Pendiente</span>
+                      )}
+                    </td>
+                  )}
+                  <td className="px-3 py-3">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -593,8 +620,11 @@ export default function Pipeline() {
     [success, setSuccess] = useState("");
   const { isAdmin, hasPermission } = usePermissions();
   const canReadQuotes = hasPermission("quotations");
+  const alertScope =
+    filter.scope === "Validación CRM" ? "Validación CRM" : "Pipeline";
   const qs = new URLSearchParams({
-    ...filter,
+    ...(["Resumen", "Concentración"].includes(tab) ? {} : filter),
+    ...(tab === "Alertas" ? { scope: alertScope } : {}),
     ...(snapshot ? { snapshotId: snapshot } : {}),
   }).toString();
   const universeQs = snapshot ? `snapshotId=${snapshot}` : "";
@@ -606,7 +636,7 @@ export default function Pipeline() {
     });
   const summary = useData("/summary?" + qs),
     rows = useData(
-      `/${tab === "Alertas" ? "alerts" : "opportunities"}?${qs}&offset=${offset}${tab === "Concentración" ? "&warner=true" : ""}`,
+      `/${tab === "Alertas" ? "alerts" : "opportunities"}?${qs}&offset=${offset}${tab === "Concentración" ? "&warner=true" : tab === "Resumen" ? "&scope=Pipeline" : ""}`,
       ["Resumen", "Oportunidades", "Alertas", "Concentración"].includes(tab),
     ),
     cuts = useData("/cuts"),
@@ -632,6 +662,14 @@ export default function Pipeline() {
       "/opportunities?" + universeQs + "&group=owner&limit=1",
       showFilters,
     );
+  const countParams = new URLSearchParams(qs);
+  countParams.delete("scope");
+  countParams.delete("alert");
+  countParams.delete("group");
+  const scopeSummary = useData(
+    "/summary?" + countParams.toString(),
+    tab === "Oportunidades",
+  );
   const data = summary.data;
   const selectedCut = cut.data;
   const effectivePeriod = selectedCut?.period ?? period;
@@ -722,7 +760,7 @@ export default function Pipeline() {
   const showList = ["Oportunidades", "Alertas", "Concentración"].includes(tab);
   const pagination = (
     <div className="flex items-center justify-between gap-3 border-t border-border/60 bg-slate-50/40 px-5 py-3">
-      <span className="text-xs text-muted-foreground">
+      <span className="text-sm text-muted-foreground">
         {rows.data?.total
           ? `${offset + 1}–${Math.min(offset + 50, rows.data.total)} de ${rows.data.total} oportunidades`
           : "Sin oportunidades"}
@@ -752,41 +790,41 @@ export default function Pipeline() {
     </div>
   );
   return (
-    <PageShell width="full" spacing="compact" className="pb-8">
-      <header className="flex flex-wrap items-start justify-between gap-4 pt-1">
-        <div>
+    <PageShell
+      width="full"
+      spacing="compact"
+      className="pb-8 !space-y-3 text-sm"
+    >
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/crm"
-            className="mb-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            aria-label="Volver al CRM"
+            className="rounded-lg border bg-card p-2 text-muted-foreground hover:text-foreground"
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Volver al CRM
+            <ArrowLeft className="h-4 w-4" />
           </Link>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-[28px]">
-              Pipeline comercial
-            </h1>
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium",
-                snapshot
-                  ? "bg-indigo-50 text-indigo-700"
-                  : "bg-emerald-50 text-emerald-700",
-              )}
-            >
-              {snapshot ? (
-                <LockKeyhole className="h-3 w-3" />
-              ) : (
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              )}
-              {snapshot ? "Corte guardado" : "Cartera actual"}
-            </span>
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Decisiones comerciales con evidencia, valor y próximos pasos.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Pipeline comercial
+          </h1>
+          <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+            {snapshot ? (
+              <LockKeyhole className="h-3.5 w-3.5" />
+            ) : (
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            )}
+            {snapshot ? "Corte guardado" : "Cartera actual"}
+          </span>
         </div>
-        <div className="flex items-center gap-2 pt-1">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="h-9 gap-2 text-sm"
+            onClick={() => navigate("Cierre mensual")}
+          >
+            <ClipboardCheck className="h-4 w-4" />
+            Resumen para Fede
+          </Button>
           <Button
             variant="outline"
             size="icon"
@@ -801,7 +839,7 @@ export default function Pipeline() {
             />
           </Button>
           {!snapshot && (
-            <Button className="h-9 gap-2 px-4 text-xs" onClick={newOpportunity}>
+            <Button className="h-9 gap-2 text-sm" onClick={newOpportunity}>
               <Plus className="h-4 w-4" />
               Nueva oportunidad
             </Button>
@@ -818,7 +856,7 @@ export default function Pipeline() {
             onClick={() => navigate(label)}
             aria-current={tab === label ? "page" : undefined}
             className={cn(
-              "relative flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
+              "relative flex shrink-0 items-center gap-2 whitespace-nowrap px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
               tab === label
                 ? "text-primary"
                 : "text-muted-foreground hover:text-foreground",
@@ -827,7 +865,7 @@ export default function Pipeline() {
             <Icon className="h-4 w-4" />
             {label}
             {label === "Alertas" && !!data?.alerted && (
-              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
+              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
                 {data.alerted}
               </span>
             )}
@@ -838,43 +876,37 @@ export default function Pipeline() {
         ))}
       </nav>
       {snapshot && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3">
-          <div className="flex items-start gap-3">
-            <LockKeyhole className="mt-0.5 h-4 w-4 text-indigo-500" />
-            <div>
-              <p className="text-xs font-medium text-indigo-950">
-                {selectedCut
-                  ? `${selectedCut.period} · versión ${selectedCut.version}`
-                  : "Corte guardado"}{" "}
-                · solo lectura
-              </p>
-              <p className="mt-1 text-[11px] text-indigo-700">
-                {selectedCut
-                  ? `Guardado el ${dateTime(selectedCut.created_at)}. `
-                  : ""}
-                Los cambios actuales no modifican esta fotografía.
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            className="h-8 border-indigo-200 bg-white text-xs"
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-sm">
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-indigo-950">
+            <LockKeyhole className="h-4 w-4 text-indigo-500" />
+            <span className="font-medium">
+              {selectedCut
+                ? `${selectedCut.period} · versión ${selectedCut.version}`
+                : "Corte guardado"}{" "}
+              · solo lectura
+            </span>
+            {selectedCut && (
+              <span className="text-xs text-indigo-700">
+                Guardado {dateTime(selectedCut.created_at)}
+              </span>
+            )}
+          </p>
+          <button
+            className="inline-flex items-center gap-2 font-medium text-indigo-800"
             onClick={() => navigate(tab, "")}
           >
-            Volver a cartera actual
-            <ArrowRight className="ml-2 h-3.5 w-3.5" />
-          </Button>
+            Cartera actual
+            <ArrowRight className="h-4 w-4" />
+          </button>
         </div>
       )}
-      {["Resumen", "Oportunidades", "Alertas", "Concentración"].includes(
-        tab,
-      ) && (
+      {tab === "Oportunidades" && (
         <div className="rounded-xl border border-border/70 bg-card">
           <div className="flex flex-wrap items-center gap-2 p-3">
             <div className="relative min-w-[200px] flex-1 sm:max-w-sm">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input
-                className="h-9 border-slate-200 bg-slate-50/60 pl-9 text-xs"
+                className="h-9 border-slate-200 bg-slate-50/60 pl-9 text-sm"
                 placeholder="Buscar cuenta, proyecto o contacto…"
                 aria-label="Buscar oportunidades"
                 value={filter.q ?? ""}
@@ -883,7 +915,7 @@ export default function Pipeline() {
             </div>
             <Button
               variant={showFilters ? "secondary" : "outline"}
-              className="h-9 gap-2 text-xs"
+              className="h-9 gap-2 text-sm"
               onClick={() => setShowFilters((v) => !v)}
             >
               <ListFilter className="h-3.5 w-3.5" />
@@ -913,7 +945,7 @@ export default function Pipeline() {
                 onChange={(v) => update("group", v)}
               />
             )}
-            <div className="ml-auto hidden items-center gap-1.5 text-[11px] text-muted-foreground sm:flex">
+            <div className="ml-auto hidden items-center gap-1.5 text-sm text-muted-foreground sm:flex">
               <ShieldCheck className="h-3.5 w-3.5 text-slate-400" />
               Importes respaldados · USD
             </div>
@@ -955,7 +987,7 @@ export default function Pipeline() {
                 <Input
                   aria-label="Mes objetivo de cierre"
                   type="month"
-                  className="h-9 w-40 bg-background text-xs"
+                  className="h-9 w-40 bg-background text-sm"
                   value={
                     filter.closeMonth === "pending"
                       ? ""
@@ -968,7 +1000,7 @@ export default function Pipeline() {
                 variant={
                   filter.closeMonth === "pending" ? "secondary" : "outline"
                 }
-                className="h-9 text-xs"
+                className="h-9 text-sm"
                 onClick={() =>
                   update(
                     "closeMonth",
@@ -986,20 +1018,61 @@ export default function Pipeline() {
                 <button
                   key={k}
                   onClick={() => update(k, "")}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-[10px] text-slate-600"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600"
                 >
                   {v === "pending" ? "Sin fecha objetivo" : v}
                   <X className="h-3 w-3" />
                 </button>
               ))}
               <button
-                className="text-[10px] font-medium text-primary"
+                className="text-xs font-medium text-primary"
                 onClick={clearFilters}
               >
                 Limpiar filtros
               </button>
             </div>
           )}
+        </div>
+      )}
+      {tab === "Oportunidades" && (
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { scope: "", label: "Todas" },
+            ...scopes.map((scope) => ({
+              scope,
+              label:
+                scope === "Cerrada / confirmada"
+                  ? "Confirmadas"
+                  : scope === "Descartada"
+                    ? "Descartadas"
+                    : scope,
+            })),
+          ].map(({ scope, label }) => (
+            <button
+              key={scope}
+              onClick={() => update("scope", scope)}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium",
+                (filter.scope ?? "") === scope
+                  ? "border-primary/30 bg-primary/5 text-primary"
+                  : "border-border bg-card text-slate-600 hover:bg-slate-50",
+              )}
+            >
+              <span>{label}</span>
+              <span className="rounded bg-slate-100 px-1.5 tabular-nums text-slate-700">
+                {scopeSummary.isLoading
+                  ? "…"
+                  : scope
+                    ? (scopeSummary.data?.scopeCounts?.[scope] ?? 0)
+                    : Object.values(
+                        scopeSummary.data?.scopeCounts ?? {},
+                      ).reduce(
+                        (total: number, n: unknown) => total + Number(n),
+                        0,
+                      )}
+              </span>
+            </button>
+          ))}
         </div>
       )}
       {currentError && (
@@ -1013,7 +1086,7 @@ export default function Pipeline() {
           </div>
           <Button
             variant="outline"
-            className="h-8 text-xs"
+            className="h-8 text-sm"
             onClick={() =>
               void queryClient.invalidateQueries({ queryKey: [base] })
             }
@@ -1025,7 +1098,7 @@ export default function Pipeline() {
       {success && (
         <p
           role="status"
-          className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-800"
+          className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-800"
         >
           <Check className="h-4 w-4" />
           {success}
@@ -1080,123 +1153,137 @@ export default function Pipeline() {
               onClick={() => navigate("Alertas")}
             />
           </div>
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)]">
+          <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,1fr)]">
             <Panel
-              title="Distribución por etapa"
-              description="El valor conocido y su cobertura dentro de cada etapa."
-              action={
-                <span className="text-[10px] text-muted-foreground">
-                  Pipeline abierto
-                </span>
-              }
+              title="Pipeline por etapa"
+              description="Cartera abierta, importes USD y cobertura de evidencia."
             >
-              <div className="px-5 py-2">
-                {(data.stages ?? [])
-                  .filter((s: any) => s.stage !== "Confirmada")
-                  .map((s: any) => (
-                    <button
-                      className="grid w-full grid-cols-[minmax(120px,1fr)_42px_minmax(90px,1fr)] items-center gap-3 border-b border-slate-100 py-4 text-left last:border-0 sm:grid-cols-[minmax(140px,1fr)_minmax(60px,1fr)_38px_120px]"
-                      key={s.stage}
-                      onClick={() => {
-                        update("stage", s.stage);
-                        navigate("Oportunidades");
-                      }}
-                    >
-                      <span className="text-xs font-medium">{s.stage}</span>
-                      <div className="hidden h-2 overflow-hidden rounded-full bg-slate-100 sm:block">
-                        <div
-                          className={cn(
-                            "h-full rounded-full",
-                            stageColors[s.stage],
-                          )}
-                          style={{
-                            width: `${data.open ? (s.open / data.open) * 100 : 0}%`,
-                          }}
-                        />
-                      </div>
-                      <span className="text-center text-sm font-semibold tabular-nums">
-                        {s.open}
-                      </span>
-                      <span className="text-right">
-                        <span className="block text-xs font-medium tabular-nums">
-                          {money(s.gross)}
-                        </span>
-                        <span className="mt-1 block text-[10px] text-muted-foreground">
-                          USD · {s.valueCoverage}/{s.open} con valor
-                        </span>
-                        <span className="mt-1 block text-[10px] text-slate-400">
-                          Pond. {money(s.weighted)} · {s.weightedCoverage}/
-                          {s.open}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-5 py-3 font-medium">
+                        Etapa / abiertas
+                      </th>
+                      <th className="px-4 py-3 font-medium">Bruto USD</th>
+                      <th className="px-4 py-3 font-medium">Ponderado USD</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(data.stages ?? [])
+                      .filter(
+                        (stage: any) =>
+                          stage.stage !== "Confirmada" &&
+                          (stage.open > 0 ||
+                            stage.stage !== "Sin etapa verificada"),
+                      )
+                      .map((stage: any) => (
+                        <tr key={stage.stage}>
+                          <td className="px-5 py-3">
+                            <button
+                              className="flex items-center gap-2 text-left font-medium hover:text-primary"
+                              onClick={() => {
+                                update("stage", stage.stage);
+                                navigate("Oportunidades");
+                              }}
+                            >
+                              <span
+                                className={cn(
+                                  "h-2 w-2 shrink-0 rounded-full",
+                                  stageColors[stage.stage],
+                                )}
+                              />
+                              {stage.stage}
+                              <span className="rounded bg-slate-100 px-2 py-0.5 tabular-nums">
+                                {stage.open}
+                              </span>
+                            </button>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-semibold tabular-nums">
+                              {money(stage.gross)}
+                            </span>
+                            <span className="mt-1 block text-xs text-muted-foreground">
+                              {stage.valueCoverage}/{stage.open} con valor
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-medium tabular-nums">
+                              {money(stage.weighted)}
+                            </span>
+                            <span className="mt-1 block text-xs text-muted-foreground">
+                              {stage.weightedCoverage}/{stage.open} respaldadas
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
               </div>
               {!data.open && (
-                <p className="border-t border-border/60 bg-slate-50/50 px-5 py-3 text-xs text-muted-foreground">
+                <p className="border-t bg-slate-50/50 px-5 py-3 text-sm text-muted-foreground">
                   Las etapas se completan al incorporar oportunidades vigentes.
                 </p>
               )}
             </Panel>
-            <div className="flex flex-col gap-4">
-              <section className="relative overflow-hidden rounded-2xl bg-slate-900 p-6 text-white">
-                <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full border-[24px] border-white/[0.035]" />
-                <div className="relative">
-                  <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[.16em] text-slate-400">
-                    <Building2 className="h-3.5 w-3.5" />
-                    Concentración Warner
-                  </p>
-                  <div className="mt-5 flex items-end gap-3">
-                    <strong className="text-4xl font-semibold tracking-tight tabular-nums">
-                      {pct(data.warner.countPct)}
-                    </strong>
-                    <span className="pb-1 text-xs text-slate-400">
-                      de las abiertas
-                    </span>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-400">
-                    {data.warner.open} de {data.open} oportunidades · umbral{" "}
-                    {data.warner.threshold}%
-                  </p>
-                  <div className="mt-6 flex justify-between border-t border-white/10 pt-4 text-xs">
-                    <span className="text-slate-400">
-                      Participación en valor
-                    </span>
-                    <span>{pct(data.warner.valuePct)}</span>
-                  </div>
-                  <button
-                    onClick={() => navigate("Concentración")}
-                    className="mt-5 inline-flex items-center gap-2 text-xs font-medium text-white"
-                  >
-                    Analizar exposición
-                    <ArrowUpRight className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </section>
-              <Panel>
-                <div className="flex gap-3 p-5">
-                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" />
+            <Panel
+              title="Exposición a Warner"
+              description={
+                hasPermission("finance")
+                  ? "Referencia de facturación, separada de la cartera abierta."
+                  : "Participación en la cartera abierta."
+              }
+            >
+              <div className="flex h-full flex-col gap-4 p-5">
+                {hasPermission("finance") && (
                   <div>
-                    <h3 className="text-xs font-semibold">
-                      Una lectura con contexto
-                    </h3>
-                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                      {data.open
-                        ? `${data.open - data.valueCoverage} oportunidades todavía no tienen un valor USD respaldado. El ponderado utiliza solo probabilidades justificadas.`
-                        : "Los importes sin evidencia se muestran pendientes. No se asignan probabilidades automáticas por etapa."}
+                    <p className="text-sm font-medium text-slate-600">
+                      Facturación histórica informada
+                    </p>
+                    <p className="mt-1 text-4xl font-semibold tracking-tight text-slate-900">
+                      ≈80%
+                    </p>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                      Referencia del 28/10/2026. La participación en facturación
+                      mensual sigue pendiente de conciliación.
                     </p>
                   </div>
-                </div>
-              </Panel>
-            </div>
+                )}
+                <dl className="space-y-2 border-t border-slate-100 pt-3 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">Pipeline abierto</dt>
+                    <dd className="text-right font-medium">
+                      {data.warner.open} de {data.open} oportunidades
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">
+                      Participación en valor
+                    </dt>
+                    <dd className="font-medium">{pct(data.warner.valuePct)}</dd>
+                  </div>
+                </dl>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  La cantidad de oportunidades no mide la dependencia económica.
+                  Cobertura de valor: {data.valueCoverage}/{data.open}.
+                </p>
+                <button
+                  className="mt-auto inline-flex items-center gap-2 self-start text-sm font-medium text-primary"
+                  onClick={() => navigate("Concentración")}
+                >
+                  Ver concentración
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </Panel>
           </div>
           <Panel
-            title="Última evidencia comercial"
-            description="Las oportunidades más recientes de la selección."
+            title="Oportunidades en seguimiento"
+            description="Pipeline abierto, ordenado por la última evidencia comercial."
             action={
               <Button
                 variant="ghost"
-                className="h-7 gap-1 text-xs"
+                className="h-7 gap-1 text-sm"
                 onClick={() => navigate("Oportunidades")}
               >
                 Ver cartera
@@ -1244,45 +1331,47 @@ export default function Pipeline() {
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold">
-                Prioridades de seguimiento
-              </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Una oportunidad puede tener más de un pendiente.
+              <h2 className="text-lg font-semibold">Alertas de seguimiento</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Datos que faltan para avanzar. Una oportunidad puede tener
+                varias alertas.
               </p>
             </div>
-            <Button
-              variant={
-                filter.scope === "Validación CRM" ? "secondary" : "outline"
-              }
-              className="h-8 text-xs"
-              onClick={() =>
-                update(
-                  "scope",
-                  filter.scope === "Validación CRM" ? "" : "Validación CRM",
-                )
-              }
-            >
-              Revisión del CRM
-              {filter.scope === "Validación CRM" && (
-                <Check className="ml-2 h-3 w-3" />
-              )}
-            </Button>
+            <div className="flex gap-2">
+              {["Pipeline", "Validación CRM"].map((scope) => (
+                <Button
+                  key={scope}
+                  variant={alertScope === scope ? "secondary" : "outline"}
+                  className="h-9 text-sm"
+                  onClick={() => {
+                    update("scope", scope);
+                    update("alert", "");
+                  }}
+                >
+                  {scope}
+                </Button>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {alertTypes.map((a) => (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {alertTypes.map((alert) => (
               <button
-                key={a}
-                onClick={() => update("alert", filter.alert === a ? "" : a)}
+                key={alert}
+                onClick={() =>
+                  update("alert", filter.alert === alert ? "" : alert)
+                }
                 className={cn(
-                  "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] transition-colors",
-                  filter.alert === a
-                    ? "border-amber-300 bg-amber-50 text-amber-900"
-                    : "border-border bg-card text-muted-foreground hover:border-amber-200",
+                  "rounded-xl border bg-card p-4 text-left shadow-sm transition-colors",
+                  filter.alert === alert
+                    ? "border-amber-400 bg-amber-50/60"
+                    : "border-border hover:border-amber-200",
                 )}
               >
-                <AlertCircle className="h-3.5 w-3.5" />
-                {a}
+                <AlertCircle className="mb-2 h-4 w-4 text-amber-600" />
+                <strong className="block text-3xl font-semibold tabular-nums">
+                  {summary.isLoading ? "…" : (data?.alertCounts?.[alert] ?? 0)}
+                </strong>
+                <span className="mt-2 block text-sm font-medium">{alert}</span>
               </button>
             ))}
           </div>
@@ -1290,65 +1379,47 @@ export default function Pipeline() {
       )}
       {tab === "Concentración" && data && (
         <>
-          <div className="grid gap-4 lg:grid-cols-2">
-            {[
-              {
-                title: "Participación por cantidad",
-                value: data.warner.countPct,
-                caption: `${data.warner.open} de ${data.open} oportunidades abiertas`,
-                note: "Warner dentro de la cartera abierta.",
-                partial: false,
-              },
-              {
-                title: "Participación por valor",
-                value: data.warner.valuePct,
-                caption: `USD ${money(data.warner.gross)} de USD ${money(data.gross)}`,
-                note: `Cobertura Warner: ${data.warner.valueCoverage}/${data.warner.open}. ${data.warner.partial ? "La participación total sigue pendiente." : "Base completa."}`,
-                partial: data.warner.partial,
-              },
-            ].map((c) => (
-              <Panel key={c.title} title={c.title}>
-                <div className="p-6">
-                  <div className="flex items-end justify-between gap-3">
-                    <strong className="text-4xl font-semibold tracking-tight tabular-nums">
-                      {pct(c.value)}
-                    </strong>
-                    <span className="text-xs text-muted-foreground">
-                      Umbral {data.warner.threshold}%
-                    </span>
-                  </div>
-                  <div className="relative my-5 h-3 rounded-full bg-slate-100">
-                    <div
-                      className={cn(
-                        "h-full rounded-full",
-                        c.value >= data.warner.threshold
-                          ? "bg-amber-500"
-                          : "bg-slate-700",
-                      )}
-                      style={{ width: `${Math.min(100, c.value ?? 0)}%` }}
-                    />
-                    <div
-                      className="absolute -top-1 h-5 w-px bg-slate-400"
-                      style={{ left: `${data.warner.threshold}%` }}
-                    />
-                  </div>
-                  <p className="text-sm font-medium">{c.caption}</p>
-                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                    {c.note}
-                  </p>
-                  {c.value !== null && c.value >= data.warner.threshold && (
-                    <Badge
-                      className="mt-3 border-amber-200 bg-amber-50 text-amber-800"
-                      variant="outline"
-                    >
-                      {c.partial
-                        ? "Señal parcial de concentración"
-                        : "Concentración sobre el umbral"}
-                    </Badge>
-                  )}
-                </div>
-              </Panel>
-            ))}
+          <div
+            className={cn(
+              "grid gap-4",
+              hasPermission("finance") ? "lg:grid-cols-3" : "lg:grid-cols-2",
+            )}
+          >
+            {hasPermission("finance") && (
+              <Metric
+                title="Facturación histórica informada"
+                value="≈80%"
+                icon={Building2}
+                subtitle="Referencia del 28/10/2026 · conciliación mensual pendiente"
+              />
+            )}
+            <Metric
+              title="Warner / bruto cuantificado"
+              value={pct(data.warner.valuePct)}
+              icon={TrendingUp}
+              subtitle={`USD ${money(data.warner.gross)} de USD ${money(data.gross)} · cobertura ${data.valueCoverage}/${data.open}`}
+            />
+            <Metric
+              title="Warner / oportunidades abiertas"
+              value={`${data.warner.open} de ${data.open}`}
+              icon={Users}
+              subtitle={`${data.warner.outside.open} oportunidades fuera de Warner. No mide facturación.`}
+            />
+          </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 text-sm leading-relaxed">
+            <p className="font-medium">Lectura de concentración</p>
+            <p className="mt-1 text-muted-foreground">
+              Umbral operativo: {data.warner.threshold}%.{" "}
+              {data.warner.valuePct === null
+                ? "Faltan valores para medir la concentración del pipeline."
+                : data.warner.partial
+                  ? "La participación describe solo el bruto cuantificado; la concentración total sigue pendiente."
+                  : data.warner.signal
+                    ? "El bruto cuantificado alcanza el umbral operativo."
+                    : "El bruto cuantificado está por debajo del umbral."}{" "}
+              La referencia de facturación histórica y la cantidad de
+              oportunidades representan bases diferentes.
+            </p>
           </div>
           <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
             <Panel title="Cartera fuera de Warner">
@@ -1357,7 +1428,7 @@ export default function Pipeline() {
                   <p className="text-2xl font-semibold tabular-nums">
                     {data.warner.outside.open}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     oportunidades abiertas
                   </p>
                 </div>
@@ -1365,7 +1436,7 @@ export default function Pipeline() {
                   <p className="text-2xl font-semibold tabular-nums">
                     {money(data.warner.outside.gross)}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     USD · {data.warner.outside.valueCoverage}/
                     {data.warner.outside.open} con valor
                   </p>
@@ -1382,20 +1453,20 @@ export default function Pipeline() {
                     type="month"
                     value={effectivePeriod}
                     disabled={!!snapshot}
-                    className="h-8 w-36 text-xs"
+                    className="h-8 w-36 text-sm"
                     onChange={(e) =>
                       e.target.value && setPeriod(e.target.value)
                     }
                   />
                 }
               >
-                <div className="px-5 py-4">
+                <div className="px-5 py-3">
                   {billing.isLoading ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                       Conciliando ingresos reales…
                     </p>
                   ) : billing.error ? (
-                    <p className="text-xs text-red-700">
+                    <p className="text-sm text-red-700">
                       No pudimos consultar la facturación. Reintentá actualizar.
                     </p>
                   ) : (
@@ -1405,7 +1476,7 @@ export default function Pipeline() {
                           <p className="text-2xl font-semibold tabular-nums">
                             {pct(billing.data?.warnerSharePct)}
                           </p>
-                          <p className="mt-1 text-[10px] text-muted-foreground">
+                          <p className="mt-1 text-xs text-muted-foreground">
                             Participación Warner · {effectivePeriod}
                           </p>
                         </div>
@@ -1422,17 +1493,17 @@ export default function Pipeline() {
                             : "Pendiente de conciliación"}
                         </Badge>
                       </div>
-                      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                         {billing.data?.reason}
                       </p>
                       {billing.data?.state === "verified" && (
-                        <p className="mt-2 text-xs">
+                        <p className="mt-2 text-sm">
                           Warner: USD {money(billing.data.warnerUsd)} / total
                           USD {money(billing.data.totalUsd)} ·{" "}
                           {billing.data.eventCount} hechos reales
                         </p>
                       )}
-                      <p className="mt-3 border-t pt-3 text-[10px] leading-relaxed text-slate-400">
+                      <p className="mt-3 border-t pt-3 text-xs leading-relaxed text-slate-400">
                         Referencia histórica: ≈80% informado el 28/10/2026. No
                         equivale a facturación mensual verificada.
                         {snapshot
@@ -1447,7 +1518,7 @@ export default function Pipeline() {
           </div>
           {isAdmin && !snapshot && (
             <details className="rounded-xl border bg-card">
-              <summary className="cursor-pointer px-5 py-4 text-xs font-medium text-muted-foreground">
+              <summary className="cursor-pointer px-5 py-4 text-sm font-medium text-muted-foreground">
                 Configurar umbral operativo
               </summary>
               <form
@@ -1464,7 +1535,7 @@ export default function Pipeline() {
                     .catch(() => {});
                 }}
               >
-                <label className="text-xs">
+                <label className="text-sm">
                   Umbral (%)
                   <Input
                     className="mt-2 h-9 w-28"
@@ -1476,7 +1547,7 @@ export default function Pipeline() {
                     required
                   />
                 </label>
-                <label className="min-w-[220px] flex-1 text-xs">
+                <label className="min-w-[220px] flex-1 text-sm">
                   Motivo del cambio
                   <Input
                     className="mt-2 h-9"
@@ -1486,7 +1557,7 @@ export default function Pipeline() {
                   />
                 </label>
                 <Button
-                  className="h-9 text-xs"
+                  className="h-9 text-sm"
                   disabled={busy || !settings.data}
                 >
                   Guardar umbral
@@ -1507,12 +1578,12 @@ export default function Pipeline() {
                     ? "Oportunidades para revisar"
                     : "Cartera comercial"}
               </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {navigation.find((n) => n.label === tab)?.description}
               </p>
             </div>
             {tab === "Oportunidades" && data && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 {data.open} abiertas ·{" "}
                 <span className="font-medium text-foreground">
                   USD {money(data.gross)}
@@ -1521,32 +1592,51 @@ export default function Pipeline() {
               </p>
             )}
           </div>
-          {rows.data?.groups?.length > 0 && (
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {rows.data.groups.map((g: any) => (
-                <div
-                  className="rounded-xl border bg-card px-4 py-3"
-                  key={g.name}
-                >
-                  <p className="truncate text-xs font-medium">{g.name}</p>
-                  <p className="mt-2 text-sm font-semibold">
-                    USD {money(g.gross)}
-                  </p>
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    {g.open} abiertas · cobertura {g.valueCoverage}/{g.open}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
           <Panel>
             {rows.isLoading || visibleRows.length ? (
               <>
-                <OpportunityTable
-                  rows={visibleRows}
-                  loading={rows.isLoading}
-                  onOpen={openOpportunity}
-                />
+                {tab === "Oportunidades" && filter.group && !rows.isLoading ? (
+                  Object.entries(
+                    Object.groupBy(visibleRows, (r: any) =>
+                      filter.group === "closeMonth"
+                        ? (r.closeDate?.slice(0, 7) ?? "Sin fecha de cierre")
+                        : (r[filter.group] ?? "Sin responsable"),
+                    ),
+                  ).map(([name, items]) => {
+                    const aggregate = rows.data?.groups?.find(
+                      (g: any) => g.name === name,
+                    );
+                    return (
+                      <section key={name}>
+                        <div className="border-y border-slate-200 bg-slate-50 px-5 py-3">
+                          <h3 className="text-base font-semibold">
+                            {name}
+                            <span className="ml-2 text-sm font-normal text-muted-foreground">
+                              {items?.length} en esta página
+                            </span>
+                          </h3>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            Grupo completo · bruto USD {money(aggregate?.gross)}{" "}
+                            · ponderado USD {money(aggregate?.weighted)} ·
+                            cobertura {aggregate?.valueCoverage ?? 0}/
+                            {aggregate?.open ?? 0}
+                          </p>
+                        </div>
+                        <OpportunityTable
+                          rows={items ?? []}
+                          loading={false}
+                          onOpen={openOpportunity}
+                        />
+                      </section>
+                    );
+                  })
+                ) : (
+                  <OpportunityTable
+                    rows={visibleRows}
+                    loading={rows.isLoading}
+                    onOpen={openOpportunity}
+                  />
+                )}
                 {pagination}
               </>
             ) : (
@@ -1593,7 +1683,7 @@ export default function Pipeline() {
               <h2 className="text-base font-semibold">
                 Un corte, una conversación clara
               </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Guardá la cartera completa. El resumen respeta la selección que
                 estás consultando.
               </p>
@@ -1604,7 +1694,7 @@ export default function Pipeline() {
               <Input
                 aria-label="Período del corte"
                 type="month"
-                className="h-8 w-36 border-0 bg-transparent p-0 text-xs shadow-none"
+                className="h-8 w-36 border-0 bg-transparent p-0 text-sm shadow-none"
                 value={effectivePeriod}
                 disabled={!!snapshot}
                 onChange={(e) => {
@@ -1621,7 +1711,7 @@ export default function Pipeline() {
               <Panel
                 title={snapshot ? "Checklist del corte" : "Preparar el cierre"}
                 action={
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     {snapshot ? "Guardado" : `${completed}/4 completados`}
                   </span>
                 }
@@ -1658,12 +1748,12 @@ export default function Pipeline() {
                           }}
                         />
                         <span>
-                          <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                          <span className="block text-xs font-medium uppercase tracking-wider text-slate-400">
                             Paso {i + 1}
                           </span>
                           <span
                             className={cn(
-                              "mt-1 block text-xs",
+                              "mt-1 block text-sm",
                               checked ? "text-muted-foreground" : "font-medium",
                             )}
                           >
@@ -1692,7 +1782,7 @@ export default function Pipeline() {
                       {canReadQuotes && (
                         <Button
                           variant="outline"
-                          className="h-9 text-xs"
+                          className="h-9 text-sm"
                           disabled={busy || !decision.trim()}
                           onClick={() =>
                             void mutate("/decisions", "POST", {
@@ -1710,7 +1800,7 @@ export default function Pipeline() {
                         </Button>
                       )}
                       <Button
-                        className="h-9 gap-2 text-xs"
+                        className="h-9 gap-2 text-sm"
                         disabled={busy || !decision.trim()}
                         onClick={() =>
                           void mutate("/cuts", "POST", {
@@ -1744,7 +1834,7 @@ export default function Pipeline() {
                 description="Cada versión conserva su propia cartera."
               >
                 {cuts.isLoading ? (
-                  <p className="p-5 text-xs text-muted-foreground">
+                  <p className="p-5 text-sm text-muted-foreground">
                     Cargando cortes…
                   </p>
                 ) : cuts.data?.length ? (
@@ -1759,13 +1849,13 @@ export default function Pipeline() {
                         )}
                       >
                         <span>
-                          <span className="text-xs font-semibold">
+                          <span className="text-sm font-semibold">
                             {c.period}{" "}
                             <span className="ml-2 font-normal text-muted-foreground">
                               v{c.version}
                             </span>
                           </span>
-                          <span className="mt-1 block text-[10px] text-muted-foreground">
+                          <span className="mt-1 block text-xs text-muted-foreground">
                             {dateTime(c.created_at)}
                           </span>
                         </span>
@@ -1774,7 +1864,7 @@ export default function Pipeline() {
                     ))}
                   </div>
                 ) : (
-                  <p className="px-5 py-6 text-xs leading-relaxed text-muted-foreground">
+                  <p className="px-5 py-6 text-sm leading-relaxed text-muted-foreground">
                     Todavía no hay cortes guardados. El primero será la base de
                     las próximas comparaciones.
                   </p>
@@ -1790,7 +1880,7 @@ export default function Pipeline() {
                 <textarea
                   aria-label="Resumen para Fede"
                   readOnly
-                  className="min-h-[440px] w-full resize-y rounded-lg border border-slate-200 bg-slate-50/60 p-4 text-[13px] leading-7 text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="min-h-[440px] w-full resize-y rounded-lg border border-slate-200 bg-slate-50/60 p-4 text-sm leading-7 text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   value={
                     text.isLoading
                       ? "Preparando resumen…"
@@ -1799,7 +1889,7 @@ export default function Pipeline() {
                 />
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <Button
-                    className="h-9 gap-2 text-xs"
+                    className="h-9 gap-2 text-sm"
                     disabled={!text.data?.text}
                     onClick={() =>
                       navigator.clipboard
@@ -1820,7 +1910,7 @@ export default function Pipeline() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="h-9 gap-2 text-xs"
+                    className="h-9 gap-2 text-sm"
                     disabled={!text.data?.text}
                     onClick={() => {
                       const url = URL.createObjectURL(
@@ -1839,7 +1929,7 @@ export default function Pipeline() {
                     Descargar TXT
                   </Button>
                 </div>
-                <p className="mt-3 text-[10px] text-muted-foreground">
+                <p className="mt-3 text-xs text-muted-foreground">
                   El resumen no se envía automáticamente a ningún canal.
                 </p>
               </div>
@@ -1886,44 +1976,44 @@ export default function Pipeline() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-xs">
+                        <p className="text-sm">
                           <span className="font-semibold">
                             {r.actor || `Usuario ${r.actor_id}`}
                           </span>
-                          <span className="ml-2 rounded-md bg-slate-100 px-2 py-0.5 text-[10px] capitalize text-slate-600">
+                          <span className="ml-2 rounded-md bg-slate-100 px-2 py-0.5 text-xs capitalize text-slate-600">
                             {r.kind}
                           </span>
                         </p>
-                        <time className="text-[10px] text-muted-foreground">
+                        <time className="text-xs text-muted-foreground">
                           {dateTime(r.created_at)}
                         </time>
                       </div>
                       <p className="mt-2 text-sm leading-relaxed">{r.reason}</p>
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {r.period && (
-                          <span className="text-[10px] text-muted-foreground">
+                          <span className="text-xs text-muted-foreground">
                             Período {r.period}
                           </span>
                         )}
                         {changes.slice(0, 8).map((k) => (
                           <span
                             key={k}
-                            className="rounded border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-500"
+                            className="rounded border border-slate-200 px-1.5 py-0.5 text-xs text-slate-500"
                           >
                             {fieldLabels[k] ?? k}
                           </span>
                         ))}
                         {changes.length > 8 && (
-                          <span className="text-[10px] text-muted-foreground">
+                          <span className="text-xs text-muted-foreground">
                             +{changes.length - 8} campos
                           </span>
                         )}
                       </div>
                       <details className="mt-3">
-                        <summary className="cursor-pointer text-[10px] text-muted-foreground">
+                        <summary className="cursor-pointer text-xs text-muted-foreground">
                           Ver detalle del cambio
                         </summary>
-                        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-[10px] leading-relaxed text-slate-600">
+                        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
                           {JSON.stringify(r.changes, null, 2)}
                         </pre>
                       </details>
@@ -1936,7 +2026,7 @@ export default function Pipeline() {
           <div className="flex justify-end gap-2 border-t px-5 py-3">
             <Button
               variant="outline"
-              className="h-8 text-xs"
+              className="h-8 text-sm"
               disabled={!logOffset}
               onClick={() => setLogOffset((v) => Math.max(0, v - 100))}
             >
@@ -1944,7 +2034,7 @@ export default function Pipeline() {
             </Button>
             <Button
               variant="outline"
-              className="h-8 text-xs"
+              className="h-8 text-sm"
               disabled={(log.data?.length ?? 0) < 100}
               onClick={() => setLogOffset((v) => v + 100)}
             >

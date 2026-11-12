@@ -2,6 +2,9 @@
 
 ## 1.14.41 — 2026-11-12
 
+- Prioriza indicadores y contenido comercial desde el inicio, compacta el contexto del corte y mejora tamaños de lectura. Agrega conteos por alcance y alerta, manteniendo la estética de Mind.
+- Distingue exposición histórica informada a Warner, participación financiera mensual pendiente y proporción de oportunidades abiertas, sin presentar esta última como exposición económica.
+
 - El resumen comercial muestra la hora del corte en formato de 24 horas de Buenos Aires, sin depender del ciclo horario regional del servidor. Conserva datos y cortes existentes; regresión de fecha UTC a hora local.
 
 ## 1.14.40 — 2026-11-12

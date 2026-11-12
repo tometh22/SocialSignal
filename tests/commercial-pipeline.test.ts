@@ -170,6 +170,12 @@ describe("Pipeline comercial: reglas canónicas", () => {
       visibleRows(rows, { permissions: ["crm", "quotations"] }),
     ).toHaveLength(2);
   });
+  it("devuelve conteos de alcance y alertas independientes de paginación", () => {
+    const summary = summarize([row(), row({scope:"Validación CRM"}), row({scope:"Cerrada / confirmada",status:"Confirmada"})],"2026-11-11");
+    expect(summary.scopeCounts).toEqual({Pipeline:1,"Validación CRM":1,"Cerrada / confirmada":1,Descartada:0});
+    expect(summary.alertCounts["Sin fecha objetivo"]).toBe(3);
+    expect(summary.open).toBe(1);
+  });
   it("resumen muestra pendientes y cobertura", () => {
     const text = executiveSummary([row()], "2026-11", "2026-11-12T00:22:51Z");
     expect(text).toContain("Bruto: Pendiente (0/1)");

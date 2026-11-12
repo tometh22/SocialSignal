@@ -16,3 +16,7 @@ export function visibleRows(rows: Opportunity[], user: any) {
           !r.sources.some((s) => s.kind === "quotation"),
       );
 }
+
+export function canSeeFinance(user: any): boolean {
+  return user?.isAdmin === true || user?.role === "admin" || user?.permissions?.includes("finance") === true;
+}

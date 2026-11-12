@@ -12,6 +12,7 @@ export function TrainingInvitation() {
   const dismiss = useDismissTrainingInvitation();
   if (
     location.startsWith("/training") ||
+    location === "/crm/pipeline" ||
     !catalog.data ||
     catalog.isError ||
     catalog.data.invitationDismissed
