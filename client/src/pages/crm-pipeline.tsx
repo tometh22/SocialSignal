@@ -19,15 +19,31 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { OpportunityEditor } from "@/components/pipeline/opportunity-editor";
+import { OpportunityList } from "@/components/pipeline/opportunity-list";
+import { MonthPicker, monthLabel } from "@/components/pipeline/month-picker";
+import { SummaryPreview } from "@/components/pipeline/summary-preview";
 import {
-  OpportunityEditor,
+  ChangeList,
+  describeChanges,
+  fieldLabels,
+} from "@/components/pipeline/change-list";
+import {
+  Amount,
+  BigValue,
+  cardBase,
+  dateTime,
+  isPending,
+  money,
+  pct,
+  pendingText,
   stageColors,
-} from "@/components/pipeline/opportunity-editor";
+  tableHead,
+} from "@/components/pipeline/ui";
 import {
   opportunitySchema,
   stages,
   scopes,
-  metrics,
   localDay,
   type Opportunity,
 } from "@shared/pipeline";
@@ -36,11 +52,9 @@ import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
   ArrowRight,
-  ArrowUpRight,
   AlertCircle,
   Bell,
   Building2,
-  CalendarDays,
   Check,
   CheckCheck,
   ChevronDown,
@@ -107,79 +121,6 @@ const alertTypes = [
   "Evidencia desactualizada",
   "Sin fecha objetivo",
 ];
-const fieldLabels: Record<string, string> = {
-  account: "Cuenta",
-  project: "Proyecto",
-  stage: "Etapa",
-  status: "Estado",
-  scope: "Alcance",
-  usd: "Valor USD",
-  probability: "Probabilidad",
-  probabilityReason: "Motivo de probabilidad",
-  probabilitySource: "Fuente de probabilidad",
-  closeDate: "Fecha objetivo",
-  next: "Próximo paso",
-  nextDate: "Fecha próximo paso",
-  owner: "Responsable",
-  ownerId: "Responsable",
-  contact: "Contacto",
-  evidence: "Evidencia",
-  evidenceDate: "Fecha de evidencia",
-  sources: "Fuentes",
-  notes: "Notas",
-  confidence: "Confianza",
-  warner: "Grupo Warner",
-  eligible: "Vigencia",
-  valueNote: "Fundamento del importe",
-};
-const money = (value: unknown) =>
-  value === null || value === undefined
-    ? "Pendiente"
-    : new Intl.NumberFormat("es-AR", {
-        maximumFractionDigits: 2,
-        minimumFractionDigits: Number(value) % 1 ? 2 : 0,
-      }).format(Number(value));
-const pct = (value: unknown) =>
-  value === null || value === undefined
-    ? "Pendiente"
-    : `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(Number(value))}%`;
-const civilDate = (value?: string | null) =>
-  value
-    ? new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString("es-AR", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : "Pendiente";
-const dateTime = (value: string) =>
-  new Date(value).toLocaleString("es-AR", {
-    timeZone: "America/Argentina/Buenos_Aires",
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-// Escala tipográfica compartida por todas las vistas del módulo.
-const tableHead =
-  "bg-slate-50/80 text-xs font-medium uppercase tracking-wider text-slate-500";
-const cardBase = "rounded-2xl border border-slate-200/80 bg-card shadow-sm";
-const isPending = (value: unknown) => value === null || value === undefined;
-/** Muestra un importe o un "Pendiente" atenuado, para que el dato faltante no compita con los reales. */
-function Amount({
-  value,
-  format = money,
-  className,
-}: {
-  value: unknown;
-  format?: (v: unknown) => string;
-  className?: string;
-}) {
-  return isPending(value) ? (
-    <span className="font-normal text-slate-400">Pendiente</span>
-  ) : (
-    <span className={cn("tabular-nums", className)}>{format(value)}</span>
-  );
-}
 function SectionHeading({
   title,
   description,
@@ -304,7 +245,6 @@ function Metric({
   highlight?: boolean;
   onClick?: () => void;
 }) {
-  const pending = isPending(value) || value === "Pendiente";
   return (
     <div
       className={cn(
@@ -326,22 +266,9 @@ function Metric({
           )}
         />
       </div>
-      <p className="mt-2 flex h-9 items-baseline gap-1.5">
-        {pending ? (
-          <span className="text-xl font-medium text-slate-400">Pendiente</span>
-        ) : (
-          <>
-            <span className="text-3xl font-semibold tracking-tight tabular-nums">
-              {value}
-            </span>
-            {unit && (
-              <span className="text-sm font-medium text-muted-foreground">
-                {unit}
-              </span>
-            )}
-          </>
-        )}
-      </p>
+      <div className="mt-2">
+        <BigValue value={value} unit={unit} />
+      </div>
       <div className="mt-auto pt-4">
         {coverage ? (
           <Coverage {...coverage} />
@@ -434,231 +361,88 @@ function Picker({
     </Popover>
   );
 }
-function StageBadge({ stage }: { stage: string }) {
+/**
+ * Pestañas del módulo. En pantallas angostas se desplazan horizontalmente:
+ * los bordes se difuminan cuando hay más pestañas y la activa queda visible.
+ */
+function TabBar({
+  tab,
+  alerted,
+  onSelect,
+}: {
+  tab: string;
+  alerted: number;
+  onSelect: (label: string) => void;
+}) {
+  const scroller = useRef<HTMLElement>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const measure = () => {
+    const el = scroller.current;
+    if (!el) return;
+    setEdges({
+      left: el.scrollLeft > 4,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4,
+    });
+  };
+  useEffect(() => {
+    const el = scroller.current;
+    el?.querySelector<HTMLElement>("[aria-current=page]")?.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+    });
+    measure();
+  }, [tab]);
+  useEffect(() => {
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium leading-5 text-slate-700">
+    <div className="relative border-b border-slate-200">
+      <nav
+        ref={scroller}
+        aria-label="Vistas del pipeline"
+        onScroll={measure}
+        className="-mx-1 flex overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {navigation.map(({ label, icon: Icon }) => (
+          <button
+            key={label}
+            onClick={() => onSelect(label)}
+            aria-current={tab === label ? "page" : undefined}
+            className={cn(
+              "relative flex shrink-0 items-center gap-2 whitespace-nowrap px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
+              tab === label
+                ? "text-primary"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+            {label === "Alertas" && alerted > 0 && (
+              <span className="rounded-full bg-amber-100 px-1.5 text-xs font-medium leading-5 tabular-nums text-amber-800">
+                {alerted}
+              </span>
+            )}
+            {tab === label && (
+              <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-primary" />
+            )}
+          </button>
+        ))}
+      </nav>
       <span
+        aria-hidden
         className={cn(
-          "h-1.5 w-1.5 rounded-full",
-          stageColors[stage] ?? "bg-slate-400",
+          "pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent transition-opacity",
+          edges.left ? "opacity-100" : "opacity-0",
         )}
       />
-      {stage}
-    </span>
-  );
-}
-function OpportunityTable({
-  rows,
-  loading,
-  onOpen,
-  compact = false,
-}: {
-  rows: any[];
-  loading: boolean;
-  onOpen: (r: Opportunity) => void;
-  compact?: boolean;
-}) {
-  const cell = "px-2.5 py-3.5 align-top";
-  const head = "whitespace-nowrap px-2.5 py-3 font-medium";
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead className={tableHead}>
-          <tr>
-            <th className={cn(head, "min-w-[200px] pl-5")}>
-              Cuenta y oportunidad
-            </th>
-            <th className={cn(head, "min-w-[140px]")}>Situación</th>
-            <th className={cn(head, "text-right")}>Valor USD</th>
-            {!compact && (
-              <th className={cn(head, "text-right")}>Ponderado USD</th>
-            )}
-            <th className={cn(head, "min-w-[160px]")}>
-              {compact ? "Próximo paso" : "Seguimiento"}
-            </th>
-            {!compact && <th className={head}>Responsable</th>}
-            {!compact && (
-              <th className={cn(head, "hidden min-w-[170px] 2xl:table-cell")}>
-                Fuente
-              </th>
-            )}
-            <th className="w-10 px-2 py-3">
-              <span className="sr-only">Abrir ficha</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {loading
-            ? Array.from({ length: 4 }, (_, i) => (
-                <tr key={i}>
-                  {Array.from({ length: compact ? 5 : 8 }, (_, j) => (
-                    <td className="px-5 py-5" key={j}>
-                      <div className="h-4 animate-pulse rounded bg-slate-100" />
-                    </td>
-                  ))}
-                </tr>
-              ))
-            : rows.map((r) => {
-                const weighted = metrics([r]).weighted;
-                return (
-                  <tr
-                    className="group transition-colors hover:bg-slate-50/80"
-                    key={r.id ?? r.importKey}
-                  >
-                    <td className={cn(cell, "pl-5")}>
-                      <button
-                        onClick={() => onOpen(r)}
-                        className="block max-w-[340px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                      >
-                        <span className="block font-semibold leading-5 text-slate-900 group-hover:text-primary">
-                          {r.account}
-                        </span>
-                        <span className="mt-0.5 block leading-5 text-muted-foreground">
-                          {r.project || "Alcance por definir"}
-                        </span>
-                      </button>
-                      {!compact && (
-                        <span className="mt-1 block text-xs text-slate-400">
-                          {r.contact || "Contacto pendiente"}
-                        </span>
-                      )}
-                    </td>
-                    <td className={cell}>
-                      <StageBadge stage={r.stage} />
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {r.status} · {r.scope}
-                      </p>
-                      {!compact && (
-                        <p className="mt-0.5 text-xs text-slate-400">
-                          Confianza {r.confidence?.toLowerCase()}
-                        </p>
-                      )}
-                    </td>
-                    <td
-                      className={cn(
-                        cell,
-                        "whitespace-nowrap text-right font-medium leading-5",
-                      )}
-                    >
-                      <Amount value={r.usd} />
-                    </td>
-                    {!compact && (
-                      <td
-                        className={cn(
-                          cell,
-                          "whitespace-nowrap text-right leading-5",
-                        )}
-                      >
-                        <Amount value={weighted} className="font-medium" />
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {isPending(r.probability)
-                            ? "Sin probabilidad"
-                            : `Probabilidad ${pct(r.probability)}`}
-                        </p>
-                      </td>
-                    )}
-                    <td className={cn(cell, "max-w-[240px]")}>
-                      <p className="line-clamp-2 leading-5 text-slate-700">
-                        {compact ? (
-                          r.next || (
-                            <span className="text-slate-400">
-                              Definir próximo paso
-                            </span>
-                          )
-                        ) : r.closeDate ? (
-                          civilDate(r.closeDate)
-                        ) : (
-                          <span className="text-slate-400">
-                            Sin fecha objetivo
-                          </span>
-                        )}
-                      </p>
-                      <p className="mt-0.5 whitespace-nowrap text-xs text-muted-foreground">
-                        {compact
-                          ? civilDate(r.nextDate)
-                          : `Evidencia: ${civilDate(r.evidenceDate)}`}
-                      </p>
-                      {r.alerts?.length > 0 && (
-                        <button
-                          onClick={() => onOpen(r)}
-                          className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700"
-                          title={r.alerts.join(" · ")}
-                        >
-                          <AlertCircle className="h-3 w-3" />
-                          {r.alerts.length}{" "}
-                          {r.alerts.length === 1 ? "pendiente" : "pendientes"}
-                        </button>
-                      )}
-                    </td>
-                    {!compact && (
-                      <td className={cell}>
-                        <span className="inline-flex items-center gap-2 whitespace-nowrap leading-5">
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-500">
-                            {r.owner
-                              ? r.owner
-                                  .split(" ")
-                                  .map((s: string) => s[0])
-                                  .slice(0, 2)
-                                  .join("")
-                              : "—"}
-                          </span>
-                          {r.owner || (
-                            <span className="text-slate-400">
-                              Sin responsable
-                            </span>
-                          )}
-                        </span>
-                      </td>
-                    )}
-                    {!compact && (
-                      <td
-                        className={cn(
-                          cell,
-                          "hidden max-w-[220px] 2xl:table-cell",
-                        )}
-                      >
-                        {r.sources?.[0] ? (
-                          <>
-                            <a
-                              className="inline-flex items-start gap-1 font-medium leading-5 text-primary hover:underline"
-                              href={r.sources[0].url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <span className="line-clamp-2">
-                                {r.sources[0].title}
-                              </span>
-                              <ArrowUpRight className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                            </a>
-                            {r.sources.length > 1 && (
-                              <p className="mt-0.5 text-xs text-muted-foreground">
-                                +{r.sources.length - 1} en detalle
-                              </p>
-                            )}
-                          </>
-                        ) : (
-                          <span className="leading-5 text-slate-400">
-                            Pendiente
-                          </span>
-                        )}
-                      </td>
-                    )}
-                    <td className={cn(cell, "px-2 py-2.5")}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-slate-400"
-                        aria-label={`Abrir ${r.account}`}
-                        onClick={() => onOpen(r)}
-                      >
-                        <ArrowUpRight className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-        </tbody>
-      </table>
+      <span
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent transition-opacity",
+          edges.right ? "opacity-100" : "opacity-0",
+        )}
+      />
     </div>
   );
 }
@@ -688,6 +472,7 @@ export default function Pipeline() {
             "closeMonth",
             "group",
             "alert",
+            "sort",
           ].includes(k),
         ),
       ),
@@ -706,7 +491,13 @@ export default function Pipeline() {
   const alertScope =
     filter.scope === "Validación CRM" ? "Validación CRM" : "Pipeline";
   const qs = new URLSearchParams({
-    ...(["Resumen", "Concentración"].includes(tab) ? {} : filter),
+    ...(tab === "Resumen"
+      ? {}
+      : tab === "Concentración"
+        ? filter.sort
+          ? { sort: filter.sort }
+          : {}
+        : filter),
     ...(tab === "Alertas" ? { scope: alertScope } : {}),
     ...(snapshot ? { snapshotId: snapshot } : {}),
   }).toString();
@@ -808,9 +599,14 @@ export default function Pipeline() {
     setError("");
     setEditing(r);
   };
+  // El orden y la agrupación son formas de ver la cartera, no filtros.
+  const viewKeys = ["q", "group", "sort"];
   const filterCount = Object.entries(filter).filter(
-    ([k]) => k !== "q" && k !== "group",
+    ([k]) => !viewKeys.includes(k),
   ).length;
+  const hasFilters = Object.keys(filter).some(
+    (k) => k !== "group" && k !== "sort",
+  );
   const visibleRows = (rows.data?.rows ?? []).filter(
     (r: Opportunity) => tab !== "Concentración" || r.warner,
   );
@@ -833,11 +629,11 @@ export default function Pipeline() {
   const options = (values: readonly string[]) =>
     values.map((value) => ({ value, label: value }));
   const clearFilters = () => {
-    setFilter({});
+    setFilter((f): Record<string, string> => (f.sort ? { sort: f.sort } : {}));
     setOffset(0);
   };
   const activeFilters = Object.entries(filter).filter(
-    ([k]) => k !== "q" && k !== "group",
+    ([k]) => !viewKeys.includes(k),
   );
   const completed = (checklist.data?.steps ?? []).filter(Boolean).length;
   const showList = ["Oportunidades", "Alertas", "Concentración"].includes(tab);
@@ -931,35 +727,11 @@ export default function Pipeline() {
           )}
         </div>
       </header>
-      <nav
-        aria-label="Vistas del pipeline"
-        className="-mx-1 flex overflow-x-auto border-b border-slate-200 px-1"
-      >
-        {navigation.map(({ label, icon: Icon }) => (
-          <button
-            key={label}
-            onClick={() => navigate(label)}
-            aria-current={tab === label ? "page" : undefined}
-            className={cn(
-              "relative flex shrink-0 items-center gap-2 whitespace-nowrap px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
-              tab === label
-                ? "text-primary"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-            {label === "Alertas" && !!data?.alerted && (
-              <span className="rounded-full bg-amber-100 px-1.5 text-xs font-medium leading-5 tabular-nums text-amber-800">
-                {data.alerted}
-              </span>
-            )}
-            {tab === label && (
-              <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-primary" />
-            )}
-          </button>
-        ))}
-      </nav>
+      <TabBar
+        tab={tab}
+        alerted={data?.alerted ?? 0}
+        onSelect={(label) => navigate(label)}
+      />
       {snapshot && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-2.5 text-sm">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-indigo-950">
@@ -1067,20 +839,17 @@ export default function Pipeline() {
                 options={options(scopes)}
                 onChange={(v) => update("scope", v)}
               />
-              <label className="relative">
-                <span className="sr-only">Mes objetivo de cierre</span>
-                <Input
-                  aria-label="Mes objetivo de cierre"
-                  type="month"
-                  className="h-9 w-40 bg-background text-sm"
-                  value={
-                    filter.closeMonth === "pending"
-                      ? ""
-                      : (filter.closeMonth ?? "")
-                  }
-                  onChange={(e) => update("closeMonth", e.target.value)}
-                />
-              </label>
+              <MonthPicker
+                label="Mes objetivo de cierre"
+                placeholder="Mes de cierre"
+                clearable
+                value={
+                  filter.closeMonth === "pending"
+                    ? ""
+                    : (filter.closeMonth ?? "")
+                }
+                onChange={(v) => update("closeMonth", v)}
+              />
               <Button
                 variant={
                   filter.closeMonth === "pending" ? "secondary" : "outline"
@@ -1105,7 +874,11 @@ export default function Pipeline() {
                   onClick={() => update(k, "")}
                   className="inline-flex h-7 items-center gap-1.5 rounded-md bg-slate-100 px-2 text-xs font-medium text-slate-600 hover:bg-slate-200"
                 >
-                  {v === "pending" ? "Sin fecha objetivo" : v}
+                  {v === "pending"
+                    ? "Sin fecha objetivo"
+                    : k === "closeMonth"
+                      ? monthLabel(v)
+                      : v}
                   <X className="h-3 w-3" />
                 </button>
               ))}
@@ -1299,9 +1072,31 @@ export default function Pipeline() {
                               />
                               {stage.stage}
                             </button>
+                            <div
+                              className="ml-4 mt-2 h-1 max-w-[180px] overflow-hidden rounded-full bg-slate-100"
+                              role="img"
+                              aria-label={`${stage.open} de ${data.open} oportunidades abiertas`}
+                            >
+                              <div
+                                className={cn(
+                                  "h-full rounded-full",
+                                  stageColors[stage.stage],
+                                )}
+                                style={{
+                                  width: `${data.open ? (stage.open / data.open) * 100 : 0}%`,
+                                }}
+                              />
+                            </div>
                           </td>
-                          <td className="px-4 py-3.5 text-right align-top font-medium leading-5 tabular-nums">
-                            {stage.open}
+                          <td className="px-4 py-3.5 text-right align-top leading-5">
+                            <span className="font-medium tabular-nums">
+                              {stage.open}
+                            </span>
+                            <span className="mt-0.5 block text-xs tabular-nums text-muted-foreground">
+                              {data.open
+                                ? `${Math.round((stage.open / data.open) * 100)}%`
+                                : "—"}
+                            </span>
                           </td>
                           <td className="whitespace-nowrap px-4 py-3.5 text-right align-top leading-5">
                             <Amount
@@ -1324,6 +1119,34 @@ export default function Pipeline() {
                         </tr>
                       ))}
                   </tbody>
+                  <tfoot className="border-t border-slate-200 bg-slate-50/60">
+                    <tr>
+                      <th
+                        scope="row"
+                        className="px-5 py-3.5 align-top font-semibold leading-5"
+                      >
+                        Total abierto
+                      </th>
+                      <td className="px-4 py-3.5 text-right align-top font-semibold leading-5 tabular-nums">
+                        {data.open}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-right align-top leading-5">
+                        <Amount value={data.gross} className="font-semibold" />
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {data.valueCoverage}/{data.open} con valor
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5 text-right align-top leading-5">
+                        <Amount
+                          value={data.weighted}
+                          className="font-semibold"
+                        />
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {data.weightedCoverage}/{data.open} respaldadas
+                        </span>
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
               {!data.open && (
@@ -1399,7 +1222,7 @@ export default function Pipeline() {
             }
           >
             {rows.isLoading || visibleRows.length ? (
-              <OpportunityTable
+              <OpportunityList
                 rows={visibleRows.slice(0, 5)}
                 loading={rows.isLoading}
                 onOpen={openOpportunity}
@@ -1409,12 +1232,12 @@ export default function Pipeline() {
               <EmptyState
                 title="La cartera está lista para empezar"
                 description={
-                  Object.keys(filter).length
+                  hasFilters
                     ? "No encontramos oportunidades para esta selección. Probá otros filtros."
                     : "Incorporá una oportunidad o conciliá la carga inicial para empezar a seguir el valor y los próximos pasos."
                 }
                 action={
-                  Object.keys(filter).length ? (
+                  hasFilters ? (
                     <Button variant="outline" onClick={clearFilters}>
                       Limpiar filtros
                     </Button>
@@ -1440,7 +1263,17 @@ export default function Pipeline() {
             title="Alertas de seguimiento"
             description="Datos que faltan para avanzar. Una oportunidad puede tener varias alertas."
             action={
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                {filter.alert && (
+                  <Button
+                    variant="ghost"
+                    className="h-9 gap-1.5 text-sm"
+                    onClick={() => update("alert", "")}
+                  >
+                    <X className="h-4 w-4" />
+                    Ver todas
+                  </Button>
+                )}
                 {["Pipeline", "Validación CRM"].map((scope) => (
                   <Button
                     key={scope}
@@ -1457,34 +1290,76 @@ export default function Pipeline() {
               </div>
             }
           />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            {alertTypes.map((alert) => (
-              <button
-                key={alert}
-                aria-pressed={filter.alert === alert}
-                onClick={() =>
-                  update("alert", filter.alert === alert ? "" : alert)
-                }
-                className={cn(
-                  "flex min-h-[112px] flex-col items-stretch justify-start rounded-2xl border bg-card p-5 text-left shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                  filter.alert === alert
-                    ? "border-amber-400 bg-amber-50/60"
-                    : "border-slate-200/80 hover:border-amber-200",
-                )}
-              >
-                <span className="flex items-start justify-between gap-3">
-                  <span className="text-3xl font-semibold leading-9 tracking-tight tabular-nums">
-                    {summary.isLoading
-                      ? "…"
-                      : (data?.alertCounts?.[alert] ?? 0)}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+            {alertTypes.map((alert) => {
+              const count = data?.alertCounts?.[alert] ?? 0;
+              const active = filter.alert === alert;
+              const clear = !summary.isLoading && count === 0 && !active;
+              return (
+                <button
+                  key={alert}
+                  aria-pressed={active}
+                  disabled={clear}
+                  onClick={() => update("alert", active ? "" : alert)}
+                  className={cn(
+                    "group flex min-h-[132px] flex-col items-stretch justify-start rounded-2xl border p-4 text-left sm:p-5 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                    active
+                      ? "border-amber-400 bg-amber-50 ring-1 ring-amber-300"
+                      : clear
+                        ? "cursor-default border-slate-200/80 bg-slate-50/60 shadow-none"
+                        : "border-slate-200/80 bg-card hover:border-amber-300 hover:bg-amber-50/30",
+                  )}
+                >
+                  <span className="flex items-start justify-between gap-3">
+                    <span
+                      className={cn(
+                        "text-3xl font-semibold leading-9 tracking-tight tabular-nums",
+                        clear && pendingText,
+                      )}
+                    >
+                      {summary.isLoading ? "…" : count}
+                    </span>
+                    {clear ? (
+                      <CheckCheck className="mt-1 h-4 w-4 shrink-0 text-emerald-500" />
+                    ) : (
+                      <AlertCircle className="mt-1 h-4 w-4 shrink-0 text-amber-600" />
+                    )}
                   </span>
-                  <AlertCircle className="mt-1 h-4 w-4 shrink-0 text-amber-600" />
-                </span>
-                <span className="mt-2 text-sm font-medium leading-snug text-slate-600">
-                  {alert}
-                </span>
-              </button>
-            ))}
+                  <span
+                    className={cn(
+                      "mt-2 text-sm font-medium leading-snug",
+                      clear ? pendingText : "text-slate-700",
+                    )}
+                  >
+                    {alert}
+                  </span>
+                  <span
+                    className={cn(
+                      "mt-auto inline-flex items-center gap-1 pt-3 text-xs font-medium",
+                      active
+                        ? "text-amber-800"
+                        : clear
+                          ? "text-emerald-700"
+                          : "text-amber-700 opacity-70 group-hover:opacity-100",
+                    )}
+                  >
+                    {active ? (
+                      <>
+                        Filtrando · quitar
+                        <X className="h-3 w-3" />
+                      </>
+                    ) : clear ? (
+                      "Al día"
+                    ) : (
+                      <>
+                        Ver oportunidades
+                        <ArrowRight className="h-3 w-3" />
+                      </>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </>
       )}
@@ -1501,7 +1376,7 @@ export default function Pipeline() {
                 title="Facturación histórica informada"
                 value="≈80%"
                 icon={Building2}
-                subtitle="Referencia del 28/10/2026 · conciliación mensual pendiente"
+                subtitle="Referencia informada el 28/10/2026. No equivale a facturación mensual verificada."
               />
             )}
             <Metric
@@ -1518,22 +1393,24 @@ export default function Pipeline() {
               title="Warner / oportunidades abiertas"
               value={`${data.warner.open} de ${data.open}`}
               icon={Users}
-              subtitle={`${data.warner.outside.open} oportunidades fuera de Warner. No mide facturación.`}
+              subtitle="Cuenta oportunidades; no mide dependencia económica."
             />
           </div>
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/40 px-5 py-4 text-sm leading-relaxed">
-            <p className="font-semibold">Lectura de concentración</p>
-            <p className="mt-1 text-muted-foreground">
-              Umbral operativo: {data.warner.threshold}%.{" "}
-              {data.warner.valuePct === null
-                ? "Faltan valores para medir la concentración del pipeline."
-                : data.warner.partial
-                  ? "La participación describe solo el bruto cuantificado; la concentración total sigue pendiente."
-                  : data.warner.signal
-                    ? "El bruto cuantificado alcanza el umbral operativo."
-                    : "El bruto cuantificado está por debajo del umbral."}{" "}
-              La referencia de facturación histórica y la cantidad de
-              oportunidades representan bases diferentes.
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/40 px-5 py-3.5 text-sm leading-relaxed">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <p>
+              <span className="font-semibold">
+                Umbral operativo {data.warner.threshold}%.
+              </span>{" "}
+              <span className="text-slate-700">
+                {data.warner.valuePct === null
+                  ? "Faltan valores para medir la concentración del pipeline."
+                  : data.warner.partial
+                    ? "La participación describe solo el bruto cuantificado; la concentración total sigue pendiente."
+                    : data.warner.signal
+                      ? "El bruto cuantificado alcanza el umbral operativo."
+                      : "El bruto cuantificado está por debajo del umbral."}
+              </span>
             </p>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
@@ -1546,26 +1423,25 @@ export default function Pipeline() {
                   <p className="text-sm text-muted-foreground">
                     Oportunidades abiertas
                   </p>
-                  <p className="mt-1 text-2xl font-semibold leading-8 tracking-tight tabular-nums">
-                    {data.warner.outside.open}
-                  </p>
+                  <div className="mt-1">
+                    <BigValue size="md" value={data.warner.outside.open} />
+                  </div>
                 </div>
                 <div className="px-5 py-4">
                   <p className="text-sm text-muted-foreground">
                     Bruto USD · {data.warner.outside.valueCoverage}/
                     {data.warner.outside.open} con valor
                   </p>
-                  <p className="mt-1 text-2xl font-semibold leading-8 tracking-tight">
-                    {isPending(data.warner.outside.gross) ? (
-                      <span className="text-xl font-medium text-slate-400">
-                        Pendiente
-                      </span>
-                    ) : (
-                      <span className="tabular-nums">
-                        {money(data.warner.outside.gross)}
-                      </span>
-                    )}
-                  </p>
+                  <div className="mt-1">
+                    <BigValue
+                      size="md"
+                      value={
+                        isPending(data.warner.outside.gross)
+                          ? null
+                          : money(data.warner.outside.gross)
+                      }
+                    />
+                  </div>
                 </div>
               </div>
             </Panel>
@@ -1574,23 +1450,26 @@ export default function Pipeline() {
                 title="Facturación mensual · USD"
                 description="Base facturación, separada del pipeline comercial."
                 action={
-                  <Input
-                    aria-label="Período de facturación"
-                    type="month"
+                  <MonthPicker
+                    label="Período de facturación"
+                    size="sm"
                     value={effectivePeriod}
                     disabled={!!snapshot}
-                    className="h-8 w-36 text-sm"
-                    onChange={(e) =>
-                      e.target.value && setPeriod(e.target.value)
-                    }
+                    onChange={(v) => v && setPeriod(v)}
                   />
                 }
               >
                 <div className="px-5 py-4">
                   {billing.isLoading ? (
-                    <p className="text-sm text-muted-foreground">
-                      Conciliando ingresos reales…
-                    </p>
+                    <div
+                      className="space-y-2"
+                      role="status"
+                      aria-label="Conciliando ingresos reales"
+                    >
+                      <div className="h-4 w-1/3 animate-pulse rounded bg-slate-100" />
+                      <div className="h-8 w-1/4 animate-pulse rounded bg-slate-100" />
+                      <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
+                    </div>
                   ) : billing.error ? (
                     <p className="text-sm text-red-700">
                       No pudimos consultar la facturación. Reintentá actualizar.
@@ -1600,27 +1479,27 @@ export default function Pipeline() {
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <p className="text-sm text-muted-foreground">
-                            Participación Warner · {effectivePeriod}
+                            Participación Warner
                           </p>
-                          <p className="mt-1 text-2xl font-semibold leading-8 tracking-tight">
-                            {isPending(billing.data?.warnerSharePct) ? (
-                              <span className="text-xl font-medium text-slate-400">
-                                Pendiente
-                              </span>
-                            ) : (
-                              <span className="tabular-nums">
-                                {pct(billing.data?.warnerSharePct)}
-                              </span>
-                            )}
-                          </p>
+                          <div className="mt-1">
+                            <BigValue
+                              size="md"
+                              value={
+                                isPending(billing.data?.warnerSharePct)
+                                  ? null
+                                  : pct(billing.data?.warnerSharePct)
+                              }
+                            />
+                          </div>
                         </div>
                         <Badge
                           variant="outline"
-                          className={
+                          className={cn(
+                            "shrink-0 whitespace-nowrap",
                             billing.data?.state === "verified"
                               ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : "border-amber-200 bg-amber-50 text-amber-700"
-                          }
+                              : "border-amber-200 bg-amber-50 text-amber-700",
+                          )}
                         >
                           {billing.data?.state === "verified"
                             ? "Verificada"
@@ -1637,13 +1516,12 @@ export default function Pipeline() {
                           {billing.data.eventCount} hechos reales
                         </p>
                       )}
-                      <p className="mt-4 border-t border-slate-100 pt-3 text-xs leading-relaxed text-muted-foreground">
-                        Referencia histórica: ≈80% informado el 28/10/2026. No
-                        equivale a facturación mensual verificada.
-                        {snapshot
-                          ? " Esta consulta financiera es actual y no forma parte del corte congelado."
-                          : ""}
-                      </p>
+                      {snapshot && (
+                        <p className="mt-4 border-t border-slate-100 pt-3 text-xs leading-relaxed text-muted-foreground">
+                          Esta consulta financiera es actual y no forma parte
+                          del corte congelado.
+                        </p>
+                      )}
                     </>
                   )}
                 </div>
@@ -1759,19 +1637,23 @@ export default function Pipeline() {
                             {aggregate?.open ?? 0}
                           </p>
                         </div>
-                        <OpportunityTable
+                        <OpportunityList
                           rows={items ?? []}
                           loading={false}
                           onOpen={openOpportunity}
+                          sort={filter.sort}
+                          onSort={(v) => update("sort", v)}
                         />
                       </section>
                     );
                   })
                 ) : (
-                  <OpportunityTable
+                  <OpportunityList
                     rows={visibleRows}
                     loading={rows.isLoading}
                     onOpen={openOpportunity}
+                    sort={filter.sort}
+                    onSort={(v) => update("sort", v)}
                   />
                 )}
                 {pagination}
@@ -1793,12 +1675,12 @@ export default function Pipeline() {
                       : "No encontramos oportunidades"
                 }
                 description={
-                  Object.keys(filter).length
+                  hasFilters
                     ? "Ajustá los filtros para ampliar la selección."
                     : "Las oportunidades aparecerán aquí cuando se incorporen a la cartera."
                 }
                 action={
-                  Object.keys(filter).length ? (
+                  hasFilters ? (
                     <Button variant="outline" onClick={clearFilters}>
                       Limpiar filtros
                     </Button>
@@ -1819,23 +1701,17 @@ export default function Pipeline() {
             title="Un corte, una conversación clara"
             description="Guardá la cartera completa. El resumen respeta la selección que estás consultando."
             action={
-              <label className="flex h-9 items-center gap-2 rounded-lg border bg-card px-3">
-                <CalendarDays className="h-4 w-4 text-slate-400" />
-                <span className="sr-only">Período del corte</span>
-                <Input
-                  aria-label="Período del corte"
-                  type="month"
-                  className="h-7 w-36 border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
-                  value={effectivePeriod}
-                  disabled={!!snapshot}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setPeriod(e.target.value);
-                      cutKey.current = crypto.randomUUID();
-                    }
-                  }}
-                />
-              </label>
+              <MonthPicker
+                label="Período del corte"
+                value={effectivePeriod}
+                disabled={!!snapshot}
+                onChange={(v) => {
+                  if (v) {
+                    setPeriod(v);
+                    cutKey.current = crypto.randomUUID();
+                  }
+                }}
+              />
             }
           />
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(300px,1fr)_minmax(0,1.35fr)]">
@@ -1848,6 +1724,24 @@ export default function Pipeline() {
                   </span>
                 }
               >
+                {!snapshot && (
+                  <div
+                    className="h-1 bg-slate-100"
+                    role="progressbar"
+                    aria-label="Avance del cierre"
+                    aria-valuemin={0}
+                    aria-valuemax={4}
+                    aria-valuenow={completed}
+                  >
+                    <div
+                      className={cn(
+                        "h-full transition-all",
+                        completed === 4 ? "bg-emerald-500" : "bg-primary",
+                      )}
+                      style={{ width: `${(completed / 4) * 100}%` }}
+                    />
+                  </div>
+                )}
                 <div className="divide-y divide-slate-100">
                   {[
                     "Conciliar CRM, cotizaciones y evidencia",
@@ -1880,7 +1774,7 @@ export default function Pipeline() {
                           }}
                         />
                         <span>
-                          <span className="block text-xs font-medium uppercase leading-4 tracking-wider text-slate-400">
+                          <span className="block text-xs font-medium uppercase leading-4 tracking-wider text-slate-500">
                             Paso {i + 1}
                           </span>
                           <span
@@ -1958,6 +1852,12 @@ export default function Pipeline() {
                         Guardar corte
                       </Button>
                     </div>
+                    {!decision.trim() && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Escribí la decisión del período para poder{" "}
+                        {canReadQuotes ? "registrarla o " : ""}guardar el corte.
+                      </p>
+                    )}
                   </div>
                 </Panel>
               )}
@@ -1966,9 +1866,18 @@ export default function Pipeline() {
                 description="Cada versión conserva su propia cartera."
               >
                 {cuts.isLoading ? (
-                  <p className="px-5 py-4 text-sm text-muted-foreground">
-                    Cargando cortes…
-                  </p>
+                  <div
+                    className="divide-y divide-slate-100"
+                    role="status"
+                    aria-label="Cargando cortes"
+                  >
+                    {[0, 1].map((i) => (
+                      <div key={i} className="space-y-2 px-5 py-3">
+                        <div className="h-4 w-1/3 animate-pulse rounded bg-slate-100" />
+                        <div className="h-3 w-1/4 animate-pulse rounded bg-slate-100" />
+                      </div>
+                    ))}
+                  </div>
                 ) : cuts.data?.length ? (
                   <div className="max-h-72 divide-y overflow-auto">
                     {cuts.data.map((c: any) => (
@@ -1981,8 +1890,8 @@ export default function Pipeline() {
                         )}
                       >
                         <span>
-                          <span className="flex items-baseline gap-2 text-sm font-semibold tabular-nums">
-                            {c.period}
+                          <span className="flex items-baseline gap-2 text-sm font-semibold">
+                            {monthLabel(c.period)}
                             <span className="text-xs font-medium text-muted-foreground">
                               v{c.version}
                             </span>
@@ -2005,19 +1914,13 @@ export default function Pipeline() {
             </div>
             <Panel
               title="Resumen para Fede"
-              description={`${effectivePeriod} · listo para revisar y compartir manualmente`}
+              description={`${monthLabel(effectivePeriod)} · listo para revisar y compartir manualmente`}
               action={<FileText className="h-4 w-4 text-slate-400" />}
             >
               <div className="p-5">
-                <textarea
-                  aria-label="Resumen para Fede"
-                  readOnly
-                  className="min-h-[440px] w-full resize-y rounded-lg border border-slate-200 bg-slate-50/60 p-4 text-sm leading-7 text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  value={
-                    text.isLoading
-                      ? "Preparando resumen…"
-                      : (text.data?.text ?? "Pendiente")
-                  }
+                <SummaryPreview
+                  text={text.data?.text}
+                  loading={text.isLoading}
                 />
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <Button
@@ -2062,7 +1965,8 @@ export default function Pipeline() {
                   </Button>
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">
-                  El resumen no se envía automáticamente a ningún canal.
+                  Se copia y descarga como texto plano. No se envía
+                  automáticamente a ningún canal.
                 </p>
               </div>
             </Panel>
@@ -2082,9 +1986,21 @@ export default function Pipeline() {
               description="Necesitás acceso a cotizaciones para consultar los fundamentos y las fuentes del registro."
             />
           ) : log.isLoading ? (
-            <p className="px-5 py-4 text-sm text-muted-foreground">
-              Cargando registro…
-            </p>
+            <div
+              className="divide-y divide-slate-100"
+              role="status"
+              aria-label="Cargando registro"
+            >
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex gap-4 px-5 py-4">
+                  <div className="h-8 w-8 animate-pulse rounded-full bg-slate-100" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-1/4 animate-pulse rounded bg-slate-100" />
+                    <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : !log.data?.length ? (
             <EmptyState
               icon={History}
@@ -2094,13 +2010,7 @@ export default function Pipeline() {
           ) : (
             <div className="divide-y divide-slate-100">
               {log.data.map((r: any) => {
-                const changes = r.changes?.after
-                  ? Object.keys(r.changes.after).filter(
-                      (k) =>
-                        JSON.stringify(r.changes.after[k]) !==
-                        JSON.stringify(r.changes.before?.[k]),
-                    )
-                  : Object.keys(r.changes ?? {});
+                const changes = describeChanges(r.changes).map((c) => c.key);
                 return (
                   <article key={r.id} className="flex gap-4 px-5 py-4">
                     <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50">
@@ -2126,7 +2036,7 @@ export default function Pipeline() {
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         {r.period && (
                           <span className="text-xs text-muted-foreground">
-                            Período {r.period}
+                            {monthLabel(r.period)}
                           </span>
                         )}
                         {changes.slice(0, 8).map((k) => (
@@ -2143,14 +2053,20 @@ export default function Pipeline() {
                           </span>
                         )}
                       </div>
-                      <details className="mt-3">
-                        <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
-                          Ver detalle del cambio
-                        </summary>
-                        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
-                          {JSON.stringify(r.changes, null, 2)}
-                        </pre>
-                      </details>
+                      {changes.length > 0 && (
+                        <details className="group/details mt-3">
+                          <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
+                            <ChevronRight className="h-3.5 w-3.5 transition-transform group-open/details:rotate-90" />
+                            Ver{" "}
+                            {changes.length === 1
+                              ? "el cambio"
+                              : `los ${changes.length} cambios`}
+                          </summary>
+                          <div className="mt-2">
+                            <ChangeList changes={r.changes} />
+                          </div>
+                        </details>
+                      )}
                     </div>
                   </article>
                 );

@@ -7,6 +7,8 @@ import {
   alerts,
   localDay,
   executiveSummary,
+  sortOpportunities,
+  sortSchema,
 } from "../shared/pipeline";
 import { visibleRows } from "../server/pipeline/access";
 const row = (patch = {}) =>
@@ -181,5 +183,56 @@ describe("Pipeline comercial: reglas canónicas", () => {
     expect(text).toContain("Bruto: Pendiente (0/1)");
     expect(text).toContain("11/11/2026, 21:22:51");
     expect(text).toContain("Comparación anterior: Pendiente");
+  });
+});
+describe("Pipeline comercial: orden de la cartera", () => {
+  const valued = (account: string, usd: string | null, extra = {}) =>
+    row({
+      account,
+      usd,
+      valueNote: usd ? "Propuesta documentada" : null,
+      ...extra,
+    });
+  const rows = [
+    valued("Beta", "500"),
+    valued("alfa", null),
+    valued("Gamma", "1200"),
+    valued("Delta", "500"),
+  ];
+  it("sin orden conserva la secuencia original", () =>
+    expect(sortOpportunities(rows, undefined)).toBe(rows));
+  it("ordena importes y deja los pendientes al final en ambas direcciones", () => {
+    expect(sortOpportunities(rows, "usd").map((r) => r.account)).toEqual([
+      "Beta",
+      "Delta",
+      "Gamma",
+      "alfa",
+    ]);
+    expect(sortOpportunities(rows, "-usd").map((r) => r.account)).toEqual([
+      "Gamma",
+      "Beta",
+      "Delta",
+      "alfa",
+    ]);
+  });
+  it("ordena cuentas sin distinguir mayúsculas y etapas por embudo", () => {
+    expect(sortOpportunities(rows, "account").map((r) => r.account)).toEqual([
+      "alfa",
+      "Beta",
+      "Delta",
+      "Gamma",
+    ]);
+    const staged = [
+      row({ account: "N", stage: "Negociación" }),
+      row({ account: "P", stage: "Prospección" }),
+    ];
+    expect(sortOpportunities(staged, "stage").map((r) => r.account)).toEqual([
+      "P",
+      "N",
+    ]);
+  });
+  it("solo acepta claves conocidas", () => {
+    expect(sortSchema.safeParse("-weighted").success).toBe(true);
+    expect(sortSchema.safeParse("notes").success).toBe(false);
   });
 });

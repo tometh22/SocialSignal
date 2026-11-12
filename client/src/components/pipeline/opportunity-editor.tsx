@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { authFetchJson } from "@/lib/queryClient";
+import { pendingText, stageColors } from "./ui";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
@@ -135,14 +136,6 @@ function Choice({
     </Select>
   );
 }
-export const stageColors: Record<string, string> = {
-  Prospección: "bg-slate-400",
-  "Reunión / demo": "bg-sky-500",
-  Propuesta: "bg-indigo-500",
-  Negociación: "bg-amber-500",
-  Confirmada: "bg-emerald-500",
-  "Sin etapa verificada": "bg-slate-300",
-};
 const cash = (v: string | null | undefined) =>
   v == null || !Number.isFinite(Number(v))
     ? "Pendiente"
@@ -395,7 +388,7 @@ export function OpportunityEditor({
               </p>
               <p className="mt-1 text-lg font-semibold leading-7 tabular-nums">
                 {text === "Pendiente" ? (
-                  <span className="text-base font-medium text-slate-400">
+                  <span className={`text-base font-medium ${pendingText}`}>
                     Pendiente
                   </span>
                 ) : (

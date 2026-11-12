@@ -12,6 +12,8 @@ import {
   alerts,
   executiveSummary,
   periodSchema,
+  sortSchema,
+  sortOpportunities,
   localDay,
   type Opportunity,
 } from "../../shared/pipeline";
@@ -30,6 +32,7 @@ const filters = z.object({
   alert: z.string().optional(),
   closeMonth: z.union([periodSchema, z.literal("pending")]).optional(),
   group: z.enum(["stage", "account", "owner", "closeMonth"]).optional(),
+  sort: sortSchema.optional(),
   offset: z.coerce.number().int().min(0).default(0),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
@@ -227,7 +230,7 @@ export function registerPipelineRoutes(
       endpoint,
       wrap(async (req, res) => {
         const s = await selection(req);
-        const rows = s.rows
+        const rows = sortOpportunities(s.rows, s.f.sort)
           .map((r) => ({ ...r, alerts: alerts(r, localDay(new Date(s.at))) }))
           .filter((r) => (endpoint !== "/alerts" || r.alerts.length) && (!s.f.alert || r.alerts.includes(s.f.alert)));
         const groups = s.f.group

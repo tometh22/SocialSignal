@@ -206,6 +206,63 @@ export function metrics(rows: Opportunity[]) {
     weightedCoverage: weighted.length,
   };
 }
+export const sortKeys = [
+  "account",
+  "stage",
+  "usd",
+  "weighted",
+  "closeDate",
+  "evidenceDate",
+] as const;
+export type SortKey = (typeof sortKeys)[number];
+export const sortSchema = z
+  .string()
+  .regex(new RegExp(`^-?(${sortKeys.join("|")})$`));
+/**
+ * Ordena la cartera completa antes de paginar. Los datos pendientes van
+ * siempre al final, en cualquier dirección, y los empates conservan el orden
+ * original (última evidencia primero).
+ */
+export function sortOpportunities<T extends Opportunity>(
+  rows: T[],
+  sort?: string | null,
+): T[] {
+  if (!sort) return rows;
+  const desc = sort.startsWith("-");
+  const key = (desc ? sort.slice(1) : sort) as SortKey;
+  const value = (r: T): string | number | null => {
+    switch (key) {
+      case "account":
+        return r.account.toLocaleLowerCase("es");
+      case "stage":
+        return stages.indexOf(r.stage as (typeof stages)[number]);
+      case "usd":
+        return usableValue(r) ? Number(r.usd) : null;
+      case "weighted":
+        return usableValue(r) && usableProbability(r)
+          ? (Number(r.usd) * Number(r.probability)) / 100
+          : null;
+      case "closeDate":
+        return r.closeDate ?? null;
+      case "evidenceDate":
+        return r.evidenceDate ?? null;
+      default:
+        return null;
+    }
+  };
+  return rows
+    .map((r, i) => ({ r, i, v: value(r) }))
+    .sort((a, b) => {
+      if (a.v === null || b.v === null)
+        return a.v === b.v ? a.i - b.i : a.v === null ? 1 : -1;
+      const c =
+        typeof a.v === "string"
+          ? a.v.localeCompare(b.v as string, "es")
+          : a.v - (b.v as number);
+      return (desc ? -c : c) || a.i - b.i;
+    })
+    .map((x) => x.r);
+}
 export function summarize(
   rows: Opportunity[],
   day = localDay(),
