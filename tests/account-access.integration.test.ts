@@ -240,4 +240,19 @@ describe.skipIf(!fixture.url)("account invitations and recovery with PostgreSQL"
     expect(responses.map(response => response.status)).toEqual([200, 200, 200, 200, 200, 429]);
     expect(fixture.send).toHaveBeenCalledOnce();
   });
+  it("preserves inactive creation without mail and allows an invitation after activation", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+    const response = await create({ isActive: false });
+    expect(response.status).toBe(201);
+    const user = await response.json();
+    expect(user.isActive).toBe(false);
+    expect(user.invitation.status).toBe("none");
+    expect((await pool.query("SELECT id FROM account_access_links")).rowCount).toBe(0);
+    expect(fixture.send).not.toHaveBeenCalled();
+    vi.stubEnv("RESEND_API_KEY", "test-only");
+    expect((await http(`/api/admin/users/${user.id}/invitation`, {})).status).toBe(409);
+    expect((await http(`/api/admin/users/${user.id}`, { isActive: true }, 1, "PATCH")).status).toBe(200);
+    expect((await http(`/api/admin/users/${user.id}/invitation`, {})).status).toBe(200);
+    expect(fixture.send).toHaveBeenCalledOnce();
+  });
 });
