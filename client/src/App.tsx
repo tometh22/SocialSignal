@@ -14,6 +14,7 @@ const ServiceBlueprintsAdmin = lazy(() => import("@/pages/service-blueprints-adm
 const QuoteRedirect = lazy(() => import("@/pages/quote-redirect"));
 const PublicProposal = lazy(() => import("@/pages/public-proposal"));
 const PublicProposalGroup = lazy(() => import("@/pages/public-proposal-group"));
+const PublicPipeline = lazy(() => import("@/pages/public-pipeline"));
 const QuotationGroupWorkspace = lazy(() => import("@/pages/quotation-group-workspace"));
 const Clients = lazy(() => import("@/pages/clients"));
 const Admin = lazy(() => import("@/pages/admin-fixed"));
@@ -228,6 +229,9 @@ function AppRoutes() {
       <Route path="/reset-password"><Suspense fallback={<AppRouteFallback />}><AccountAccessPage key="reset" /></Suspense></Route>
       <Route path="/proposal/:token">
         <Suspense fallback={<AppRouteFallback />}><PublicProposal /></Suspense>
+      </Route>
+      <Route path="/pipeline/compartido">
+        <Suspense fallback={<AppRouteFallback />}><PublicPipeline /></Suspense>
       </Route>
       <Route path="/proposal-group/:token">
         <Suspense fallback={<AppRouteFallback />}><PublicProposalGroup /></Suspense>

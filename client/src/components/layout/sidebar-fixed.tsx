@@ -50,6 +50,7 @@ import {
   LockKeyhole,
   Calculator,
   GraduationCap,
+  TrendingUp,
 } from "lucide-react";
 
 type NavItem = {
@@ -160,7 +161,8 @@ export default function SidebarFixed({ mobileMode = false, onNavigate }: Sidebar
     {
       title: "Comercial",
       items: [
-        { href: "/crm", title: "CRM", icon: Target, badge: crmOverdue > 0 ? crmOverdue.toString() : undefined, description: "Pipeline comercial", permission: 'crm' as AppSection },
+        { href: "/crm", title: "CRM", icon: Target, badge: crmOverdue > 0 ? crmOverdue.toString() : undefined, description: "Leads y seguimiento", permission: 'crm' as AppSection },
+        { href: "/crm/pipeline", title: "Pipeline comercial", icon: TrendingUp, description: "Valor, etapas, Status y cierre mensual", permission: 'crm' as AppSection },
         { href: "/clients", title: "Clientes", icon: Building2, description: "Base de clientes", permission: 'crm' as AppSection },
         { href: "/quotations", title: "Cotizaciones", icon: FileText, description: "Gestionar cotizaciones", permission: 'quotations' as AppSection },
       ]

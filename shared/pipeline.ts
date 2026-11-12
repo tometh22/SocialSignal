@@ -181,14 +181,17 @@ export function alerts(r: Opportunity, day = localDay()) {
     !r.closeDate && "Sin fecha objetivo",
   ].filter(Boolean) as string[];
 }
-export function metrics(rows: Opportunity[]) {
-  const open = rows.filter(
-    (r) =>
-      r.scope === "Pipeline" &&
-      r.eligible &&
-      !["Confirmada", "Descartada"].includes(r.status) &&
-      r.stage !== "Confirmada",
+/** Oportunidad vigente del pipeline abierto: la base de bruto, ponderado y cobertura. */
+export function isOpenOpportunity(r: Opportunity) {
+  return (
+    r.scope === "Pipeline" &&
+    r.eligible &&
+    !["Confirmada", "Descartada"].includes(r.status) &&
+    r.stage !== "Confirmada"
   );
+}
+export function metrics(rows: Opportunity[]) {
+  const open = rows.filter(isOpenOpportunity);
   const valued = open.filter(usableValue),
     weighted = valued.filter(usableProbability);
   const sum = valued.reduce((a, r) => a + cents(r.usd!), BigInt(0));
