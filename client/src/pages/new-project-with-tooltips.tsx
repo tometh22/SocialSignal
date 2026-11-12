@@ -215,6 +215,10 @@ export default function NewProjectWithTooltips() {
   });
 
   const onSubmit = (data: FormData) => {
+    if (data.projectCategory !== "internal" && !data.quotationId) {
+      form.setError("quotationId", { message: "Seleccioná una cotización aprobada para crear un proyecto comercial." });
+      return;
+    }
     // Sin cotización, el nombre es obligatorio (no hay quotations.project_name del cual tomarlo).
     if (!data.quotationId && !(data.name && data.name.trim())) {
       form.setError("name", { message: "Poné un nombre al proyecto (no hay cotización de la cual tomarlo)" });
@@ -310,13 +314,13 @@ export default function NewProjectWithTooltips() {
                   render={({ field }) => (
                     <FormItem>
                       <div className="flex items-center gap-2">
-                        <FormLabel>Cotización Aprobada <span className="text-muted-foreground font-normal">(opcional)</span></FormLabel>
+                        <FormLabel>Cotización aprobada <span className="text-muted-foreground font-normal">{form.watch("projectCategory") === "internal" ? "(no corresponde a proyectos internos)" : "(obligatoria)"}</span></FormLabel>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Vincula una cotización aprobada al proyecto. Si el proyecto no viene de una cotización (ej. demo, interno), dejá este campo vacío y seleccioná el cliente directamente.</p>
+                            <p>Los proyectos comerciales requieren una cotización aprobada. Para demos, capacitación o automatización interna, seleccioná la categoría Interno; se asignará al cliente Epical sin cotización.</p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -336,14 +340,15 @@ export default function NewProjectWithTooltips() {
                           }
                         }}
                         value={field.value?.toString() ?? '__none__'}
+                        disabled={form.watch("projectCategory") === "internal"}
                       >
                         <FormControl>
                           <SelectTrigger className="h-auto min-h-[40px]">
-                            <SelectValue placeholder="Sin cotización (proyecto directo)" />
+                            <SelectValue placeholder="Seleccioná una cotización aprobada" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="__none__">Sin cotización (proyecto directo)</SelectItem>
+                          <SelectItem value="__none__">{form.watch("projectCategory") === "internal" ? "Sin cotización: proyecto interno" : "Seleccioná una cotización aprobada"}</SelectItem>
                           {approvedQuotations.map((q: any) => (
                             <SelectItem key={q.id} value={q.id.toString()}>
                               <div className="flex items-center gap-2 py-1">

@@ -2,21 +2,21 @@
 CREATE TABLE users (id integer PRIMARY KEY, first_name text, last_name text, is_active boolean DEFAULT true,
   is_admin boolean DEFAULT false, role text DEFAULT 'member', permissions text[] DEFAULT ARRAY['status'], email text);
 CREATE TABLE review_rooms (id integer PRIMARY KEY, name text, description text, archived_at timestamp);
-CREATE TABLE review_room_members (room_id integer REFERENCES review_rooms, user_id integer REFERENCES users, PRIMARY KEY(room_id,user_id));
+CREATE TABLE review_room_members (room_id integer REFERENCES review_rooms, user_id integer REFERENCES users, role text NOT NULL DEFAULT 'editor', PRIMARY KEY(room_id,user_id));
 CREATE TABLE clients (id integer PRIMARY KEY, name text);
 CREATE TABLE quotations (id integer PRIMARY KEY, project_name text);
 CREATE TABLE active_projects (id integer PRIMARY KEY, name text, quotation_id integer, client_id integer, status text);
 CREATE TABLE project_status_reviews (id integer PRIMARY KEY, room_id integer, project_id integer,
   health_status text, margin_status text, team_strain text, main_risk text, current_action text, next_milestone text,
-  next_milestone_date timestamp, deadline timestamp, owner_id integer, decision_needed text, updated_at timestamp DEFAULT now(), hidden_from_weekly boolean DEFAULT false);
+  next_milestone_date timestamp, deadline timestamp, owner_id integer, decision_needed text, updated_at timestamp DEFAULT now(), updated_by integer, hidden_from_weekly boolean DEFAULT false);
 CREATE TABLE weekly_status_items (id integer PRIMARY KEY, room_id integer, title text, subtitle text,
   health_status text, margin_status text, team_strain text, main_risk text, current_action text, next_milestone text,
-  deadline timestamp, owner_id integer, decision_needed text, updated_at timestamp DEFAULT now(), hidden_from_weekly boolean DEFAULT false);
-CREATE TABLE project_review_notes (id integer PRIMARY KEY, room_id integer, project_id integer, weekly_status_item_id integer,
+  deadline timestamp, owner_id integer, decision_needed text, updated_at timestamp DEFAULT now(), updated_by integer, hidden_from_weekly boolean DEFAULT false);
+CREATE TABLE project_review_notes (id serial PRIMARY KEY, room_id integer, project_id integer, weekly_status_item_id integer,
   content text, author_id integer, created_at timestamp DEFAULT now(), note_date timestamp DEFAULT now());
-CREATE TABLE status_update_entries (id integer PRIMARY KEY, room_id integer, project_id integer, weekly_status_item_id integer,
+CREATE TABLE status_update_entries (id serial PRIMARY KEY, room_id integer, project_id integer, weekly_status_item_id integer,
   content text, author_id integer, created_at timestamp DEFAULT now());
-CREATE TABLE status_change_log (id integer PRIMARY KEY, room_id integer, project_id integer, weekly_status_item_id integer,
+CREATE TABLE status_change_log (id serial PRIMARY KEY, room_id integer, project_id integer, weekly_status_item_id integer,
   field_name text, old_value text, new_value text, user_id integer, created_at timestamp DEFAULT now());
 
 INSERT INTO users(id,first_name,last_name) VALUES (1,'Tomi','Test'),(2,'Vicky','Test'),(3,'Sin','Salas'),(4,'Inactivo','Test');
@@ -36,3 +36,7 @@ INSERT INTO project_review_notes(id,room_id,project_id,weekly_status_item_id,con
   (1,10,100,NULL,'Nota visible',2),(2,20,100,NULL,'NOTA SECRETA',2),(3,10,101,NULL,'NOTA OCULTA',2),(4,10,NULL,201,'TEMA OCULTO',2);
 INSERT INTO status_update_entries(id,room_id,weekly_status_item_id,content,author_id) VALUES(1,10,200,'Actualización del tema',1);
 INSERT INTO status_change_log(id,room_id,project_id,field_name,old_value,new_value,user_id) VALUES(1,10,100,'healthStatus','verde','rojo',2);
+
+SELECT setval(pg_get_serial_sequence('project_review_notes','id'),(SELECT max(id) FROM project_review_notes));
+SELECT setval(pg_get_serial_sequence('status_update_entries','id'),(SELECT max(id) FROM status_update_entries));
+SELECT setval(pg_get_serial_sequence('status_change_log','id'),(SELECT max(id) FROM status_change_log));

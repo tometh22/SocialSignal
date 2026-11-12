@@ -1,6 +1,8 @@
+import { commercialPipelineMigrationSql } from "./migrations/commercial-pipeline";
 import { deliverableNameCompatibilityMigrationSql } from "./migrations/deliverable-name-compatibility";
 import { payrollDocumentModesMigrationSql } from "./migrations/payroll-document-modes";
 import { capacityPlanningMigrationSql } from "./migrations/capacity-planning";
+import { trainingMigrationSql } from "./migrations/training";
 import { teamSettlementWorkflowMigrationSql } from "./migrations/team-settlement-workflow";
 import express, { type Request, Response, NextFunction } from "express";
 import { notificationReliabilityMigrationSql } from "./migrations/notification-reliability";
@@ -66,6 +68,7 @@ import { taskBlockDetailsMigrationSql } from "./migrations/task-block-details";
 import { taskRecurrenceMigrationSql } from "./migrations/task-recurrence";
 import { optionalActiveProjectStartDateMigrationSql } from "./migrations/optional-active-project-start-date";
 import { mcpOauthMigrationSql } from "./migrations/mcp-oauth";
+import { mcpStatusActionsMigrationSql } from "./migrations/mcp-status-actions";
 import { ensureServiceBlueprintSeeds } from "./services/service-blueprints";
 import { ensureObjectivesPlanSeed } from "./services/objectives-seed";
 import cors from 'cors';
@@ -94,7 +97,10 @@ async function applyPendingMigrations() {
   };
 
   try {
+    await run('0096 commercial pipeline', commercialPipelineMigrationSql);
     await run('0086 MCP OAuth grants', mcpOauthMigrationSql);
+    await run('0095 MCP Status confirmations', mcpStatusActionsMigrationSql);
+    await run('0094 interactive training', trainingMigrationSql);
     // 0002_new_terrax: personnel extra columns (idempotent guard for Railway DB)
     // These were added via drizzle-kit migration in the repo but may not have been
     // applied if drizzle-kit push/migrate was never run on the production DB.

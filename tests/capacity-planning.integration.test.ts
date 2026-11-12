@@ -47,7 +47,7 @@ describe.skipIf(!setup.url)("capacity planning with PostgreSQL", () => {
     await query(capacityPlanningMigrationSql); await query(capacityPlanningMigrationSql);
   });
   beforeEach(async () => {
-    await query(`TRUNCATE ${tables.map(table => getTableConfig(table).name).join(",")},capacity_group_estimates RESTART IDENTITY CASCADE`);
+    await query(`TRUNCATE ${tables.map(table => getTableConfig(table).name).join(",")},capacity_group_estimates,capacity_week_modes RESTART IDENTITY CASCADE`);
     await query(`INSERT INTO users(id,email) VALUES(1,'ops@example.test'),(2,'member@example.test'),(3,'other@example.test');
       INSERT INTO personnel(id,name,email) VALUES(1,'Member','member@example.test'),(2,'Teammate','teammate@example.test'),(3,'Other','other@example.test');
       INSERT INTO clients(id,name) VALUES(1,'Client');
@@ -67,27 +67,28 @@ describe.skipIf(!setup.url)("capacity planning with PostgreSQL", () => {
   });
   it("counts only the selected base plus explicit extras across mode changes", async () => {
     await saveCapacityExtra(2, weekStart, true, member);
-    await saveCapacityMode(1, "section", ops);
+    await saveCapacityMode(1, "section", ops, weekStart);
     await saveCapacityGroup(group("section", 16), member);
     expect(await total()).toBe(18);
-    await saveCapacityMode(1, "project", ops);
+    await saveCapacityMode(1, "project", ops, weekStart);
     await saveCapacityGroup(group("project", 30), member);
     expect(await total()).toBe(32);
-    await saveCapacityMode(1, "task", ops); expect(await total()).toBe(12);
-    await saveCapacityMode(1, "section", ops); expect(await total()).toBe(18);
+    await saveCapacityMode(1, "task", ops, weekStart); expect(await total()).toBe(12);
+    await saveCapacityMode(1, "section", ops, weekStart); expect(await total()).toBe(18);
     expect((await query("SELECT count(*)::int AS n FROM capacity_group_estimates")).rows[0].n).toBe(2);
   });
   it("upserts without duplication, removes zero groups and isolates weeks", async () => {
-    await saveCapacityMode(1, "project", ops);
+    await saveCapacityMode(1, "project", ops, weekStart);
     await saveCapacityGroup(group("project", 30), member); await saveCapacityGroup(group("project", 20), member);
     expect(await total()).toBe(20);
+    await saveCapacityMode(1, "project", ops, "2026-11-09");
     await saveCapacityGroup(group("project", 40, { weekStart: "2026-11-09" }), member);
     expect(await total()).toBe(20);
     await saveCapacityGroup(group("project", 0), member); expect(await total()).toBe(0);
   });
   it("rejects other owners, nonmembers and mode changes by ordinary members", async () => {
-    await expect(saveCapacityMode(1, "project", member)).rejects.toMatchObject({ status: 403 });
-    await saveCapacityMode(1, "project", ops);
+    await expect(saveCapacityMode(1, "project", member, weekStart)).rejects.toMatchObject({ status: 403 });
+    await saveCapacityMode(1, "project", ops, weekStart);
     await expect(saveCapacityGroup(group("project", 20, { personnelId: 2 }), member)).rejects.toMatchObject({ status: 403 });
     await expect(saveCapacityGroup(group("project", 20), other)).rejects.toMatchObject({ status: 403 });
     await expect(saveCapacityGroup(group("project", 20, { personnelId: 3 }), ops)).rejects.toMatchObject({ status: 400 });
@@ -96,14 +97,14 @@ describe.skipIf(!setup.url)("capacity planning with PostgreSQL", () => {
   });
   it("rejects stale scopes, foreign sections, invalid dates and inactive projects", async () => {
     await expect(saveCapacityGroup(group("project", 20), member)).rejects.toMatchObject({ status: 409 });
-    await saveCapacityMode(1, "section", ops);
+    await saveCapacityMode(1, "section", ops, weekStart);
     await expect(saveCapacityGroup(group("section", 20, { sectionName: "Foreign" }), member)).rejects.toMatchObject({ status: 400 });
     await expect(saveCapacityGroup(group("section", 20, { weekStart: "2026-11-03" }), member)).rejects.toThrow();
     await query("UPDATE active_projects SET status='completed' WHERE id=1");
     await expect(saveCapacityGroup(group("section", 20), member)).rejects.toMatchObject({ status: 409 });
   });
   it("returns assigned empty projects and keeps teammates' estimates private", async () => {
-    await saveCapacityMode(1, "project", ops); await saveCapacityGroup(group("project", 20), member);
+    await saveCapacityMode(1, "project", ops, weekStart); await saveCapacityGroup(group("project", 20), member);
     await saveCapacityGroup(group("project", 7, { personnelId: 2 }), ops);
     const planning = await loadCapacityPlanning(weekStart, member);
     expect(planning.projects.map(project => project.id)).toEqual([2, 1]);
@@ -114,7 +115,7 @@ describe.skipIf(!setup.url)("capacity planning with PostgreSQL", () => {
     expect((await loadCapacityPlanning(weekStart, ops)).groups).toHaveLength(2);
   });
   it("keeps section estimates when sections are renamed or merged into General", async () => {
-    await saveCapacityMode(1, "section", ops); await saveCapacityGroup(group("section", 20), member);
+    await saveCapacityMode(1, "section", ops, weekStart); await saveCapacityGroup(group("section", 20), member);
     await db.transaction(tx => moveCapacitySectionEstimates(tx, 1, "Base", "General"));
     expect(await total()).toBe(20);
     await saveCapacityGroup(group("section", 5), member);
@@ -122,8 +123,27 @@ describe.skipIf(!setup.url)("capacity planning with PostgreSQL", () => {
     const planning = await loadCapacityPlanning(weekStart, member);
     expect(planning.groups).toMatchObject([{ sectionName: "General", estimatedHours: 25 }]);
   });
+  it("preserves previous weeks when changing mode and includes completed planned tasks", async () => {
+    await saveCapacityMode(1, "project", ops, "2026-11-09");
+    await saveCapacityGroup(group("project", 30, { weekStart: "2026-11-09" }), member);
+    await query("UPDATE tasks SET status='done' WHERE id=1");
+    expect(await total()).toBe(12);
+    const planning = await loadCapacityPlanning(weekStart, member);
+    expect(planning.projects.find(p => p.id === 1)?.mode).toBe("task");
+    expect(planning.tasks.find(t => t.id === 1)?.estimatedHours).toBe(10);
+    expect((await loadCapacityPlanning("2026-11-09", member)).projects.find(p => p.id === 1)?.mode).toBe("project");
+  });
+  it("recovers an unambiguous legacy base once without adding alternate bases", async () => {
+    await query("DELETE FROM capacity_week_modes; UPDATE active_projects SET capacity_estimation_mode='project' WHERE id=1");
+    await query(capacityPlanningMigrationSql);
+    expect(await total()).toBe(12);
+    await saveCapacityMode(1, "project", ops, weekStart);
+    await saveCapacityGroup(group("project", 20), member);
+    await query(capacityPlanningMigrationSql);
+    expect(await total()).toBe(20);
+  });
   it("uses week overlap for reports without spreading project hours into sections", async () => {
-    await saveCapacityMode(1, "project", ops); await saveCapacityGroup(group("project", 20), member);
+    await saveCapacityMode(1, "project", ops, weekStart); await saveCapacityGroup(group("project", 20), member);
     const rows = (await db.execute(effectiveCapacityEstimatesQuery({ dateFrom: "2026-11-08", dateTo: "2026-11-08" }))).rows;
     expect(rows).toHaveLength(1); expect(rows[0]).toMatchObject({ sectionName: null, taskId: null, estimatedHours: 20 });
     expect((await db.execute(effectiveCapacityEstimatesQuery({ dateFrom: "2026-11-09", dateTo: "2026-11-09" }))).rows).toHaveLength(0);

@@ -113,6 +113,7 @@ export function isBrokenNetProfit(
 }
 
 export interface MonthData {
+  fuenteDatos?: 'master' | 'mind' | 'cierre' | 'mixta';
   periodKey: string;
   year: number;
   month: number;
@@ -164,7 +165,7 @@ export interface MonthData {
   cashflow60Dias: number | null;
 }
 
-function createSheetsClient() {
+export function createSheetsClient() {
   let privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
   if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
     privateKey = privateKey.slice(1, -1);
@@ -213,7 +214,9 @@ export function aggregateMonths(
    */
   const tieneBalance = (m: MonthData) =>
     m.activoTotal != null &&
-    (m.activoTotal !== 0 || (m.pasivoTotal ?? 0) !== 0 || (m.clientesACobrar ?? 0) !== 0);
+    (m.fuenteDatos === 'master'
+      ? [m.activoLiquido, m.clientesACobrar, m.pasivoProveedores, m.pasivoTotal, m.balanceNeto].every(value => value != null)
+      : (m.activoTotal !== 0 || (m.pasivoTotal ?? 0) !== 0 || (m.clientesACobrar ?? 0) !== 0));
 
   const conBalance = sorted.filter(tieneBalance);
   const snapshot = conBalance.length > 0 ? conBalance[conBalance.length - 1] : last;
@@ -229,7 +232,8 @@ export function aggregateMonths(
   const cashflow = sumField('cashflow');
 
   const margenOperativo = ventasDelMes ? (ebitOperativo ?? 0) / ventasDelMes * 100 : null;
-  const margenNeto = ventasDelMes ? (beneficioNeto ?? 0) / ventasDelMes * 100 : null;
+  const ventasConNeto = sorted.filter(m => m.beneficioNeto != null).reduce((sum, m) => sum + (m.ventasDelMes ?? 0), 0);
+  const margenNeto = beneficioNeto != null && ventasConNeto ? beneficioNeto / ventasConNeto * 100 : null;
 
   /**
    * Markup de un período multi-mes: media armónica ponderada por ventas.
@@ -266,7 +270,7 @@ export function aggregateMonths(
   // porque su celda estaba rota, el agregado lo declara para que la vista lo
   // etiquete en vez de mostrar un número que no cubre el período completo.
   const mesesSinBeneficioNeto = sorted
-    .filter(m => m.beneficioNetoRoto)
+    .filter(m => m.beneficioNetoRoto || m.beneficioNeto == null)
     .map(m => m.monthLabel);
 
   return {
@@ -274,6 +278,7 @@ export function aggregateMonths(
     year,
     month,
     monthLabel,
+    fuenteDatos: new Set(sorted.map(m => m.fuenteDatos)).size === 1 ? sorted[0].fuenteDatos : 'mixta',
     cierre: true,
     ventasDelMes,
     ebitOperativo,

@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,6 +32,7 @@ const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | 
 type Person = { id: number; name: string; email?: string | null };
 type Absence = {
   allowanceExempt?: boolean; id: number; personnelId: number; personName: string; startDate: string; endDate: string;
+  cancellationReason?: string | null; cancelledAt?: string | null; cancelledBy?: number | null;
   type: string; status: string; planningStatus?: "tentative" | "confirmed"; businessDays: number; notes?: string | null; reviewReason?: string | null;
 };
 type Balance = {
@@ -95,6 +98,9 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
   const [form, setForm] = useState({ startDate: "", endDate: "", type: "vacation", notes: "", planningStatus: "tentative", personnelId: "" });
   const [allowanceDraft, setAllowanceDraft] = useState({ vacationDays: "", vacationCarryoverDays: "", epicalDays: "" });
   const [editingAbsence, setEditingAbsence] = useState<Absence | null>(null);
+  const [cancelling, setCancelling] = useState<{ absence: Absence; action: string } | null>(null);
+  const [cancellationReason, setCancellationReason] = useState("");
+  const [confirmUnusedDays, setConfirmUnusedDays] = useState(false);
   const [editDraft, setEditDraft] = useState({ startDate: "", endDate: "", type: "vacation", notes: "", planningStatus: "tentative" });
 
   const { data: personnel = [] } = useQuery<Person[]>({ queryKey: ["/api/personnel"] });
@@ -132,6 +138,8 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
     queryClient.invalidateQueries({ queryKey: ["/api/absence-allowances"] });
     queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
     queryClient.invalidateQueries({ queryKey: ["/api/capacity/weekly"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/personnel-absences"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks/team-calendar"] });
   };
   const createMutation = useMutation({
     mutationFn: () => apiRequest("/api/absence-requests", "POST", { ...form, personnelId: isManagement && form.personnelId ? Number(form.personnelId) : undefined, notes: form.notes.trim() || null }),
@@ -139,9 +147,9 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
     onError: (error: Error) => toast({ title: "No se pudo enviar", description: error.message, variant: "destructive" }),
   });
   const actionMutation = useMutation({
-    mutationFn: ({ id, action, reason, allowNegativeBalance = false }: { id: number; action: string; reason?: string; allowNegativeBalance?: boolean }) =>
-      apiRequest(`/api/absence-requests/${id}/actions`, "POST", { action, reason, allowNegativeBalance }),
-    onSuccess: () => { refresh(); toast({ title: "Solicitud actualizada" }); },
+    mutationFn: ({ id, action, reason, allowNegativeBalance = false, confirmUnusedDays }: { id: number; action: string; reason?: string; allowNegativeBalance?: boolean; confirmUnusedDays?: boolean }) =>
+      apiRequest(`/api/absence-requests/${id}/actions`, "POST", { action, reason, allowNegativeBalance, confirmUnusedDays }),
+    onSuccess: () => { refresh(); setCancelling(null); toast({ title: "Solicitud actualizada" }); },
     onError: (error: Error) => toast({ title: "No se pudo actualizar", description: error.message, variant: "destructive" }),
   });
   const editMutation = useMutation({
@@ -160,6 +168,9 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
   const pendingTeam = useMemo(() => team.filter((absence) => ["pending", "cancellation_requested"].includes(absence.status)), [team]);
   const visibleTeam = team.filter((absence) => teamFilterId === "all" || String(absence.personnelId) === teamFilterId);
   const requestAction = (absence: Absence, action: string) => {
+    if (["cancel_by_operations", "approve_cancellation"].includes(action)) {
+      setCancelling({ absence, action }); setCancellationReason(""); setConfirmUnusedDays(false); return;
+    }
     const needsReason = ["reject", "request_cancellation", "approve_cancellation", "reject_cancellation"].includes(action);
     const reason = needsReason ? window.prompt("Motivo o comentario:") ?? undefined : undefined;
     if (needsReason && reason === undefined) return;
@@ -185,6 +196,7 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
                   <p className="mt-1 text-xs text-muted-foreground">{absence.startDate} → {absence.endDate} · {absence.businessDays} día(s) hábil(es)</p>
                   {absence.notes && <p className="mt-1 text-xs text-slate-600">{absence.notes}</p>}
                   {absence.reviewReason && <p className="mt-1 text-xs text-muted-foreground">Respuesta: {absence.reviewReason}</p>}
+                  {absence.cancellationReason && <p className="mt-1 text-xs text-muted-foreground">Cancelación: {absence.cancellationReason}{absence.cancelledAt ? ` · ${new Date(absence.cancelledAt).toLocaleString("es-AR")}` : ""}{absence.cancelledBy ? ` · Usuario #${absence.cancelledBy}` : ""}</p>}
                   {teamMode && ["pending", "cancellation_requested"].includes(absence.status) && <BalanceStrip person={balanceByPerson.get(absence.personnelId)} absence={absence} />}
                   {editingAbsence?.id === absence.id && <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     <Input type="date" value={editDraft.startDate} onChange={(e) => setEditDraft({ ...editDraft, startDate: e.target.value })} />
@@ -199,6 +211,7 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
                   {(teamMode || ["pending", "approved"].includes(absence.status)) && <Button size="sm" variant="outline" onClick={() => { setEditingAbsence(absence); setEditDraft({ startDate: absence.startDate, endDate: absence.endDate, type: absence.type, notes: absence.notes || "", planningStatus: absence.planningStatus || "tentative" }); }}>Editar</Button>}
                   {!teamMode && absence.status === "pending" && <Button size="sm" variant="outline" onClick={() => requestAction(absence, "cancel_pending")}>Cancelar</Button>}
                   {!teamMode && absence.status === "approved" && <Button size="sm" variant="outline" onClick={() => requestAction(absence, "request_cancellation")}>Pedir cancelación</Button>}
+                  {teamMode && ["pending", "approved"].includes(absence.status) && <Button size="sm" variant="outline" disabled={actionMutation.isPending} onClick={() => requestAction(absence, "cancel_by_operations")}>Cancelar ausencia</Button>}
                   {teamMode && absence.status === "pending" && <>
                     <Button size="sm" onClick={() => requestAction(absence, "approve")}><Check className="mr-1 h-3.5 w-3.5" />Aprobar</Button>
                     <Button size="sm" variant="destructive" onClick={() => requestAction(absence, "reject")}><X className="mr-1 h-3.5 w-3.5" />Rechazar</Button>
@@ -233,6 +246,15 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 py-2">
+      <Dialog open={Boolean(cancelling)} onOpenChange={(open) => { if (!open && !actionMutation.isPending) setCancelling(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Cancelar ausencia</DialogTitle><DialogDescription>Se conservará el historial y se actualizarán los saldos y la disponibilidad. Los períodos cerrados requieren revisión previa.</DialogDescription></DialogHeader>
+          {cancelling && <p className="text-sm"><strong>{cancelling.absence.personName}</strong> · {TYPE_LABELS[cancelling.absence.type]}<br />{cancelling.absence.startDate} → {cancelling.absence.endDate} · {cancelling.absence.businessDays} día(s) hábil(es)</p>}
+          <div className="space-y-2"><Label htmlFor="cancellation-reason">Motivo de cancelación</Label><Input id="cancellation-reason" maxLength={4000} value={cancellationReason} onChange={e => setCancellationReason(e.target.value)} disabled={actionMutation.isPending} /></div>
+          <div className="flex items-start gap-2"><Checkbox id="unused-days" checked={confirmUnusedDays} disabled={actionMutation.isPending} onCheckedChange={v => setConfirmUnusedDays(v === true)} /><Label htmlFor="unused-days">Confirmo que ninguno de estos días fue tomado. Si se tomó una parte, corresponde revisar las fechas antes de cancelar.</Label></div>
+          <DialogFooter><Button variant="outline" disabled={actionMutation.isPending} onClick={() => setCancelling(null)}>Volver</Button><Button variant="destructive" disabled={actionMutation.isPending || !cancellationReason.trim() || !confirmUnusedDays} onClick={() => cancelling && actionMutation.mutate({ id: cancelling.absence.id, action: cancelling.action, reason: cancellationReason.trim(), confirmUnusedDays })}>{actionMutation.isPending ? "Cancelando…" : "Confirmar cancelación"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div><h1 className="flex items-center gap-2 text-2xl font-semibold"><UserX className="h-5 w-5" />{isManagement ? "Gestión de ausencias" : "Mis ausencias"}</h1><p className="text-sm text-muted-foreground">{isManagement ? "Gestión de Operaciones: aprobá solicitudes, administrá cupos y planificá las ausencias del equipo." : "Solicitá tus días y consultá el estado de tus ausencias."}</p></div>
         <Select value={String(year)} onValueChange={(value) => setYear(Number(value))}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent>{[year - 1, year, year + 1].map((item) => <SelectItem key={item} value={String(item)}>{item}</SelectItem>)}</SelectContent></Select>

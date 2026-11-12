@@ -1,4 +1,8 @@
+import { registerPipelineFinanceRoutes } from "./pipeline/finance";
+import { registerPipelineRoutes } from "./pipeline/routes";
+import { guardAbsenceCancellation } from "./services/absence-cancellation";
 import { registerNotificationRoutes } from "./routes-notifications";
+import { registerTrainingRoutes } from "./routes-training";
 import { getTransactionalEmailConfig, sendTransactionalEmail } from "./services/email-transport";
 import { withJobLock } from "./services/job-lock";
 import { quotationListStatsQuery } from "./domain/quotation-list-stats";
@@ -11,7 +15,8 @@ import { onAppEvent } from "./services/app-events";
 import { invalidateNativeDashboard } from "./services/financial-native-dashboard";
 import { publishAppEvent } from "./services/app-events";
 import { registerPerformanceRoutes } from "./middleware/performance";
-import { taskBucketSql } from "./domain/task-list";
+import { personalTaskAfter, personalTaskOrder, taskBucketSql } from "./domain/task-list";
+import { summarizeWeeklyHours } from "@shared/utils/weekly-hours";
 import { registerBiRoutes } from "./routes-bi";
 import { cursorPage, readPage, escapeLike } from "./utils/pagination";
 import { notifyQuotationApprovalRequests } from "./services/quotation-approval-notifications";
@@ -231,6 +236,7 @@ import { requireRole, requireProvider, requireProviderCanAccessProject } from ".
 import { requirePermission } from "./middleware/requirePermission";
 import { createReviewRoomsRouter } from "./routes-review-rooms";
 import { registerMindMcp } from "./mcp/routes";
+import { notifyMcpStatusNote } from "./services/mcp-status-notifications";
 import { readMcpConfig } from "./mcp/config";
 import { createLedgerRouter } from "./routes-ledger";
 import { createFinancialIntelligenceRouter } from "./routes-financial-intelligence";
@@ -1080,9 +1086,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Setup authentication with storage
   const { requireAuth, resolveUserFromSessionCookie } = setupAuth(app, storage);
+  registerPipelineRoutes(app, requireAuth);
+  registerPipelineFinanceRoutes(app, requireAuth);
   registerBiRoutes(app, pool, requireAuth);
   registerSearchRoutes(app, requireAuth, accessibleTaskProjectIds);
   registerPerformanceRoutes(app, pool, requireAuth);
+  registerTrainingRoutes(app, pool, requireAuth);
   app.use((req, res, next) => {
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && req.path.startsWith("/api") && !/^\/api\/(?:telemetry|notifications|reviews|status-semanal|conversations)(?:\/|$)/.test(req.path)) {
       res.once("finish", () => {
@@ -1108,7 +1117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
-  registerMindMcp(app, pool, readMcpConfig(), (id) => storage.getUser(id));
+  registerMindMcp(app, pool, readMcpConfig(), (id) => storage.getUser(id), notifyMcpStatusNote);
   // Apply personal-hour visibility to every task read, including detail and estimates.
   app.use(["/api/tasks", "/api/tasks-projects", "/api/tasks-personnel"], requireAuth, requirePermission("projects", "operations", "task_manager"), async (req, res, next) => {
     if (req.method !== "GET" || isOperationsRequest(req) || /\/(my-hours|hours-summary)(?:\?|$)/.test(req.originalUrl)) return next();
@@ -1183,6 +1192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.all('/api/status-semanal/updates/:entryId', legacyRewrite((r, req) => `/api/reviews/${r}/updates/${req.params.entryId}`));
   // Note: /api/status-semanal/users is left as-is (old handler still registered below) — it's
   // used by CreateReviewDialog to list ALL users (no room membership implied).
+  app.all('/api/status-semanal/ai-draft', legacyRewrite((r) => `/api/reviews/${r}/ai-draft`));
   app.all('/api/status-semanal/ai-summary', legacyRewrite((r) => `/api/reviews/${r}/ai-summary`));
   app.all('/api/status-semanal/daily-sessions', legacyRewrite((r) => `/api/reviews/${r}/daily-sessions`));
   app.all('/api/status-semanal/daily-sessions/latest', legacyRewrite((r) => `/api/reviews/${r}/daily-sessions/latest`));
@@ -9729,12 +9739,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "year inválido" });
     }
     try {
-      const { getNativeProjectionSummary } = await import('./services/financial-native-dashboard');
-      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
-      res.json(await getNativeProjectionSummary(year));
+      const { getFinancialProjection } = await import('./services/financial-projection');
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json(await getFinancialProjection(year));
     } catch (error: any) {
       console.error('❌ Proyección error:', error?.message || error);
-      res.status(500).json({ message: 'Error obteniendo la proyección', error: error?.message });
+      res.status(500).json({ message: 'Error obteniendo la proyección' });
+    }
+  });
+
+  app.get("/api/v2/executive/proyeccion/escenario", requireAuth, requirePermission("dashboard", "finance"), async (req, res) => {
+    const year = Number(req.query.year ?? new Date().getFullYear());
+    if (!Number.isInteger(year) || year < 2020 || year > 2100) return res.status(400).json({ message: "year inválido" });
+    try {
+      const { getFinancialScenario } = await import('./services/financial-scenario');
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json(await getFinancialScenario(year));
+    } catch (error) {
+      console.error('❌ Escenario financiero:', error instanceof Error ? error.message : 'Error de lectura');
+      res.status(500).json({ message: 'No se pudieron cargar los conceptos del escenario' });
     }
   });
 
@@ -9751,12 +9774,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endMonth = p('endMonth');
       const { fetchNativeExecutiveDashboard } = await import('./services/financial-native-dashboard');
       const result = await fetchNativeExecutiveDashboard(year, month, quarter, yearTotal, startYear, startMonth, endYear, endMonth);
-      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
-      res.setHeader('X-Financial-Source', 'mind-native');
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('X-Financial-Source', result.filtered?.fuenteDatos ?? 'mind');
       res.json(result);
     } catch (error: any) {
       console.error('❌ Native financial dashboard error:', error?.message || error);
-      res.status(500).json({ message: 'Error construyendo el dashboard financiero de Mind', error: error?.message });
+      res.status(500).json({ message: 'Error construyendo el dashboard financiero de Mind' });
     }
   });
 
@@ -11736,7 +11759,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validatedData.internalType = validatedData.internalType || "otro";
       }
 
-      // Quotation is optional — projects can be created without one (demos, internal, etc.)
+      if (validatedData.projectCategory !== "internal" && !validatedData.quotationId) {
+        return res.status(400).json({ message: "Los proyectos comerciales requieren una cotización aprobada. Para trabajo interno, seleccioná la categoría Interno." });
+      }
+      // Only internal projects may be created without an approved quotation.
       const quotation = validatedData.quotationId
         ? await storage.getQuotation(Number(validatedData.quotationId))
         : null;
@@ -11794,7 +11820,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const project = await db.transaction(async (tx) => {
         if (validatedData.quotationId) {
-          await tx.execute(sql`SELECT id FROM quotations WHERE id = ${Number(validatedData.quotationId)} FOR UPDATE`);
+          const [lockedQuotation] = await tx.select().from(quotations).where(eq(quotations.id, Number(validatedData.quotationId))).for("update");
+          if (!lockedQuotation || lockedQuotation.status !== "approved" || lockedQuotation.clientId !== validatedData.clientId || lockedQuotation.acceptedVariantId !== quotation?.acceptedVariantId) {
+            throw Object.assign(new Error("La cotización cambió. Actualizá la pantalla y revisá su aprobación antes de crear el proyecto."), { statusCode: 409 });
+          }
           const [existingProject] = await tx.select({ id: activeProjects.id }).from(activeProjects)
             .where(eq(activeProjects.quotationId, Number(validatedData.quotationId))).limit(1);
           if (existingProject) throw Object.assign(new Error("La cotización ya fue materializada en un proyecto"), { statusCode: 409, projectId: existingProject.id });
@@ -23472,9 +23501,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (statusCondition) conditions.push(statusCondition);
         if (bucket) conditions.push(sql`${taskBucket} = ${bucket}`);
-        if (page?.beforeId) conditions.push(lt(tasks.id, page.beforeId));
+        if (page?.beforeId) conditions.push(bucket === "done" ? lt(tasks.id, page.beforeId) : personalTaskAfter(page.beforeId));
         const taskQuery = db.select({ ...getTableColumns(tasks), asanaSource: sql<Record<string, unknown> | null>`${tasks.asanaSource} - 'raw' - 'csvRaw' - 'sourceDuplicates'` })
-          .from(tasks).where(and(...conditions)).orderBy(...(page ? [desc(tasks.id)] : [asc(tasks.dueDate), asc(tasks.position)])).$dynamic();
+          .from(tasks).where(and(...conditions)).orderBy(...(page ? (bucket === "done" ? [desc(tasks.id)] : personalTaskOrder()) : [asc(tasks.dueDate), asc(tasks.position)])).$dynamic();
         const taskRows = await (page ? taskQuery.limit(page.limit + 1) : taskQuery);
         if (page) { const result = cursorPage(taskRows, page.limit); myTasks = result.items; nextCursor = result.nextCursor; }
         else myTasks = taskRows;
@@ -23970,14 +23999,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const enriched = reconcileSectionHours(enrichedRaw.filter(e => e.source === "task"), enrichedRaw.filter(e => e.source === "legacy"), section);
 
-      // By week
-      const byWeekMap: Record<string, number> = {};
-      for (const e of enriched) {
-        const d = new Date(e.date);
-        const key = currentBuenosAiresWeek(new Date(`${hoursCivilDate(d)}T12:00:00Z`)).from;
-        byWeekMap[key] = (byWeekMap[key] || 0) + e.hours;
-      }
-      const byWeek = Object.entries(byWeekMap).map(([week, hours]) => ({ week, hours })).sort((a, b) => a.week.localeCompare(b.week));
+      // Use the same filtered estimates as the project totals, including weeks
+      // with planning but no recorded hours. Weekly plans are not prorated.
+      const byWeek = summarizeWeeklyHours(enriched, effectiveEstimates);
 
       // By project (real hours + estimated hours para comparar estimado vs real)
       const byProjectMap: Record<string, { projectId: number | null; name: string; hours: number; estimatedHours: number }> = {};
@@ -26902,6 +26926,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }).strict();
   const absenceActionSchema = z.object({
     action: z.enum(ABSENCE_ACTIONS),
+    confirmUnusedDays: z.boolean().optional().default(false),
     reason: z.string().trim().max(4000).optional(),
     allowNegativeBalance: z.boolean().optional().default(false),
   }).strict();
@@ -27128,6 +27153,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (input.allowNegativeBalance && (!access.isAdmin || !input.reason)) {
         return res.status(403).json({ message: "El override requiere Admin y un motivo obligatorio" });
       }
+      const managedCancellation = ["cancel_by_operations", "approve_cancellation"].includes(input.action);
+      if (managedCancellation && (!input.reason || !input.confirmUnusedDays)) {
+        return res.status(400).json({ message: "Indicá un motivo y confirmá que ninguno de los días fue tomado. Si hubo días tomados, revisá el período antes de cancelar." });
+      }
+      // A retry after a committed cancellation must not duplicate events or notifications.
+      if (managedCancellation && current.status === "cancelled") return res.json(current);
       const nextStatus = transitionAbsence(current.status as AbsenceStatus, input.action);
       const holidayDates = await holidaysForRange(current.startDate, current.endDate);
       const requestedByYear = businessDaysByYear(current.startDate, current.endDate, holidayDates);
@@ -27135,6 +27166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allowanceType = absencePerson?.contractType === "freelance" ? null : absenceConsumesAllowance(current.type as AbsenceType);
 
       const updated = await db.transaction(async (tx) => {
+        if (managedCancellation) await guardAbsenceCancellation(tx, current.personnelId, current.startDate, current.endDate);
         await tx.execute(sql`SELECT pg_advisory_xact_lock(291, ${current.personnelId})`);
         if (input.action === "approve") {
           const [overlap] = await tx.select({ id: personnelAbsences.id }).from(personnelAbsences).where(and(
@@ -27211,7 +27243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const changes: any = { status: nextStatus, updatedAt: now };
         if (["approve", "reject"].includes(input.action)) Object.assign(changes, { reviewedBy: access.userId, reviewedAt: now, reviewReason: input.reason || null });
         if (input.action === "request_cancellation") Object.assign(changes, { cancellationRequestedAt: now, cancellationReason: input.reason || null });
-        if (input.action === "approve_cancellation" || input.action === "cancel_pending") Object.assign(changes, { cancelledBy: access.userId, cancelledAt: now, cancellationReason: input.reason || current.cancellationReason });
+        if (managedCancellation || input.action === "cancel_pending") Object.assign(changes, { cancelledBy: access.userId, cancelledAt: now, cancellationReason: input.reason || current.cancellationReason });
         const [row] = await tx.update(personnelAbsences).set(changes).where(and(
           eq(personnelAbsences.id, absenceId), eq(personnelAbsences.status, current.status), sql`xmin::text = ${current.rowVersion}`,
         )).returning();
@@ -27221,7 +27253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eventKey: `${input.action}:${absenceId}:${new Date(current.updatedAt).toISOString()}`,
           action: input.action,
           fromStatus: current.status, toStatus: nextStatus, reason: input.reason || null, actorUserId: access.userId,
-          metadata: { allowNegativeBalance: input.allowNegativeBalance, daysByYear: requestedByYear },
+          metadata: { allowNegativeBalance: input.allowNegativeBalance, daysByYear: requestedByYear, confirmUnusedDays: input.confirmUnusedDays },
         }).onConflictDoNothing();
         if (input.action === "request_cancellation") {
           await createUserNotifications(await operationsNotificationUserIds(tx), {
@@ -27236,6 +27268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             approve: "Ausencia aprobada",
             reject: "Ausencia rechazada",
             approve_cancellation: "Cancelación confirmada",
+            cancel_by_operations: "Ausencia cancelada por Operaciones",
             reject_cancellation: "Cancelación rechazada",
           };
           if(owner) await createUserNotifications([owner.id], {
@@ -27396,8 +27429,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/capacity/projects/:id/mode", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const id = z.coerce.number().int().positive().parse(req.params.id);
-      const { mode } = z.object({ mode: z.unknown() }).strict().parse(req.body);
-      await saveCapacityMode(id, mode, await capacityActor(req));
+      const { mode, weekStart } = z.object({ mode: z.unknown(), weekStart: capacityWeekSchema }).strict().parse(req.body);
+      await saveCapacityMode(id, mode, await capacityActor(req), weekStart);
       res.json({ success: true });
     } catch (error) { capacityError(res, error); }
   });
@@ -27471,7 +27504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT personnel_id, SUM(estimated_hours)::float AS estimated_hours
         FROM capacity_effective_weekly_estimates
         WHERE week_start = ${weekStartISO} AND project_status='active'
-          AND personnel_id IS NOT NULL AND (task_status IS NULL OR task_status NOT IN ('done','cancelled'))
+          AND personnel_id IS NOT NULL AND (task_status IS NULL OR task_status <> 'cancelled')
           AND (${actor.isOperations} OR personnel_id=${actor.personnelId})
         GROUP BY personnel_id
       `);

@@ -25,7 +25,7 @@ export default function DailyStatusEditor({ itemKey, value, onChange, textareaRe
           {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
         </button>
       </div>
-      <p id="daily-editor-help" className="mt-1.5 text-xs text-slate-500">Arrastrá la esquina inferior derecha para ajustar el alto. Enter agrega una línea · Ctrl/⌘ + Enter guarda y sigue.</p>
+      <p id="daily-editor-help" className="mt-1.5 text-xs text-slate-500">Arrastrá la esquina inferior derecha para ajustar el alto. Enter guarda y sigue · Shift+Enter agrega una línea.</p>
     </>
   );
 }

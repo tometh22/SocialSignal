@@ -28,9 +28,23 @@ function pdfjsAssets(): Plugin {
   };
 }
 
+// Keep training screenshots outside public/: access is checked by the API.
+function trainingMediaAssets(): Plugin {
+  return {
+    name: "private-training-media",
+    writeBundle(options) {
+      const source = path.resolve(import.meta.dirname, "server/content/training-media");
+      const target = path.resolve(options.dir!, "../training-media");
+      fs.mkdirSync(target, { recursive: true });
+      fs.cpSync(source, target, { recursive: true });
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     pdfjsAssets(),
+    trainingMediaAssets(),
     react(),
     runtimeErrorOverlay(),
     themePlugin(),

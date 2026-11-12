@@ -1,5 +1,129 @@
 # Changelog
 
+## 1.14.44 — 2026-11-12
+
+- Pipeline comercial más fácil de leer: el total por etapa y la proporción de cada una; la cartera se ordena por cuenta, etapa, valor, ponderado o fecha (en el servidor, antes de paginar) y toda la fila abre la ficha; en celulares cada oportunidad es una tarjeta.
+- El Registro muestra cada cambio como "antes → después" con nombres de campo, y el resumen para Fede tiene vista previa con formato (se sigue copiando y descargando como texto plano).
+- Períodos en español con un selector propio; alertas en cero atenuadas y filtro activo visible con "Ver todas"; guía para habilitar el guardado del corte; avance del cierre, pestañas desplazables en móvil y estados de carga en todas las vistas. "Pendiente" gana contraste y Concentración deja de repetir la referencia histórica. Sin cambios de datos ni migraciones.
+
+## 1.14.43 — 2026-11-12
+
+- Permite editar updates propios desde Status → Actividad, además de los comentarios. El botón de edición queda visible sin depender de pasar el mouse.
+- Distingue comentarios y updates con el mismo ID al editar y actualiza el historial y los resúmenes al guardar. Mantiene la edición exclusiva del autor.
+
+## 1.14.42 — 2026-11-12
+
+- Unifica la interfaz del Pipeline comercial: una sola escala tipográfica para títulos, descripciones, encabezados de tabla y cifras; radios, alturas de controles e iconos consistentes en todas las vistas y en la ficha.
+- Alinea indicadores y tablas: los valores de las tarjetas quedan a la misma altura, las cifras se alinean a la derecha y las filas se leen desde la primera línea. "Pendiente" se muestra atenuado para no competir con importes reales.
+- La cartera entra sin scroll horizontal desde 1280 px: la probabilidad se integra bajo el ponderado y la fuente se muestra en pantallas anchas (sigue disponible en la ficha). Sin cambios de datos ni de API.
+
+## 1.14.41 — 2026-11-12
+
+- Prioriza indicadores y contenido comercial desde el inicio, compacta el contexto del corte y mejora tamaños de lectura. Agrega conteos por alcance y alerta, manteniendo la estética de Mind.
+- Distingue exposición histórica informada a Warner, participación financiera mensual pendiente y proporción de oportunidades abiertas, sin presentar esta última como exposición económica.
+
+- El resumen comercial muestra la hora del corte en formato de 24 horas de Buenos Aires, sin depender del ciclo horario regional del servidor. Conserva datos y cortes existentes; regresión de fecha UTC a hora local.
+
+## 1.14.40 — 2026-11-12
+
+- Incorpora Pipeline comercial al CRM: resumen ejecutivo, oportunidades, alertas, concentración, cierre mensual y registro, con interfaz adaptable y ficha comercial guiada.
+- Calcula bruto, ponderado y cobertura desde evidencia validada; separa confirmadas, validación CRM y facturación real. Respeta acceso CRM, cotizaciones y finanzas.
+- Agrega alcances vinculados, cortes inmutables, auditoría transaccional, concurrencia optimista y carga histórica idempotente con conciliación previa. Migración aditiva 0096.
+- Prepara la conciliación del corte comercial de noviembre sin convertir proyecciones en facturación ni completar importes o probabilidades desconocidos.
+
+## 1.14.39 — 2026-11-11
+
+- Capacidad conserva la modalidad por proyecto y semana: modificar una semana no altera la planificación histórica. Recupera las bases históricas inequívocas sin sumar modalidades alternativas.
+- Las tareas finalizadas mantienen sus horas planificadas y aparecen identificadas en el detalle. Las canceladas siguen excluidas.
+- La primera carga fija la modalidad semanal también desde el detalle de tareas; migración idempotente y regresiones de recuperación, aislamiento entre semanas, permisos y cálculo HTTP.
+
+## 1.14.38 — 2026-11-11
+
+- Operaciones puede cancelar ausencias pendientes o aprobadas con motivo y confirmación de días no tomados. Se conservan autor, fecha e historial; saldo, disponibilidad y capacidad se actualizan sin duplicar devoluciones ni notificaciones al reintentar.
+- La cancelación respeta cierres financieros, cortes de horas y liquidaciones publicadas, incluso en rangos de varios meses o años. Usa los mismos bloqueos que el cierre y mantiene estado, auditoría y notificación en una transacción.
+- Capacitación unifica las aclaraciones y amplía los pasos de Inicio, Notificaciones, Mis facturas, Cotizaciones y Cierre del equipo. Distingue lista, kanban y Cartera; reúne las guías de gestión financiera del proyecto y entregables en Cartera y actualiza las capturas.
+- Retira las guías y accesos de Objetivos y Tarifas/servicios, conservando sus funciones, datos y rutas históricas. Oculta las guías de Finanzas hasta su validación, también en búsquedas y acceso directo. Conserva el progreso anterior y publica las guías vigentes como versión 3.
+- Los proyectos comerciales nuevos requieren una cotización aprobada del mismo cliente, revalidada bajo bloqueo antes del alta. Los proyectos internos conservan su excepción sin cotización. Regresiones PostgreSQL y de navegador para permisos, cierres, concurrencia, saldos, capacidad, compatibilidad y navegación móvil; sin nuevas migraciones.
+
+## 1.14.37 — 2026-11-10
+
+- El campo de escritura del daily comienza vacío al entrar o volver a un tema. El último mensaje guardado permanece en Comentarios y antecedentes, sin copiarse como borrador.
+- Avanzar con el campo vacío o solo espacios no publica una actualización ni borra el estado anterior. Un fallo de guardado conserva el texto para reintentar.
+- Regresión de navegador para apertura, navegación, guardado, reingreso y recuperación de errores. Se conservan las sugerencias de IA y el guardado con Enter de 1.14.36; sin migraciones.
+
+## 1.14.36 — 2026-11-10
+
+- En la daily, Enter guarda y avanza; Shift+Enter agrega una línea. Se conserva Ctrl/⌘+Enter y se actualizan las ayudas.
+- Agrega sugerencias de mensajes con IA basadas en el estado actual y los últimos 30 comentarios y updates de la misma sala. El borrador se revisa y se aplica explícitamente; no se guarda automáticamente ni reemplaza ediciones posteriores a la solicitud.
+- Usa Claude Sonnet 4.6 con la conexión de Anthropic de Mind; permite configurar ANTHROPIC_STATUS_DRAFT_MODEL. Incluye pruebas del servicio y verificación en navegador de borradores y respuestas tardías. Sin nuevas migraciones.
+
+## 1.14.35 — 2026-11-10
+
+- El conector MCP permite proponer cambios y agregar notas en Status con el nuevo alcance explícito `status:write`. Cada pedido presenta el antes/después en Mind y requiere confirmación de la misma cuenta antes de guardarse; los demás módulos siguen siendo de solo lectura.
+- Valida permiso de Status, membresía de la sala, usuario activo, alcance y vigencia de la autorización tanto al proponer como al confirmar. Las autorizaciones anteriores no adquieren escritura al renovarse.
+- Guarda cambios, avances e historial en una transacción; rechaza propuestas vencidas o desactualizadas y evita duplicados al reintentar. No permite borrar, ocultar, mover ítems ni administrar miembros desde el conector.
+- Migración idempotente `0095_mcp_status_actions` y pruebas con PostgreSQL y cliente MCP para consentimiento, aislamiento, CSRF, revocación, conflictos, reintentos y rollback.
+
+## 1.14.34 — 2026-11-10
+
+- Agrega diagnóstico de errores OAuth al reconectar Mind desde ChatGPT: distingue rechazos de credenciales, PKCE, códigos y renovación. Registra únicamente categorías y presencia de parámetros, sin secretos, tokens, códigos ni descripciones arbitrarias.
+- Pruebas contra el handler OAuth del SDK verifican los rechazos y la exclusión de datos sensibles. No cambia las reglas de autenticación ni los permisos del conector.
+
+## 1.14.33 — 2026-11-06
+
+- El Dashboard conserva los meses del Máster hasta que existan ingresos o un cierre nativo de Mind. Los movimientos importados ya no reemplazan el histórico con facturación cero. Ventas, resultados, saldos y cashflow usan la misma instantánea del Máster que Proyección; los cierres nativos permanecen inmutables.
+- Se identifica la fuente por período. El agregado anual toma el último balance completo y muestra su fecha; el neto y su margen señalan cobertura parcial y usan los mismos meses. No se infieren ajustes entre un EBIT anual y un neto parcial, ni se grafican faltantes como cero. Las pérdidas conservan su signo en el estado de resultados.
+- Proyección toma las fechas de cierre del Máster para separar ejecutado y proyectado. Totales y exclusiones conservan la precisión original hasta la suma final: quitar todas las exclusiones recupera exactamente los importes iniciales y elimina los desvíos de centavos.
+- Regresiones con PostgreSQL para fuentes, cancelaciones, cierres y reaperturas, fechas de cierre, rangos y errores de lectura; pruebas de precisión y recorridos de navegador. Cotejo independiente de los 12 meses, 1.863 conceptos y ocho escenarios contra el Máster. Sin migraciones ni modificaciones de datos contables.
+
+## 1.14.32 — 2026-11-06
+
+- Mis tareas prioriza los vencimientos más próximos también al cargar más páginas. Mantiene un orden estable para fechas iguales y deja las tareas sin vencimiento al final; Finalizadas conserva su orden anterior.
+- El Panel de horas incorpora gráficos de estimadas por semana y por proyecto, con los mismos filtros de período, persona, proyecto y sección. Los gráficos semanales comparten escala y los proyectos conservan sus colores entre reales y estimadas.
+- Las semanas con planificación y sin horas registradas también se muestran. Las estimaciones conservan la regla de semanas completas que intersectan el período, aclarada en pantalla.
+- Regresiones de paginación con PostgreSQL incorporadas a CI, agregación semanal y verificación de navegador en escritorio y móvil. Sin nuevas migraciones.
+
+## 1.14.31 — 2026-11-06
+
+- Corrige la fuente de las exclusiones: los meses del Máster leen una misma instantánea de Resumen Ejecutivo, Costos directos e indirectos, Costos estimados y las provisiones pertinentes de Pasivo. Los consumos de Pasivo ya no sustituyen los gastos que realmente alimentan el resultado.
+- Cada mes usa una sola base de costos conciliada con Ventas menos EBIT, sin rellenar gastos reales con estimados. Se conservan la precisión y las reglas de las fórmulas del Máster: IVA ya excluido, impuestos bajo EBIT y bonos con impacto separado sobre EBIT y neto. Si el detalle no concilia, se informa y se deshabilitan las exclusiones afectadas.
+- Proyección y simulación comparten la base actual del Máster; los meses nativos conservan su fuente. El escenario muestra la fecha de consulta y la hoja/fila de cada gasto, reconoce la clasificación Marketing y mantiene los importes fijos durante la selección. Al salir se descarta la caché de esa simulación.
+- Regresiones de selección parcial, paginación, filtros, exclusión masiva y reversión; pruebas con PostgreSQL y conciliación de las fórmulas del Máster, devoluciones, importes faltantes y precisión monetaria. Sin migraciones ni modificaciones del Máster.
+
+## 1.14.30 — 2026-11-06
+
+- Proyección incorpora «Escenario sin reinversión»: búsqueda anual de conceptos, proveedores y consumos de tarjeta, selección individual o de todas las coincidencias, y comparación de costos, EBIT y beneficio neto. La selección se acumula entre búsquedas, puede revertirse y se reinicia al salir o cambiar de año; no modifica la contabilidad.
+- El detalle registrado sustituye el estimado del mismo concepto/categoría/mes, sin sumar pagos de caja ni documentos de balance o anulados. Se conservan devoluciones, importes netos y conversiones de moneda; los movimientos sin importe o tipo de cambio no se excluyen como si fueran cero.
+- La comparación conserva los demás ingresos y gastos, sin recalcular tasas impositivas. El neto identifica meses faltantes o con fórmulas inconsistentes y muestra un subtotal explícito, sin presentarlo como total anual. Los conceptos fiscales afectan solo al neto, respetando el tratamiento explícito de los movimientos nativos.
+- Validación con PostgreSQL y recorridos de navegador para búsqueda, selección entre páginas, reversión, cambio de año, permisos, recuperación de errores y móvil. Endpoint de solo lectura con los permisos del reporte; sin nuevas migraciones.
+
+## 1.14.29 — 2026-11-06
+
+- Proyección conserva los doce meses de la base anual importada del Máster, incluidos los posteriores al corte operativo. Corrige la exclusión de agosto a diciembre introducida al recuperar el histórico en 1.14.28.
+- Los ingresos y cierres de Mind reemplazan la base del mes correspondiente sin sumarse a ella. El detalle mensual indica si la facturación proviene del Máster importado, de ingresos de Mind o de un cierre de Mind.
+- Los totales se redondean a centavos. Regresiones con PostgreSQL para el año completo con corte configurado y la sustitución de un mes sin perder los meses siguientes.
+
+## 1.14.28 — 2026-11-06
+
+- Proyección recupera la facturación del resumen histórico importado cuando no hay ingresos nativos para ese mes, respeta la fecha de corte y evita duplicar los importes.
+- Los períodos nativos usan la base de facturación; los cierres conservan su resultado, incluido un EBIT cero. Los costos del resumen se derivan de ventas menos EBIT.
+- Se corrigen los nombres de meses del gráfico y se aclaran las fuentes de la pantalla. Regresiones con PostgreSQL para histórico, corte, cancelaciones y reapertura de períodos.
+
+## 1.14.27 — 2026-11-06
+
+- Capacitación pasa a ser una biblioteca de 37 guías de consulta con instrucciones numeradas, ejemplos, puntos de revisión y enlaces a las funciones. Se eliminan ejercicios, evaluaciones y recorridos obligatorios; la marca de lectura es opcional y conserva el historial anterior.
+- Capturas reales de la app con datos de ejemplo en todas las guías, acompañadas por indicaciones del paso correspondiente. Visor ampliable, tamaño original y navegación con teclado y móvil; un error de imagen permite reintentar sin bloquear las instrucciones.
+- Las imágenes se sirven mediante una API autenticada que respeta los permisos de cada guía, incluidas las habilitaciones específicas de proveedores. El build las conserva fuera del directorio público; no se requiere una nueva migración.
+- Se actualizan la invitación, la ayuda contextual, la documentación y las pruebas de lectura, versiones, acceso directo a imágenes y recuperación de errores.
+
+## 1.14.26 — 2026-11-05
+
+- Nueva sección Capacitación con 37 lecciones por permisos, búsqueda, módulos, avance personal y acceso para proveedores. Invitación inicial descartable y ayuda integrada en escritorio y móvil.
+- Explicaciones, formularios simulados, ejercicios de orden y preguntas con devolución. Las prácticas usan datos ficticios y solo guardan respuestas y avance, sin modificar registros operativos.
+- Progreso por usuario, lección y versión; reintentos, continuidad entre sesiones y conservación del historial. El servidor valida respuestas y acceso, incluidos proyectos y habilitación de horas de proveedores.
+- Migración aditiva 0094 para progreso y preferencias. Ambos quedan excluidos del catálogo MCP como información personal. Se evita un fallo de Inicio en cuentas nuevas sin conteos de tareas.
+- Pruebas de permisos, persistencia, concurrencia y versiones con PostgreSQL aislado; recorridos de navegador para capacitación, teclado, móvil y recuperación de errores de guardado. Inventario de funciones y mantenimiento documentados.
+
 ## 1.14.25 — 2026-11-04
 
 - Las notificaciones verifican permisos, membresías y titularidad al crearse, mostrarse y enviarse, también en MCP. Se separan las audiencias de tareas, salas, aprobaciones, ausencias y liquidaciones.

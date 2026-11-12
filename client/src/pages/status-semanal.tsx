@@ -14,6 +14,7 @@ import AddProjectDialog from "@/components/review/AddProjectDialog";
 import AddItemButton, { type NewItemInput } from "@/components/review/AddStatusItemButton";
 import StatusText from "@/components/review/StatusText";
 import StatusFocusWorkspace from "@/components/review/StatusFocusWorkspace";
+import DailyDraftSuggestion from "@/components/review/DailyDraftSuggestion";
 import DailyStatusEditor from "@/components/review/DailyStatusEditor";
 import { useAutoResize } from "@/hooks/use-auto-resize-textarea";
 import RoomTitleEditor from "@/components/review/RoomTitleEditor";
@@ -1934,13 +1935,13 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
   const { user } = useAuth();
   const { toast } = useToast();
   const [newNote, setNewNote] = useState('');
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingEntry, setEditingEntry] = useState<{ id: number; type: 'note' | 'update' } | null>(null);
   const [editText, setEditText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const newNoteRef = useRef<HTMLTextAreaElement>(null);
   const editNoteRef = useRef<HTMLTextAreaElement>(null);
   useAutoResize(newNoteRef, newNote);
-  useAutoResize(editNoteRef, editText, editingId !== null);
+  useAutoResize(editNoteRef, editText, editingEntry !== null);
   const currentUserId = (user as any)?.id;
 
   const notesUrl = projectId
@@ -1966,10 +1967,11 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
   });
   // The compact thread counts notes AND updates. Read the same update query here
   // so opening its history includes all counted entries, not just field changes.
+  const updatesCacheKey = projectId
+    ? ['/api/status-semanal', projectId, 'updates']
+    : ['/api/status-semanal/custom', customItemId, 'updates'];
   const { data: updates = [], isLoading: updatesLoading, isError: updatesError } = useQuery<UpdateEntry[]>({
-    queryKey: projectId
-      ? ['/api/status-semanal', projectId, 'updates']
-      : ['/api/status-semanal/custom', customItemId, 'updates'],
+    queryKey: updatesCacheKey,
     queryFn: async () => {
       const r = await authFetch(projectId
         ? `/api/status-semanal/${projectId}/updates`
@@ -2008,10 +2010,13 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
   });
 
   const editMutation = useMutation({
-    mutationFn: ({ noteId, content }: { noteId: number; content: string }) =>
-      mutationFetch(`/api/status-semanal/notes/${noteId}`, 'PATCH', { content }),
+    mutationFn: ({ id, type, content }: { id: number; type: 'note' | 'update'; content: string }) =>
+      mutationFetch(`/api/status-semanal/${type === 'note' ? 'notes' : 'updates'}/${id}`, 'PATCH', { content }),
     onSuccess: () => {
-      setEditingId(null);
+      setEditingEntry(null);
+      queryClient.refetchQueries({ queryKey: updatesCacheKey });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
+      if (customItemId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
       queryClient.refetchQueries({ queryKey: activityCacheKey });
       queryClient.refetchQueries({ queryKey: notesCacheKey });
     },
@@ -2047,7 +2052,8 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
         )}
         {timeline.map((entry, idx) => {
           if (entry.type === 'note' || entry.type === 'update') {
-            const isOwn = entry.authorId === currentUserId;
+            const isOwn = currentUserId != null && entry.authorId === currentUserId;
+            const isEditing = editingEntry?.id === entry.id && editingEntry.type === entry.type;
             return (
               <div id={entry.type === "note" ? `mind-note-${entry.id}` : undefined} key={`${entry.type}_${entry.id}`} data-testid={`activity-${entry.type}-${entry.id}`} className={cn("group flex gap-2 py-1 rounded-lg", typeof window !== "undefined" && new URLSearchParams(window.location.search).get("noteId") === String(entry.id) && entry.type === "note" && "bg-indigo-50 ring-2 ring-indigo-200")}>
                 <div className={cn("h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5", isOwn ? "bg-indigo-100 text-indigo-700" : "bg-teal-100 text-teal-700")}>
@@ -2066,7 +2072,7 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  {entry.type === 'note' && editingId === entry.id ? (
+                  {isEditing ? (
                     <div className="space-y-1">
                       <Textarea
                         ref={editNoteRef}
@@ -2077,9 +2083,9 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
                         onKeyDown={e => {
                           if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
-                            if (editText.trim()) editMutation.mutate({ noteId: entry.id, content: editText });
+                            if (editText.trim() && !editMutation.isPending) editMutation.mutate({ id: entry.id, type: entry.type, content: editText });
                           } else if (e.key === 'Escape') {
-                            setEditingId(null);
+                            setEditingEntry(null);
                           }
                         }}
                         className="resize-y overflow-auto text-[11px] min-h-[32px] bg-white px-2.5 py-1.5 leading-relaxed"
@@ -2087,11 +2093,11 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
                       <div className="flex gap-1">
                         <Button size="sm" className="h-6 px-2 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white"
                           disabled={!editText.trim() || editMutation.isPending}
-                          onClick={() => editMutation.mutate({ noteId: entry.id, content: editText })}>
+                          onClick={() => editMutation.mutate({ id: entry.id, type: entry.type, content: editText })}>
                           {editMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Guardar'}
                         </Button>
                         <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]"
-                          onClick={() => setEditingId(null)}>
+                          onClick={() => setEditingEntry(null)}>
                           Cancelar
                         </Button>
                       </div>
@@ -2100,14 +2106,14 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
                     <StatusText className={embedded ? "text-sm leading-7 py-1" : "text-[11px] bg-white border border-slate-100 rounded-md px-2.5 py-1.5"}>{entry.content}</StatusText>
                   )}
                 </div>
-                {entry.type === 'note' && isOwn && editingId !== entry.id && (
-                  <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
-                    <button onClick={() => { setEditingId(entry.id); setEditText(entry.content); }} className="p-0.5 text-slate-300 hover:text-indigo-400">
+                {isOwn && !isEditing && (
+                  <div className="flex flex-col gap-0.5 shrink-0 mt-0.5">
+                    <button aria-label={entry.type === 'note' ? 'Editar comentario' : 'Editar update'} onClick={() => { setEditingEntry({ id: entry.id, type: entry.type }); setEditText(entry.content); }} className="p-1 text-slate-500 hover:text-indigo-600">
                       <Pencil className="h-3 w-3" />
                     </button>
-                    <button onClick={() => deleteMutation.mutate(entry.id)} className="p-0.5 text-slate-300 hover:text-red-400">
+                    {entry.type === 'note' && <button aria-label="Eliminar comentario" onClick={() => deleteMutation.mutate(entry.id)} className="p-1 text-slate-500 hover:text-red-600">
                       <Trash2 className="h-3 w-3" />
-                    </button>
+                    </button>}
                   </div>
                 )}
               </div>
@@ -2358,7 +2364,8 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   const entry = done ? null : queue[idx];
   const item = entry ? { ...entry.item, ...(local.get(entry.item.key) ?? {}) } as Item : null;
 
-  useEffect(() => { setDraft(item?.currentAction ?? ''); setPicker(null); if (!done) setTimeout(() => textareaRef.current?.focus(), 30); }, [idx, done]);
+  // The saved update belongs in the history, never in the new-message draft.
+  useEffect(() => { setDraft(''); setPicker(null); if (!done) setTimeout(() => textareaRef.current?.focus(), 30); }, [idx, done]);
 
   const record = (it: Item, text: string) => {
     setChanges(prev => {
@@ -2382,7 +2389,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   const next = async () => {
     if (!item) return;
     const t = draft.trim();
-    if (t !== (item.currentAction ?? '').trim()) {
+    if (t && t !== (item.currentAction ?? '').trim()) {
       try {
         await postUpdate(item, t);
         patchLocal(item, { currentAction: t });
@@ -2453,16 +2460,17 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   };
   useEffect(() => () => { recognitionRef.current?.stop?.(); }, []);
 
-  // Atajos: Enter fuera del textarea (o ⌘/Ctrl+Enter adentro) avanza.
+  // Atajos: Enter guarda y avanza; Shift+Enter agrega una línea en el editor.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing) return;
       const el = document.activeElement as HTMLElement | null;
       const inText = el?.tagName === 'TEXTAREA' || el?.tagName === 'INPUT' || el?.tagName === 'SELECT' || el?.isContentEditable;
       if (e.key === 'Escape') { e.preventDefault(); if (picker) setPicker(null); else if (listening) toggleListening(); else onExit(); return; }
       if (done) { if (e.key === 'Enter' && !inText) { e.preventDefault(); void finish(); } return; }
-      // Within the editor, Enter adds a line; Ctrl/⌘+Enter saves and advances.
+      // Keep Ctrl/⌘+Enter working too; Shift+Enter remains a newline.
       const inTextarea = el === textareaRef.current;
-      if (e.key === 'Enter' && (!inText || (inTextarea && (e.metaKey || e.ctrlKey)))) { e.preventDefault(); void next(); return; }
+      if (e.key === 'Enter' && !e.shiftKey && (!inText || inTextarea)) { e.preventDefault(); void next(); return; }
       if (inText) return;
       if (e.key === '1') { e.preventDefault(); setHealth('verde'); }
       else if (e.key === '2') { e.preventDefault(); setHealth('amarillo'); }
@@ -2587,6 +2595,9 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
               <div className="mt-5">
                 <DailyStatusEditor itemKey={item.key} value={draft} onChange={setDraft}
                   textareaRef={textareaRef} listening={listening} onToggleListening={toggleListening} />
+                <DailyDraftSuggestion key={item.key} kind={item.isCustom ? 'custom' : 'project'}
+                  targetId={(item.isCustom ? item.customId : item.projectId)!} draft={draft}
+                  onUse={text => { setDraft(text); textareaRef.current?.focus(); }} />
                 {changes.get(item.key)?.changes.length ? (
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {changes.get(item.key)!.changes.map((c, i) => <span key={i} className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5">{c}</span>)}
@@ -2600,7 +2611,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
               <div className="text-[11px] text-slate-400 uppercase tracking-wide font-bold mb-3">Acciones</div>
               <div className="space-y-2 text-sm">
                 <button onClick={() => void next()} className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2.5 hover:border-indigo-300 transition-colors">
-                  <span>{draft.trim() !== (item.currentAction ?? '').trim() ? 'Guardar y siguiente' : 'Todo igual, siguiente'}</span><kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500">Ctrl/⌘ ⏎</kbd>
+                  <span>{draft.trim() && draft.trim() !== (item.currentAction ?? '').trim() ? 'Guardar y siguiente' : 'Todo igual, siguiente'}</span><kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500">Enter ⏎</kbd>
                 </button>
                 <div className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2">
                   <span>Semáforo</span>

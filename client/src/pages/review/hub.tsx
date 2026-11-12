@@ -1,8 +1,7 @@
-import { usePermissions } from "@/hooks/use-permissions";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Bot, Plus, Target } from "lucide-react";
+import { Bot, Plus } from "lucide-react";
 import { reviewApi, reviewKeys, type ReviewRoomSummary } from "@/lib/review-api";
 import { setCurrentReviewRoomId, getCurrentReviewRoomId } from "@/lib/queryClient";
 import CreateReviewDialog from "@/components/review/CreateReviewDialog";
@@ -22,7 +21,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 export default function ReviewHubPage() {
-  const { isOperations } = usePermissions();
   const [createOpen, setCreateOpen] = useState(false);
   const [roomToArchive, setRoomToArchive] = useState<ReviewRoomSummary | null>(null);
   const queryClient = useQueryClient();
@@ -63,9 +61,6 @@ export default function ReviewHubPage() {
           <Button variant="outline" asChild>
             <a href="/mcp/connections"><Bot className="h-4 w-4" /> Agentes</a>
           </Button>
-          {isOperations && <Button variant="outline" asChild>
-            <a href="/review/objectives"><Target className="h-4 w-4" /> Objetivos</a>
-          </Button>}
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nueva sala

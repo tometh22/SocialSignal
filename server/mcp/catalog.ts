@@ -1,5 +1,13 @@
 // Explicit business-data allowlist. Review permissions and fields before adding resources.
 export const excludedMindTables = {
+  pipeline_opportunities: "Alcances y evidencia con permisos combinados CRM/cotizaciones; usar API nativa de Pipeline.",
+  pipeline_cuts: "Instantáneas comerciales con proyección por permisos; usar API nativa de Pipeline.",
+  pipeline_log: "Auditoría comercial privada; usar API nativa de Pipeline.",
+  pipeline_checklists: "Checklist interno de cierre comercial; usar API nativa de Pipeline.",
+  pipeline_settings: "Configuración operativa interna del Pipeline.",
+  "capacity_week_modes": "Modalidad semanal interna; se consulta en Capacidad con permisos del proyecto",
+  training_progress: "Avance y respuestas personales de capacitación; solo accesibles por su titular en la app.",
+  training_preferences: "Preferencias personales de capacitación; no son datos de negocio.",
   "notification_email_batches": "Contenido privado de la cola de correo",
   "notification_email_events": "Eventos técnicos de entrega del proveedor",
   "notification_email_suppressions": "Bloqueos privados de direcciones de correo",
@@ -8,6 +16,7 @@ export const excludedMindTables = {
   "user_notification_thread_mutes": "Preferencias privadas de cada conversación",
   "capacity_group_estimates": "Planificación semanal por persona; se consulta en Capacidad con validación de titularidad",
   "mcp_oauth_grants": "Credenciales OAuth",
+  "mcp_status_actions": "Solicitudes privadas de confirmación de cambios",
   "password_reset_tokens": "Tokens de recuperación",
   "user_notification_push_subscriptions": "Credenciales push",
   "system_config": "Configuración interna que puede contener secretos; no se expone como datos de negocio"
