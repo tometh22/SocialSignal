@@ -24,6 +24,7 @@ const filters = z.object({
   stage: z.string().optional(),
   owner: z.string().optional(),
   scope: z.string().optional(),
+  warner: z.enum(["true", "false"]).optional(),
   alert: z.string().optional(),
   closeMonth: z.union([periodSchema, z.literal("pending")]).optional(),
   group: z.enum(["stage", "account", "owner", "closeMonth"]).optional(),
@@ -204,6 +205,7 @@ export function registerPipelineRoutes(
         (!f.stage || r.stage === f.stage) &&
         (!f.owner || (r.owner ?? "Sin responsable") === f.owner) &&
         (!f.scope || r.scope === f.scope) &&
+        (!f.warner || r.warner === (f.warner === "true")) &&
         (!f.closeMonth ||
           (f.closeMonth === "pending"
             ? !r.closeDate

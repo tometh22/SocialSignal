@@ -606,7 +606,7 @@ export default function Pipeline() {
     });
   const summary = useData("/summary?" + qs),
     rows = useData(
-      `/${tab === "Alertas" ? "alerts" : "opportunities"}?${qs}&offset=${offset}`,
+      `/${tab === "Alertas" ? "alerts" : "opportunities"}?${qs}&offset=${offset}${tab === "Concentración" ? "&warner=true" : ""}`,
       ["Resumen", "Oportunidades", "Alertas", "Concentración"].includes(tab),
     ),
     cuts = useData("/cuts"),
