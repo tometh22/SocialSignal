@@ -6,6 +6,7 @@ import { trainingMigrationSql } from "./migrations/training";
 import { teamSettlementWorkflowMigrationSql } from "./migrations/team-settlement-workflow";
 import express, { type Request, Response, NextFunction } from "express";
 import { notificationReliabilityMigrationSql } from "./migrations/notification-reliability";
+import { accountAccessLinksMigrationSql } from "./migrations/account-access-links";
 import { verifyNotificationWebhook, recordNotificationEmailEvent,verifySendgridWebhook,recordSendgridEvents } from "./services/notification-email-events";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -926,6 +927,7 @@ async function applyPendingMigrations() {
     await run('0081 notification category preferences', userNotificationCategoryPreferencesMigrationSql);
     await run('0082 notification push subscriptions', userNotificationPushSubscriptionsMigrationSql);
     await run('0093 notification relevance and reliable delivery', notificationReliabilityMigrationSql);
+    await run('0097 account invitations and password recovery', accountAccessLinksMigrationSql);
     // Install payroll guards before serving requests; financial cutover stays independent.
     await client.query("BEGIN");
     try {

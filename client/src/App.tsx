@@ -77,6 +77,7 @@ const TasksHomePage = lazy(() => import("@/pages/tasks/tasks-home"));
 
 // Authentication & Utilities
 import AuthPage from "@/pages/auth-page";
+const AccountAccessPage = lazy(() => import("@/pages/account-access"));
 const EditDeliverable = lazy(() => import("@/pages/edit-deliverable"));
 const EditRobustnessPage = lazy(() => import("@/pages/edit-robustness"));
 const AlwaysOnProjectView = lazy(() => import("@/pages/always-on-project-view"));
@@ -222,6 +223,9 @@ function AppRoutes() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
+      <Route path="/accept-invitation"><Suspense fallback={<AppRouteFallback />}><AccountAccessPage key="invitation" /></Suspense></Route>
+      <Route path="/forgot-password"><Suspense fallback={<AppRouteFallback />}><AccountAccessPage key="forgot" /></Suspense></Route>
+      <Route path="/reset-password"><Suspense fallback={<AppRouteFallback />}><AccountAccessPage key="reset" /></Suspense></Route>
       <Route path="/proposal/:token">
         <Suspense fallback={<AppRouteFallback />}><PublicProposal /></Suspense>
       </Route>

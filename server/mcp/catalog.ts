@@ -8,6 +8,7 @@ export const excludedMindTables = {
   "capacity_week_modes": "Modalidad semanal interna; se consulta en Capacidad con permisos del proyecto",
   training_progress: "Avance y respuestas personales de capacitación; solo accesibles por su titular en la app.",
   training_preferences: "Preferencias personales de capacitación; no son datos de negocio.",
+  "account_access_links": "Enlaces privados de invitación y recuperación de cuenta",
   "notification_email_batches": "Contenido privado de la cola de correo",
   "notification_email_events": "Eventos técnicos de entrega del proveedor",
   "notification_email_suppressions": "Bloqueos privados de direcciones de correo",

@@ -4,8 +4,10 @@ import { and, eq, sql } from "drizzle-orm";
 import { readPushDeviceToken } from "./services/notification-device";
 import { Express, Request, Response } from "express";
 import session from "express-session";
-import { createHmac, scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { comparePasswords } from "./services/passwords";
+import { registerAccountAccessRoutes } from "./routes-account-access";
+export { hashPassword } from "./services/passwords";
 import { User } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -21,40 +23,6 @@ declare global {
 declare module 'express-session' {
   interface SessionData {
     userId: number;
-  }
-}
-
-const scryptAsync = promisify(scrypt);
-
-// Función para generar hash de contraseña
-export async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
-}
-
-// Función para comparar contraseñas
-async function comparePasswords(supplied: string, stored: string) {
-  if (!stored.includes(".")) {
-    console.error("Formato de hash incorrecto, no contiene separador '.'");
-    return false;
-  }
-
-  const [hashed, salt] = stored.split(".");
-
-  try {
-    const hashedBuf = Buffer.from(hashed, "hex");
-    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-
-    try {
-      return timingSafeEqual(hashedBuf, suppliedBuf);
-    } catch (error) {
-      console.error("Error en timingSafeEqual:", error);
-      return false;
-    }
-  } catch (error) {
-    console.error("Error al comparar contraseñas:", error);
-    return false;
   }
 }
 
@@ -317,62 +285,7 @@ export function setupAuth(app: Express, storage: IStorage) {
     }
   });
 
-  // Rutas de recuperación de contraseñas
-  app.post("/api/forgot-password", async (req, res) => {
-    try {
-      const { email } = req.body;
-
-      const user = await storage.getUserByEmail(email);
-      if (!user) {
-        return res.status(200).json({ 
-          message: "Si el correo existe en nuestro sistema, recibirás un enlace de recuperación." 
-        });
-      }
-
-      const resetToken = randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + 3600000);
-
-      await storage.createPasswordResetToken(email, resetToken, expiresAt);
-
-      console.log(`🔑 Password reset token generated for ${email}`);
-
-      res.status(200).json({
-        message: "Si el correo existe en nuestro sistema, recibirás un enlace de recuperación."
-      });
-    } catch (error) {
-      console.error("Error en forgot-password:", error);
-      res.status(500).json({ message: "Error en el servidor" });
-    }
-  });
-
-  app.post("/api/reset-password", async (req, res) => {
-    try {
-      const { token, password } = req.body;
-
-      const resetToken = await storage.getPasswordResetToken(token);
-
-      if (!resetToken) {
-        return res.status(400).json({ message: "Token inválido o expirado" });
-      }
-
-      if (resetToken.used) {
-        return res.status(400).json({ message: "Este token ya ha sido utilizado" });
-      }
-
-      if (new Date() > resetToken.expiresAt) {
-        return res.status(400).json({ message: "Token expirado" });
-      }
-
-      const hashedPassword = await hashPassword(password);
-      await storage.updateUserPassword(resetToken.email, hashedPassword);
-      await storage.markPasswordResetTokenAsUsed(token);
-
-      res.status(200).json({ message: "Contraseña actualizada correctamente" });
-    } catch (error) {
-      console.error("Error en reset-password:", error);
-      res.status(500).json({ message: "Error en el servidor" });
-    }
-  });
+  registerAccountAccessRoutes(app, storage);
 
   return { requireAuth, resolveUserFromSessionCookie };
 }

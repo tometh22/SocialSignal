@@ -45,6 +45,7 @@ jobs:
       ABSENCE_TEST_DATABASE_URL: postgres://mind_test:mind_test@localhost:5432/mind_test
       TRAINING_TEST_DATABASE_URL: postgres://mind_test:mind_test@localhost:5432/mind_test
       TASK_LIST_TEST_DATABASE_URL: postgres://mind_test:mind_test@localhost:5432/mind_test
+      ACCOUNT_ACCESS_TEST_DATABASE_URL: postgres://mind_test:mind_test@localhost:5432/mind_test
 
     steps:
       - name: Check out repository
