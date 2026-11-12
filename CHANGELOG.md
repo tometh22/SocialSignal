@@ -1,10 +1,15 @@
 # Changelog
 
-## 1.14.43 — 2026-11-12
+## 1.14.44 — 2026-11-12
 
 - Pipeline comercial más fácil de leer: el total por etapa y la proporción de cada una; la cartera se ordena por cuenta, etapa, valor, ponderado o fecha (en el servidor, antes de paginar) y toda la fila abre la ficha; en celulares cada oportunidad es una tarjeta.
 - El Registro muestra cada cambio como "antes → después" con nombres de campo, y el resumen para Fede tiene vista previa con formato (se sigue copiando y descargando como texto plano).
 - Períodos en español con un selector propio; alertas en cero atenuadas y filtro activo visible con "Ver todas"; guía para habilitar el guardado del corte; avance del cierre, pestañas desplazables en móvil y estados de carga en todas las vistas. "Pendiente" gana contraste y Concentración deja de repetir la referencia histórica. Sin cambios de datos ni migraciones.
+
+## 1.14.43 — 2026-11-12
+
+- Permite editar updates propios desde Status → Actividad, además de los comentarios. El botón de edición queda visible sin depender de pasar el mouse.
+- Distingue comentarios y updates con el mismo ID al editar y actualiza el historial y los resúmenes al guardar. Mantiene la edición exclusiva del autor.
 
 ## 1.14.42 — 2026-11-12
 
