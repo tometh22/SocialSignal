@@ -20,6 +20,8 @@ Las propuestas y correos manuales conservan sus aprobaciones y confirmación exp
 
 ## Invitaciones y recuperación de acceso
 
+El API conserva el alta de cuentas inactivas: se crean desactivadas y sin invitación, incluso si el proveedor de correo no está configurado. Después de activarlas, administración puede usar **Enviar acceso**.
+
 Crear una cuenta desde **Administración → Usuarios** envía automáticamente una invitación al email de esa persona. El administrador define sus permisos y no necesita asignar ni compartir una contraseña. El alta de la cuenta y el enlace se guardan juntos; hasta que la persona configure su contraseña, la cuenta tiene una clave aleatoria desconocida.
 
 La invitación vence en 48 horas y se usa una sola vez. Usuarios muestra si está pendiente, aceptada, vencida o si no se confirmó el envío; **Enviar acceso / Reenviar** permite invitar a las cuentas existentes o reemplazar un enlace. Cada nuevo enlace invalida la invitación anterior y hay un minuto de espera entre intentos. Reenviar a una cuenta existente mantiene su contraseña actual hasta que la persona configure otra.

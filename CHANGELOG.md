@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.47 — 2026-11-12
+
+- El alta de usuarios por API conserva `isActive: false`: crea la cuenta desactivada, sin enlace ni envío de correo. Permite activarla e invitarla luego desde administración y evita habilitar una cuenta que se pidió dejar inactiva.
+- Cobertura PostgreSQL del alta inactiva sin proveedor configurado, rechazo de invitación mientras está desactivada y envío posterior a su activación.
+
 ## 1.14.46 — 2026-11-12
 
 - Crear usuarios envía una invitación por mail para que cada persona configure su contraseña, sin claves compartidas por administración. El enlace vence en 48 horas, es de un solo uso y el panel permite consultar su estado y reenviarlo, también para cuentas existentes.

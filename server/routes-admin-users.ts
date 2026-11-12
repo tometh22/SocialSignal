@@ -15,6 +15,7 @@ const userInput = z.object({
   email: accountEmailSchema,
   permissions: z.array(sections).default([]),
   isAdmin: z.boolean().default(false),
+  isActive: z.boolean().default(true),
 });
 const updateInput = userInput.partial().extend({
   password: accountPasswordSchema.optional(), isActive: z.boolean().optional(),
