@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.43 — 2026-11-12
+
+- Pipeline comercial más fácil de leer: el total por etapa y la proporción de cada una; la cartera se ordena por cuenta, etapa, valor, ponderado o fecha (en el servidor, antes de paginar) y toda la fila abre la ficha; en celulares cada oportunidad es una tarjeta.
+- El Registro muestra cada cambio como "antes → después" con nombres de campo, y el resumen para Fede tiene vista previa con formato (se sigue copiando y descargando como texto plano).
+- Períodos en español con un selector propio; alertas en cero atenuadas y filtro activo visible con "Ver todas"; guía para habilitar el guardado del corte; avance del cierre, pestañas desplazables en móvil y estados de carga en todas las vistas. "Pendiente" gana contraste y Concentración deja de repetir la referencia histórica. Sin cambios de datos ni migraciones.
+
 ## 1.14.42 — 2026-11-12
 
 - Unifica la interfaz del Pipeline comercial: una sola escala tipográfica para títulos, descripciones, encabezados de tabla y cifras; radios, alturas de controles e iconos consistentes en todas las vistas y en la ficha.
