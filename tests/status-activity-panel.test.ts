@@ -37,6 +37,15 @@ describe.each(['project', 'custom'] as const)('complete %s Status history', kind
     // Note and update IDs overlap; each must remain a distinct entry.
     expect(html).toContain('activity-note-1');
     expect(html).toContain('activity-update-1');
+    // Authors can edit both kinds of entry from Activity, even when IDs overlap.
+    // Other authors' entries stay read-only; only notes support deletion.
+    for (const entry of [...notes, ...updates.map(update => ({ ...update, type: 'update' }))]) {
+      const entryHtml = html.split(`data-testid="activity-${entry.type}-${entry.id}"`)[1].split('data-testid="activity-')[0];
+      const label = entry.type === 'note' ? 'Editar comentario' : 'Editar update';
+      expect(entryHtml.includes(`aria-label="${label}"`)).toBe(entry.authorId === 3);
+      expect(entryHtml.includes('aria-label="Eliminar comentario"')).toBe(entry.type === 'note' && entry.authorId === 3);
+      if (entry.authorId === 3) expect(entryHtml).not.toContain('opacity-0');
+    }
     client.clear();
   });
 });

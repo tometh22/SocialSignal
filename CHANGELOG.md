@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.43 — 2026-11-12
+
+- Permite editar updates propios desde Status → Actividad, además de los comentarios. El botón de edición queda visible sin depender de pasar el mouse.
+- Distingue comentarios y updates con el mismo ID al editar y actualiza el historial y los resúmenes al guardar. Mantiene la edición exclusiva del autor.
+
 ## 1.14.42 — 2026-11-12
 
 - Unifica la interfaz del Pipeline comercial: una sola escala tipográfica para títulos, descripciones, encabezados de tabla y cifras; radios, alturas de controles e iconos consistentes en todas las vistas y en la ficha.
