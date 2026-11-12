@@ -56,6 +56,21 @@ export const loginUserSchema = z.object({
 });
 
 // ==================== TOKENS DE RECUPERACIÓN ====================
+// Single-use invitation/recovery links. Only a SHA-256 digest is persisted.
+export const accountAccessLinks = pgTable("account_access_links", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  purpose: text("purpose").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  deliveryStatus: text("delivery_status").notNull().default("pending"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [index("account_access_links_user_idx").on(table.userId, table.purpose, table.id)]);
+
 // Tabla para tokens de recuperación de contraseña
 export const passwordResetTokens = pgTable("password_reset_tokens", {
   id: serial("id").primaryKey(),

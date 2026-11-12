@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader } from '@/components/ui/loader';
-import { useLocation } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { Eye, EyeOff, AlertCircle, Mail, Lock, ArrowRight, CheckCircle2, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import BrandMark from '@/components/layout/brand-mark';
@@ -199,6 +199,8 @@ export default function AuthPage() {
                 )}
               </Button>
             </form>
+
+              <Link href="/forgot-password" className="block text-center text-sm font-medium text-primary hover:underline">¿Olvidaste tu contraseña?</Link>
 
               <p className="pt-1 text-center text-xs text-slate-400">
               ¿No tenés acceso? Contactá al administrador de la plataforma.

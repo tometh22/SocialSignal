@@ -18,6 +18,18 @@ Notificaciones, CRM, ajustes IPC y propuestas usan `server/services/email-transp
 
 Las propuestas y correos manuales conservan sus aprobaciones y confirmación explícita. Las preferencias personales de notificaciones no modifican esos envíos comerciales.
 
+## Invitaciones y recuperación de acceso
+
+Crear una cuenta desde **Administración → Usuarios** envía automáticamente una invitación al email de esa persona. El administrador define sus permisos y no necesita asignar ni compartir una contraseña. El alta de la cuenta y el enlace se guardan juntos; hasta que la persona configure su contraseña, la cuenta tiene una clave aleatoria desconocida.
+
+La invitación vence en 48 horas y se usa una sola vez. Usuarios muestra si está pendiente, aceptada, vencida o si no se confirmó el envío; **Enviar acceso / Reenviar** permite invitar a las cuentas existentes o reemplazar un enlace. Cada nuevo enlace invalida la invitación anterior y hay un minuto de espera entre intentos. Reenviar a una cuenta existente mantiene su contraseña actual hasta que la persona configure otra.
+
+Desde el login, **¿Olvidaste tu contraseña?** envía un enlace válido por una hora. La respuesta pública es igual para direcciones desconocidas, cuentas inactivas y solicitudes recientes. Hay límites por IP y por cuenta. Estos correos de acceso usan el transporte compartido y se envían independientemente de las preferencias de notificaciones.
+
+La migración 0097 agrega `account_access_links`, excluida del catálogo MCP. Solo persiste hashes SHA-256: el token viaja en el fragmento del enlace para no aparecer en logs HTTP ni encabezados Referer. Validar el enlace no lo consume, lo que permite abrirlo desde un escáner de correo. Al guardar la contraseña, se consume con bloqueo transaccional, se invalidan los demás enlaces y se eliminan las sesiones anteriores. Cambiar el email o la contraseña desde administración, o desactivar la cuenta, también invalida sus enlaces y sesiones.
+
+Un error del proveedor conserva el usuario y se informa como envío no confirmado, sin fingir que falló el alta. Si el proceso se interrumpe entre el alta y el envío, el estado pendiente sin confirmación queda visible en administración para reenviarlo. No se reintentan automáticamente los enlaces: el reenvío explícito genera uno nuevo. Ningún enlace ni contraseña se incluye en las respuestas administrativas o logs.
+
 ## Destinatarios y permisos
 
 La política común está en `server/services/notification-access.ts`. Se comprueba al crear el aviso, al consultar la bandeja —incluidas las consultas de MCP— y antes de cada intento de email o push. Ser administrador no agrega automáticamente a una persona a los destinatarios.

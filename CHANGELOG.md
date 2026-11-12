@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.46 — 2026-11-12
+
+- Crear usuarios envía una invitación por mail para que cada persona configure su contraseña, sin claves compartidas por administración. El enlace vence en 48 horas, es de un solo uso y el panel permite consultar su estado y reenviarlo, también para cuentas existentes.
+- Recuperación de contraseña por correo desde el login, con enlace válido por una hora. Validación de contraseña y confirmación, límites de solicitudes y respuestas que no revelan si una cuenta existe.
+- Migración aditiva 0097 con hashes de tokens privados, alta e invitación atómicas, consumo serializado y revocación de enlaces y sesiones al cambiar la contraseña, el email o desactivar la cuenta. Los fallos de envío quedan visibles para reintentar sin duplicar usuarios.
+- Pruebas PostgreSQL para permisos, vencimiento, reenvío, concurrencia y fallas; recorridos de navegador de invitación, recuperación y administración en escritorio y móvil.
+
 ## 1.14.45 — 2026-11-12
 
 - El Registro del Pipeline comercial muestra las altas y conciliaciones como "datos iniciales": solo los campos con valor, en el orden y con las etiquetas de la ficha. Deja de listar "vacío → vacío" e identificadores internos (lead, cliente, cotización, huella de carga). Detectado al revisar las 78 entradas productivas. Sin cambios de datos.

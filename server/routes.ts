@@ -1,6 +1,7 @@
 import { registerPipelineFinanceRoutes } from "./pipeline/finance";
 import { registerPipelineRoutes } from "./pipeline/routes";
 import { guardAbsenceCancellation } from "./services/absence-cancellation";
+import { registerAdminUserRoutes } from "./routes-admin-users";
 import { registerNotificationRoutes } from "./routes-notifications";
 import { registerTrainingRoutes } from "./routes-training";
 import { getTransactionalEmailConfig, sendTransactionalEmail } from "./services/email-transport";
@@ -15179,89 +15180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get("/api/admin/users", requireAuth, requireAdminMiddleware, async (req: Request, res: Response) => {
-    try {
-      const allUsers = await storage.getAllUsers();
-      const usersWithoutPasswords = allUsers.map(({ password, ...u }) => u);
-      res.json(usersWithoutPasswords);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      res.status(500).json({ message: "Error al obtener usuarios" });
-    }
-  });
-
-  app.post("/api/admin/users", requireAuth, requireAdminMiddleware, async (req: Request, res: Response) => {
-    try {
-      const { firstName, lastName, email, password, permissions, isAdmin, isActive } = req.body;
-      if (!firstName || !lastName || !email || !password) {
-        return res.status(400).json({ message: "Nombre, apellido, email y contraseña son requeridos" });
-      }
-      const existing = await storage.getUserByEmail(email);
-      if (existing) {
-        return res.status(400).json({ message: "El email ya está registrado" });
-      }
-      const hashedPwd = await hashPassword(password);
-      const newUser = await storage.createUser({
-        firstName,
-        lastName,
-        email,
-        password: hashedPwd,
-        permissions: permissions || [],
-        isAdmin: isAdmin || false,
-        isActive: isActive !== undefined ? isActive : true,
-      });
-      const { password: _, ...userWithoutPassword } = newUser;
-      res.status(201).json(userWithoutPassword);
-    } catch (error) {
-      console.error("Error creating user:", error);
-      res.status(500).json({ message: "Error al crear usuario" });
-    }
-  });
-
-  app.patch("/api/admin/users/:id", requireAuth, requireAdminMiddleware, async (req: Request, res: Response) => {
-    try {
-      const userId = parseInt(req.params.id);
-      const { firstName, lastName, email, password, permissions, isAdmin, isActive } = req.body;
-      
-      const updateData: any = {};
-      if (firstName !== undefined) updateData.firstName = firstName;
-      if (lastName !== undefined) updateData.lastName = lastName;
-      if (email !== undefined) updateData.email = email;
-      if (permissions !== undefined) updateData.permissions = permissions;
-      if (isAdmin !== undefined) updateData.isAdmin = isAdmin;
-      if (isActive !== undefined) updateData.isActive = isActive;
-      if (password) updateData.password = await hashPassword(password);
-      updateData.updatedAt = new Date();
-
-      const updatedUser = await storage.updateUser(userId, updateData);
-      if (!updatedUser) {
-        return res.status(404).json({ message: "Usuario no encontrado" });
-      }
-      const { password: _, ...userWithoutPassword } = updatedUser;
-      res.json(userWithoutPassword);
-    } catch (error) {
-      console.error("Error updating user:", error);
-      res.status(500).json({ message: "Error al actualizar usuario" });
-    }
-  });
-
-  app.delete("/api/admin/users/:id", requireAuth, requireAdminMiddleware, async (req: Request, res: Response) => {
-    try {
-      const userId = parseInt(req.params.id);
-      const requestingUserId = req.session.userId;
-      if (userId === requestingUserId) {
-        return res.status(400).json({ message: "No podés eliminar tu propia cuenta" });
-      }
-      const deleted = await storage.deleteUser(userId);
-      if (!deleted) {
-        return res.status(404).json({ message: "Usuario no encontrado" });
-      }
-      res.json({ message: "Usuario eliminado correctamente" });
-    } catch (error) {
-      console.error("Error deleting user:", error);
-      res.status(500).json({ message: "Error al eliminar usuario" });
-    }
-  });
+  registerAdminUserRoutes(app, storage, requireAuth, requireAdminMiddleware);
 
   // =========== RUTAS PARA INFLACIÓN Y CONFIGURACIÓN ===========
 

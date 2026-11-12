@@ -21,7 +21,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { UserPlus, Pencil, UserX, UserCheck, ShieldCheck, Shield, Trash2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { UserPlus, Pencil, UserX, UserCheck, ShieldCheck, Shield, Trash2, Mail, MoreHorizontal } from "lucide-react";
+import type { InvitationStatus } from "@shared/account-access";
 
 type UserRecord = {
   id: number;
@@ -32,6 +34,7 @@ type UserRecord = {
   isActive: boolean;
   permissions: string[];
   createdAt: string;
+  invitation?: InvitationStatus;
 };
 
 const SECTION_COLORS: Record<AppSection, string> = {
@@ -76,16 +79,30 @@ export default function AdminUsersPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: FormData) =>
+    mutationFn: ({ password: _password, ...data }: FormData) =>
       apiRequest("/api/admin/users", "POST", data),
-    onSuccess: () => {
+    onSuccess: (user: UserRecord) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       setModalOpen(false);
       setForm(emptyForm);
-      toast({ title: "Usuario creado correctamente" });
+      toast(user.invitation?.status === "failed"
+        ? { title: "Usuario creado; falta confirmar el envío", description: "Reenviá la invitación desde la lista en un minuto.", variant: "destructive" }
+        : { title: "Usuario creado e invitación enviada", description: "Recibirá un enlace para crear su contraseña, válido por 48 horas." });
     },
     onError: (error: any) => {
       toast({ title: error?.message || "Error al crear usuario", variant: "destructive" });
+    },
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/admin/users/${id}/invitation`, "POST"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Invitación enviada", description: "El nuevo enlace vence en 48 horas y reemplaza la invitación anterior." });
+    },
+    onError: (error: Error) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "No se pudo enviar la invitación", description: error.message, variant: "destructive" });
     },
   });
 
@@ -188,7 +205,7 @@ export default function AdminUsersPage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Gestión de Usuarios</h1>
           <p className="text-muted-foreground mt-1">
@@ -222,6 +239,7 @@ export default function AdminUsersPage() {
                   <TableHead>Permisos</TableHead>
                   <TableHead>Rol</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Invitación</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -273,38 +291,31 @@ export default function AdminUsersPage() {
                         {user.isActive ? "Activo" : "Inactivo"}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      <span className={`text-xs ${user.invitation?.status === "failed" ? "text-destructive" : "text-muted-foreground"}`}>
+                        {({ none: "Sin invitación", pending: "Enviada · pendiente", accepted: "Contraseña configurada", expired: "Enlace vencido", failed: "Envío no confirmado", unconfirmed: "Envío no confirmado", revoked: "Enlace invalidado" } as const)[user.invitation?.status ?? "none"]}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 gap-1 text-xs"
-                          onClick={() => openEdit(user)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          Editar
+                        <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs"
+                          disabled={!user.isActive || inviteMutation.isPending}
+                          onClick={() => inviteMutation.mutate(user.id)}
+                          aria-label={`Enviar invitación a ${user.email}`}>
+                          <Mail className="h-3.5 w-3.5" />
+                          {inviteMutation.isPending && inviteMutation.variables === user.id ? "Enviando…" : user.invitation?.status && user.invitation.status !== "none" ? "Reenviar" : "Enviar acceso"}
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={`h-8 gap-1 text-xs ${user.isActive ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50" : "text-green-600 hover:text-green-700 hover:bg-green-50"}`}
-                          onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
-                          disabled={toggleActiveMutation.isPending}
-                        >
-                          {user.isActive
-                            ? <><UserX className="h-3.5 w-3.5" /> Desactivar</>
-                            : <><UserCheck className="h-3.5 w-3.5" /> Activar</>
-                          }
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 gap-1 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setDeleteTarget(user)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Eliminar
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild><Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label={`Más acciones para ${user.email}`}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => openEdit(user)}><Pencil className="mr-2 h-4 w-4" />Editar</DropdownMenuItem>
+                            <DropdownMenuItem disabled={toggleActiveMutation.isPending} onSelect={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}>
+                              {user.isActive ? <><UserX className="mr-2 h-4 w-4" />Desactivar</> : <><UserCheck className="mr-2 h-4 w-4" />Activar</>}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleteTarget(user)}><Trash2 className="mr-2 h-4 w-4" />Eliminar</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -317,11 +328,11 @@ export default function AdminUsersPage() {
 
       {/* Modal Crear / Editar */}
       <Dialog open={modalOpen} onOpenChange={(open) => { if (!open) closeModal(); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingUser ? "Editar usuario" : "Crear nuevo usuario"}</DialogTitle>
             <DialogDescription>
-              {editingUser ? "Modificá los datos y permisos del usuario." : "Completá los datos para crear un nuevo usuario en el sistema."}
+              {editingUser ? "Modificá los datos y permisos del usuario." : "Le enviaremos una invitación por mail para que cree su contraseña. El enlace vence en 48 horas."}
             </DialogDescription>
           </DialogHeader>
 
@@ -358,7 +369,7 @@ export default function AdminUsersPage() {
               />
             </div>
 
-            <div className="space-y-1.5">
+            {editingUser && <div className="space-y-1.5">
               <Label htmlFor="password">
                 Contraseña{" "}
                 {editingUser && <span className="text-muted-foreground text-xs font-normal">(dejá en blanco para no cambiar)</span>}
@@ -368,9 +379,10 @@ export default function AdminUsersPage() {
                 type="password"
                 value={form.password}
                 onChange={e => setForm(prev => ({ ...prev, password: e.target.value }))}
-                placeholder={editingUser ? "••••••••" : "Mínimo 6 caracteres"}
+                placeholder="Mínimo 10 caracteres si la cambiás"
+                autoComplete="new-password"
               />
-            </div>
+            </div>}
 
             <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
               <Switch
@@ -411,7 +423,7 @@ export default function AdminUsersPage() {
           <DialogFooter>
             <Button variant="outline" onClick={closeModal}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={isPending}>
-              {isPending ? "Guardando..." : editingUser ? "Guardar cambios" : "Crear usuario"}
+              {isPending ? "Guardando..." : editingUser ? "Guardar cambios" : "Crear y enviar invitación"}
             </Button>
           </DialogFooter>
         </DialogContent>
