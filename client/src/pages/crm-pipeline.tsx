@@ -2010,7 +2010,10 @@ export default function Pipeline() {
           ) : (
             <div className="divide-y divide-slate-100">
               {log.data.map((r: any) => {
-                const changes = describeChanges(r.changes).map((c) => c.key);
+                const changeSet = describeChanges(r.changes);
+                const changes = changeSet.items.map((c) => c.key);
+                // En altas y conciliaciones todos los campos son nuevos: las etiquetas no aportan.
+                const chips = changeSet.mode === "create" ? [] : changes;
                 return (
                   <article key={r.id} className="flex gap-4 px-5 py-4">
                     <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50">
@@ -2039,17 +2042,17 @@ export default function Pipeline() {
                             {monthLabel(r.period)}
                           </span>
                         )}
-                        {changes.slice(0, 8).map((k) => (
+                        {chips.slice(0, 8).map((k) => (
                           <span
                             key={k}
                             className="rounded-md border border-slate-200 px-1.5 text-xs leading-5 text-slate-500"
                           >
-                            {fieldLabels[k] ?? k}
+                            {fieldLabels[k]}
                           </span>
                         ))}
-                        {changes.length > 8 && (
+                        {chips.length > 8 && (
                           <span className="text-xs text-muted-foreground">
-                            +{changes.length - 8} campos
+                            +{chips.length - 8} campos
                           </span>
                         )}
                       </div>
@@ -2057,10 +2060,13 @@ export default function Pipeline() {
                         <details className="group/details mt-3">
                           <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
                             <ChevronRight className="h-3.5 w-3.5 transition-transform group-open/details:rotate-90" />
-                            Ver{" "}
-                            {changes.length === 1
-                              ? "el cambio"
-                              : `los ${changes.length} cambios`}
+                            {changeSet.mode === "create"
+                              ? `Ver datos iniciales (${changes.length})`
+                              : changeSet.mode === "values"
+                                ? "Ver valores registrados"
+                                : changes.length === 1
+                                  ? "Ver el cambio"
+                                  : `Ver los ${changes.length} cambios`}
                           </summary>
                           <div className="mt-2">
                             <ChangeList changes={r.changes} />
