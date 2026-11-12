@@ -4,11 +4,27 @@ import { rateLimit } from "express-rate-limit";
 import { pool } from "../db";
 import { requirePermission } from "../middleware/requirePermission";
 import { canSeeQuotations } from "./access";
-import { audit, currentRows, transaction } from "./routes";
+import {
+  applyFilters,
+  audit,
+  currentRows,
+  listRows,
+  pipelineFilters,
+  transaction,
+} from "./routes";
+import {
+  executiveSummary,
+  localDay,
+  periodSchema,
+  summarize,
+} from "../../shared/pipeline";
 import {
   createShareLinkSchema,
-  publicPipeline,
+  isSharedUniverse,
+  publicRow,
   publicShareRequestSchema,
+  shareTokenHeader,
+  shareTokenSchema,
 } from "../../shared/pipeline-share";
 
 const digest = (token: string) =>
@@ -127,7 +143,8 @@ export function registerPipelineShareRoutes(
   );
   app.use("/api/crm/pipeline/share-links", admin);
 
-  const viewLimit = rateLimit({
+  // Abrir el enlace: valida y cuenta una vista. Límite bajo contra fuerza bruta.
+  const openLimit = rateLimit({
     windowMs: 15 * 60_000,
     limit: 60,
     standardHeaders: "draft-8",
@@ -136,31 +153,128 @@ export function registerPipelineShareRoutes(
       message: "Demasiados intentos. Volvé a intentar en unos minutos.",
     },
   });
+  // Navegar las pestañas hace varias consultas por clic: límite más amplio.
+  const dataLimit = rateLimit({
+    windowMs: 15 * 60_000,
+    limit: 900,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: {
+      message: "Demasiadas consultas. Volvé a intentar en unos minutos.",
+    },
+  });
+  const activeLink = async (token: unknown) => {
+    const parsed = shareTokenSchema.safeParse(token);
+    if (!parsed.success) throw notFound();
+    const { rows } = await pool.query(
+      `SELECT id, label, expires_at FROM pipeline_share_links
+       WHERE token_hash=$1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > NOW())`,
+      [digest(parsed.data)],
+    );
+    if (!rows[0]) throw notFound();
+    return rows[0] as { id: number; label: string; expires_at: Date | null };
+  };
   // POST para que el token no quede en la URL registrada por el servidor.
   app.post(
     "/api/public/pipeline",
     noStore,
-    viewLimit,
+    openLimit,
     wrap(async (req, res) => {
       const parsed = publicShareRequestSchema.safeParse(req.body);
       if (!parsed.success) throw notFound();
-      const { rows } = await pool.query(
-        `UPDATE pipeline_share_links SET view_count=view_count+1, last_viewed_at=NOW()
-         WHERE token_hash=$1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > NOW())
-         RETURNING label, expires_at`,
-        [digest(parsed.data.token)],
+      const link = await activeLink(parsed.data.token);
+      await pool.query(
+        "UPDATE pipeline_share_links SET view_count=view_count+1, last_viewed_at=NOW() WHERE id=$1",
+        [link.id],
       );
-      if (!rows[0]) throw notFound();
-      res.json(
-        publicPipeline(
-          await currentRows(),
-          new Date().toISOString(),
-          rows[0].label,
-          rows[0].expires_at
-            ? new Date(rows[0].expires_at).toISOString()
-            : null,
-        ),
-      );
+      res.json({
+        label: link.label,
+        expiresAt: link.expires_at
+          ? new Date(link.expires_at).toISOString()
+          : null,
+      });
     }),
   );
+
+  const shared = Router();
+  shared.use(noStore, dataLimit, (req: any, res, next) => {
+    void activeLink(req.get(shareTokenHeader))
+      .then(() => next())
+      .catch(() =>
+        res
+          .status(404)
+          .json({ message: "El enlace no existe, venció o fue revocado." }),
+      );
+  });
+  // La cartera vigente, siempre (sin cortes guardados) y solo el pipeline comercial.
+  const selection = async (req: any) => {
+    const f = pipelineFilters.parse({ ...req.query, snapshotId: undefined });
+    const threshold = Number(
+      (await pool.query("SELECT threshold FROM pipeline_settings WHERE id=1"))
+        .rows[0]?.threshold ?? 50,
+    );
+    const at = new Date().toISOString();
+    return {
+      f,
+      at,
+      threshold,
+      // Sin contacto: la búsqueda pública no puede usarse para inferirlo.
+      rows: applyFilters(
+        (await currentRows())
+          .filter(isSharedUniverse)
+          .map((r) => ({ ...r, contact: null })),
+        f,
+      ),
+    };
+  };
+  shared.get(
+    "/summary",
+    wrap(async (req, res) => {
+      const s = await selection(req);
+      res.json(summarize(s.rows, localDay(new Date(s.at)), s.threshold));
+    }),
+  );
+  for (const endpoint of ["/opportunities", "/alerts"])
+    shared.get(
+      endpoint,
+      wrap(async (req, res) => {
+        const s = await selection(req);
+        const list = listRows(
+          s.rows,
+          s.f,
+          s.at,
+          s.threshold,
+          endpoint === "/alerts",
+        );
+        res.json({ ...list, rows: list.rows.map(publicRow) });
+      }),
+    );
+  shared.get(
+    "/executive-summary",
+    wrap(async (req, res) => {
+      const s = await selection(req);
+      const period = req.query.period
+        ? periodSchema.parse(req.query.period)
+        : localDay().slice(0, 7);
+      // El Status es el texto pensado para compartir: incluye las decisiones del
+      // período, nunca información financiera ni del corte interno.
+      const decisions = (
+        await pool.query(
+          "SELECT reason FROM pipeline_log WHERE period=$1 AND kind='decisión' ORDER BY id",
+          [period],
+        )
+      ).rows.map((r) => r.reason);
+      res.json({
+        text: executiveSummary(
+          s.rows,
+          period,
+          s.at,
+          s.threshold,
+          "Pendiente",
+          decisions,
+        ),
+      });
+    }),
+  );
+  app.use("/api/public/pipeline", shared);
 }

@@ -21,7 +21,7 @@ import type { PoolClient } from "pg";
 const version = z.number().int().positive();
 const reason = z.string().trim().min(1).max(4000);
 const key = z.string().uuid();
-const filters = z.object({
+export const pipelineFilters = z.object({
   snapshotId: z.coerce.number().int().positive().optional(),
   q: z.string().max(200).optional(),
   account: z.string().optional(),
@@ -36,6 +36,63 @@ const filters = z.object({
   offset: z.coerce.number().int().min(0).default(0),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
+export type PipelineFilters = z.infer<typeof pipelineFilters>;
+/** Filtros de la cartera; compartidos por la vista interna y el enlace de solo lectura. */
+export function applyFilters<T extends Opportunity>(rows: T[], f: PipelineFilters) {
+  return rows.filter(
+    (r) =>
+      (!f.q ||
+        `${r.account} ${r.project ?? ""} ${r.contact ?? ""}`
+          .toLowerCase()
+          .includes(f.q.toLowerCase())) &&
+      (!f.account || r.account === f.account) &&
+      (!f.stage || r.stage === f.stage) &&
+      (!f.owner || (r.owner ?? "Sin responsable") === f.owner) &&
+      (!f.scope || r.scope === f.scope) &&
+      (!f.warner || r.warner === (f.warner === "true")) &&
+      (!f.closeMonth ||
+        (f.closeMonth === "pending"
+          ? !r.closeDate
+          : r.closeDate?.startsWith(f.closeMonth))),
+  );
+}
+/** Ordena, calcula alertas, agrupa y pagina; igual para la vista interna y la compartida. */
+export function listRows<T extends Opportunity>(
+  input: T[],
+  f: PipelineFilters,
+  at: string,
+  threshold: number,
+  onlyAlerted = false,
+) {
+  const day = localDay(new Date(at));
+  const rows = sortOpportunities(input, f.sort)
+    .map((r) => ({ ...r, alerts: alerts(r, day) }))
+    .filter(
+      (r) =>
+        (!onlyAlerted || r.alerts.length) &&
+        (!f.alert || r.alerts.includes(f.alert)),
+    );
+  const groups = f.group
+    ? Object.entries(
+        Object.groupBy(rows, (r) =>
+          f.group === "closeMonth"
+            ? (r.closeDate?.slice(0, 7) ?? "Sin fecha de cierre")
+            : String(
+                r[f.group as "stage" | "account" | "owner"] ??
+                  "Sin responsable",
+              ),
+        ),
+      ).map(([name, items]) => ({
+        name,
+        ...summarize(items!, day, threshold),
+      }))
+    : [];
+  return {
+    rows: rows.slice(f.offset, f.offset + f.limit),
+    total: rows.length,
+    groups,
+  };
+}
 export async function transaction<T>(fn: (c: PoolClient) => Promise<T>) {
   const c = await pool.connect();
   try {
@@ -175,7 +232,7 @@ export function registerPipelineRoutes(
       });
     };
   const selection = async (req: any) => {
-    const f = filters.parse(req.query);
+    const f = pipelineFilters.parse(req.query);
     let rows: Opportunity[],
       threshold: number,
       at = new Date().toISOString(),
@@ -200,22 +257,7 @@ export function registerPipelineRoutes(
           .rows[0].threshold,
       );
     }
-    rows = visibleRows(rows, req.user).filter(
-      (r) =>
-        (!f.q ||
-          `${r.account} ${r.project ?? ""} ${r.contact ?? ""}`
-            .toLowerCase()
-            .includes(f.q.toLowerCase())) &&
-        (!f.account || r.account === f.account) &&
-        (!f.stage || r.stage === f.stage) &&
-        (!f.owner || (r.owner ?? "Sin responsable") === f.owner) &&
-        (!f.scope || r.scope === f.scope) &&
-        (!f.warner || r.warner === (f.warner === "true")) &&
-        (!f.closeMonth ||
-          (f.closeMonth === "pending"
-            ? !r.closeDate
-            : r.closeDate?.startsWith(f.closeMonth))),
-    );
+    rows = applyFilters(visibleRows(rows, req.user), f);
     return { rows, threshold, at, period, f, snapshot };
   };
   router.get(
@@ -230,29 +272,9 @@ export function registerPipelineRoutes(
       endpoint,
       wrap(async (req, res) => {
         const s = await selection(req);
-        const rows = sortOpportunities(s.rows, s.f.sort)
-          .map((r) => ({ ...r, alerts: alerts(r, localDay(new Date(s.at))) }))
-          .filter((r) => (endpoint !== "/alerts" || r.alerts.length) && (!s.f.alert || r.alerts.includes(s.f.alert)));
-        const groups = s.f.group
-          ? Object.entries(
-              Object.groupBy(rows, (r) =>
-                s.f.group === "closeMonth"
-                  ? (r.closeDate?.slice(0, 7) ?? "Sin fecha de cierre")
-                  : String(
-                      r[s.f.group as "stage" | "account" | "owner"] ??
-                        "Sin responsable",
-                    ),
-              ),
-            ).map(([name, items]) => ({
-              name,
-              ...summarize(items!, localDay(new Date(s.at)), s.threshold),
-            }))
-          : [];
-        res.json({
-          rows: rows.slice(s.f.offset, s.f.offset + s.f.limit),
-          total: rows.length,
-          groups,
-        });
+        res.json(
+          listRows(s.rows, s.f, s.at, s.threshold, endpoint === "/alerts"),
+        );
       }),
     );
   router.get(

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import {
   AlertCircle,
   ArrowDown,
@@ -23,7 +23,8 @@ import {
 type Props = {
   rows: any[];
   loading: boolean;
-  onOpen: (r: Opportunity) => void;
+  /** Sin `onOpen` la lista es de solo lectura (enlace compartido): no abre la ficha. */
+  onOpen?: (r: Opportunity) => void;
   compact?: boolean;
   /** Orden activo, p. ej. "usd" o "-usd". */
   sort?: string;
@@ -40,6 +41,16 @@ const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
 
 function AlertsBadge({ r, onOpen }: { r: any; onOpen: Props["onOpen"] }) {
   if (!r.alerts?.length) return null;
+  if (!onOpen)
+    return (
+      <span
+        className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700"
+        title={r.alerts.join(" · ")}
+      >
+        <AlertCircle className="h-3 w-3" />
+        {r.alerts.length} {r.alerts.length === 1 ? "pendiente" : "pendientes"}
+      </span>
+    );
   return (
     <button
       onClick={(e) => {
@@ -185,9 +196,12 @@ function OpportunityTable({
               className={cn("min-w-[160px]", compact && "pr-5")}
             />
             {!compact && (
-              <SortHeader label="Responsable" className="pr-5 2xl:pr-2.5" />
+              <SortHeader
+                label="Responsable"
+                className={onOpen ? "pr-5 2xl:pr-2.5" : "pr-5"}
+              />
             )}
-            {!compact && (
+            {!compact && onOpen && (
               <SortHeader
                 label="Fuente"
                 className="hidden min-w-[170px] 2xl:table-cell 2xl:pr-5"
@@ -208,25 +222,39 @@ function OpportunityTable({
               ))
             : rows.map((r) => (
                 <tr
-                  className="group cursor-pointer transition-colors hover:bg-slate-50/80"
+                  className={cn(
+                    "group transition-colors hover:bg-slate-50/80",
+                    onOpen && "cursor-pointer",
+                  )}
                   key={r.id ?? r.importKey}
-                  onClick={() => onOpen(r)}
+                  onClick={onOpen ? () => onOpen(r) : undefined}
                 >
                   <td className={cn(cell, "pl-5")}>
-                    <button
-                      onClick={(e) => {
-                        stop(e);
-                        onOpen(r);
-                      }}
-                      className="block max-w-[340px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    >
-                      <span className="block font-semibold leading-5 text-slate-900 group-hover:text-primary">
-                        {r.account}
-                      </span>
-                      <span className="mt-0.5 block leading-5 text-muted-foreground">
-                        {r.project || "Alcance por definir"}
-                      </span>
-                    </button>
+                    {onOpen ? (
+                      <button
+                        onClick={(e) => {
+                          stop(e);
+                          onOpen(r);
+                        }}
+                        className="block max-w-[340px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        <span className="block font-semibold leading-5 text-slate-900 group-hover:text-primary">
+                          {r.account}
+                        </span>
+                        <span className="mt-0.5 block leading-5 text-muted-foreground">
+                          {r.project || "Alcance por definir"}
+                        </span>
+                      </button>
+                    ) : (
+                      <div className="max-w-[340px]">
+                        <span className="block font-semibold leading-5 text-slate-900">
+                          {r.account}
+                        </span>
+                        <span className="mt-0.5 block leading-5 text-muted-foreground">
+                          {r.project || "Alcance por definir"}
+                        </span>
+                      </div>
+                    )}
                   </td>
                   <td className={cell}>
                     <StageBadge stage={r.stage} />
@@ -250,7 +278,11 @@ function OpportunityTable({
                       )}
                     >
                       <Amount
-                        value={metrics([r]).weighted}
+                        value={
+                          r.weighted !== undefined
+                            ? r.weighted
+                            : metrics([r]).weighted
+                        }
                         className="font-medium"
                       />
                       <p className="mt-0.5 text-xs text-muted-foreground">
@@ -265,7 +297,9 @@ function OpportunityTable({
                     <AlertsBadge r={r} onOpen={onOpen} />
                   </td>
                   {!compact && (
-                    <td className={cn(cell, "pr-5 2xl:pr-2.5")}>
+                    <td
+                      className={cn(cell, onOpen ? "pr-5 2xl:pr-2.5" : "pr-5")}
+                    >
                       <span className="inline-flex items-center gap-2 whitespace-nowrap leading-5">
                         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-500">
                           {initials(r.owner)}
@@ -276,7 +310,7 @@ function OpportunityTable({
                       </span>
                     </td>
                   )}
-                  {!compact && (
+                  {!compact && onOpen && (
                     <td
                       className={cn(
                         cell,
@@ -336,16 +370,23 @@ function OpportunityCards({ rows, loading, onOpen, compact = false }: Props) {
       {rows.map((r) => (
         <li key={r.id ?? r.importKey}>
           <div
-            role="button"
-            tabIndex={0}
-            onClick={() => onOpen(r)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onOpen(r);
-              }
-            }}
-            className="flex w-full items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-slate-50/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+            {...(onOpen
+              ? {
+                  role: "button",
+                  tabIndex: 0,
+                  onClick: () => onOpen(r),
+                  onKeyDown: (e: ReactKeyboardEvent) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onOpen(r);
+                    }
+                  },
+                }
+              : {})}
+            className={cn(
+              "flex w-full items-start gap-3 px-4 py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
+              onOpen && "transition-colors hover:bg-slate-50/80",
+            )}
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-3">
@@ -372,7 +413,9 @@ function OpportunityCards({ rows, loading, onOpen, compact = false }: Props) {
               </CardMeta>
               <AlertsBadge r={r} onOpen={onOpen} />
             </div>
-            <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+            {onOpen && (
+              <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+            )}
           </div>
         </li>
       ))}

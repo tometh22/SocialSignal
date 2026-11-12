@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.49 — 2026-11-12
+
+- El enlace de solo lectura abre el mismo Pipeline comercial de Mind con sus pestañas: Resumen, Oportunidades (búsqueda, filtros, orden y agrupación), Alertas, Concentración y Status para copiar. Sin ficha editable, cierre mensual, registro ni datos financieros, aunque lo abra alguien con sesión.
+- Endpoints públicos con el token en cabecera y la misma lógica de filtros y listado que la vista interna, limitados al pipeline comercial y a campos permitidos. La búsqueda pública no considera contactos. Los enlaces ya emitidos siguen funcionando.
+
 ## 1.14.48 — 2026-11-12
 
 - Pipeline comercial con acceso propio en el menú (Comercial → Pipeline comercial). "Resumen para Fede" pasa a llamarse Status: "Copiar Status" copia el texto desde cualquier vista del pipeline.

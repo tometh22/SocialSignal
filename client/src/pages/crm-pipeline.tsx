@@ -22,6 +22,7 @@ import {
 import { OpportunityEditor } from "@/components/pipeline/opportunity-editor";
 import { OpportunityList } from "@/components/pipeline/opportunity-list";
 import { ShareDialog } from "@/components/pipeline/share-dialog";
+import { shareTokenHeader } from "@shared/pipeline-share";
 import { MonthPicker, monthLabel } from "@/components/pipeline/month-picker";
 import { SummaryPreview } from "@/components/pipeline/summary-preview";
 import {
@@ -33,6 +34,7 @@ import {
   Amount,
   BigValue,
   cardBase,
+  civilDate,
   dateTime,
   isPending,
   money,
@@ -61,6 +63,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Eye,
   CircleDot,
   ClipboardCheck,
   Copy,
@@ -109,13 +112,26 @@ const navigation = [
     label: "Cierre mensual",
     icon: ClipboardCheck,
     description: "Conciliá, guardá un corte y copiá el Status.",
+    internal: true,
   },
   {
     label: "Registro",
     icon: History,
     description: "Decisiones y cambios, con su contexto.",
+    internal: true,
+  },
+  {
+    label: "Status",
+    icon: FileText,
+    description: "El resumen del período, listo para leer o copiar.",
+    sharedOnly: true,
   },
 ];
+/** Pestañas visibles: el enlace compartido no muestra cierre, registro ni edición. */
+const tabsFor = (shared: boolean) =>
+  navigation.filter((n) =>
+    shared ? !("internal" in n) : !("sharedOnly" in n),
+  );
 const alertTypes = [
   "Sin próximo paso",
   "Sin valor USD",
@@ -368,10 +384,12 @@ function Picker({
  * los bordes se difuminan cuando hay más pestañas y la activa queda visible.
  */
 function TabBar({
+  tabs,
   tab,
   alerted,
   onSelect,
 }: {
+  tabs: typeof navigation;
   tab: string;
   alerted: number;
   onSelect: (label: string) => void;
@@ -406,7 +424,7 @@ function TabBar({
         onScroll={measure}
         className="-mx-1 flex overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {navigation.map(({ label, icon: Icon }) => (
+        {tabs.map(({ label, icon: Icon }) => (
           <button
             key={label}
             onClick={() => onSelect(label)}
@@ -449,16 +467,28 @@ function TabBar({
   );
 }
 
+/** Enlace de solo lectura abierto sin sesión (ver pages/public-pipeline). */
+export type PipelineShare = {
+  token: string;
+  label: string;
+  expiresAt: string | null;
+};
 export default function Pipeline() {
+  return <PipelineWorkspace />;
+}
+export function PipelineWorkspace({ share }: { share?: PipelineShare }) {
+  const tabs = tabsFor(!!share);
   const initial = new URLSearchParams(location.search),
     createKey = useRef(crypto.randomUUID()),
     cutKey = useRef(crypto.randomUUID());
   const [tab, setTab] = useState(
-      navigation.some((n) => n.label === initial.get("view"))
+      tabs.some((n) => n.label === initial.get("view"))
         ? initial.get("view")!
         : "Resumen",
     ),
-    [snapshot, setSnapshot] = useState(initial.get("snapshotId") ?? ""),
+    [snapshot, setSnapshot] = useState(
+      share ? "" : (initial.get("snapshotId") ?? ""),
+    ),
     [period, setPeriod] = useState(
       initial.get("period") ?? localDay().slice(0, 7),
     ),
@@ -489,7 +519,12 @@ export default function Pipeline() {
     [shareOpen, setShareOpen] = useState(false),
     [logOffset, setLogOffset] = useState(0),
     [success, setSuccess] = useState("");
-  const { isAdmin, hasPermission } = usePermissions();
+  const permissions = usePermissions();
+  // En el enlace compartido no rige la sesión de quien lo abre: siempre la vista pública.
+  const isAdmin = share ? false : permissions.isAdmin;
+  const hasPermission = share
+    ? (_section: string) => false
+    : permissions.hasPermission;
   const canReadQuotes = hasPermission("quotations");
   const alertScope =
     filter.scope === "Validación CRM" ? "Validación CRM" : "Pipeline";
@@ -506,10 +541,23 @@ export default function Pipeline() {
   }).toString();
   const universeQs = snapshot ? `snapshotId=${snapshot}` : "";
   const statusPath = "/executive-summary?" + qs + "&period=" + period;
+  const dataBase = share ? "/api/public/pipeline" : base;
+  const fetchJson = (path: string): Promise<any> =>
+    share
+      ? fetch(dataBase + path, {
+          headers: { [shareTokenHeader]: share.token },
+          credentials: "omit",
+        }).then(async (r) => {
+          const body = await r.json().catch(() => ({}));
+          if (!r.ok)
+            throw new Error(body.message ?? "No se pudo cargar el pipeline.");
+          return body;
+        })
+      : authFetchJson(base + path);
   const useData = (path: string, enabled = true) =>
     useQuery<any>({
-      queryKey: [base, path],
-      queryFn: () => authFetchJson(base + path),
+      queryKey: [dataBase, path],
+      queryFn: () => fetchJson(path),
       enabled,
     });
   const summary = useData("/summary?" + qs),
@@ -517,17 +565,17 @@ export default function Pipeline() {
       `/${tab === "Alertas" ? "alerts" : "opportunities"}?${qs}&offset=${offset}${tab === "Concentración" ? "&warner=true" : tab === "Resumen" ? "&scope=Pipeline" : ""}`,
       ["Resumen", "Oportunidades", "Alertas", "Concentración"].includes(tab),
     ),
-    cuts = useData("/cuts"),
+    cuts = useData("/cuts", !share),
     log = useData(
       "/log?offset=" + logOffset,
       tab === "Registro" && canReadQuotes,
     ),
     checklist = useData(
       "/checklist/" + period,
-      tab === "Cierre mensual" && !snapshot,
+      tab === "Cierre mensual" && !snapshot && !share,
     ),
     settings = useData("/settings", tab === "Concentración" && isAdmin),
-    text = useData(statusPath, tab === "Cierre mensual"),
+    text = useData(statusPath, ["Cierre mensual", "Status"].includes(tab)),
     cut = useData("/cuts/" + snapshot, !!snapshot),
     accounts = useData(
       "/opportunities?" + universeQs + "&group=account&limit=1",
@@ -559,7 +607,12 @@ export default function Pipeline() {
       period,
       ...(snapshot ? { snapshotId: snapshot } : {}),
     });
-    window.history.replaceState(null, "", `/crm/pipeline?${p}`);
+    // Conserva la ruta y, en el enlace compartido, el fragmento con el token.
+    window.history.replaceState(
+      null,
+      "",
+      `${location.pathname}?${p}${share ? location.hash : ""}`,
+    );
   }, [tab, snapshot, filter, period]);
   const navigate = (view: string, cutId = snapshot) => {
     setTab(view);
@@ -602,8 +655,8 @@ export default function Pipeline() {
     const load = () =>
       queryClient
         .fetchQuery({
-          queryKey: [base, statusPath],
-          queryFn: () => authFetchJson(base + statusPath),
+          queryKey: [dataBase, statusPath],
+          queryFn: () => fetchJson(statusPath),
         })
         .then((d: any) => String(d?.text ?? ""));
     const done = () => {
@@ -628,7 +681,9 @@ export default function Pipeline() {
         done();
       } catch {
         setError(
-          "No se pudo copiar el Status. Abrí Cierre mensual y copialo desde ahí.",
+          share
+            ? "No se pudo copiar el Status. Abrí la pestaña Status y copialo desde ahí."
+            : "No se pudo copiar el Status. Abrí Cierre mensual y copialo desde ahí.",
         );
       }
     }
@@ -714,27 +769,37 @@ export default function Pipeline() {
     >
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/crm"
-            aria-label="Volver al CRM"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border bg-card text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
+          {!share && (
+            <Link
+              href="/crm"
+              aria-label="Volver al CRM"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border bg-card text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          )}
           <h1 className="text-2xl font-semibold tracking-tight">
             Pipeline comercial
           </h1>
-          <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-            {snapshot ? (
-              <LockKeyhole className="h-4 w-4" />
-            ) : (
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            )}
-            {snapshot ? "Corte guardado" : "Cartera actual"}
-          </span>
+          {share ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-card px-2.5 py-0.5 text-xs font-medium text-slate-600">
+              <Eye className="h-3.5 w-3.5" />
+              Solo lectura
+              {share.expiresAt && ` · vence ${civilDate(share.expiresAt)}`}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+              {snapshot ? (
+                <LockKeyhole className="h-4 w-4" />
+              ) : (
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              )}
+              {snapshot ? "Corte guardado" : "Cartera actual"}
+            </span>
+          )}
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          {canReadQuotes && !snapshot && (
+          {canReadQuotes && !snapshot && !share && (
             <Button
               variant="outline"
               className="h-9 shrink-0 gap-2 text-sm"
@@ -762,14 +827,14 @@ export default function Pipeline() {
             aria-label="Actualizar pipeline"
             className="h-9 w-9"
             onClick={() =>
-              void queryClient.invalidateQueries({ queryKey: [base] })
+              void queryClient.invalidateQueries({ queryKey: [dataBase] })
             }
           >
             <RefreshCw
               className={cn("h-4 w-4", summary.isFetching && "animate-spin")}
             />
           </Button>
-          {!snapshot && (
+          {!snapshot && !share && (
             <Button className="h-9 gap-2 text-sm" onClick={newOpportunity}>
               <Plus className="h-4 w-4" />
               Nueva oportunidad
@@ -778,6 +843,7 @@ export default function Pipeline() {
         </div>
       </header>
       <TabBar
+        tabs={tabs}
         tab={tab}
         alerted={data?.alerted ?? 0}
         onSelect={(label) => navigate(label)}
@@ -814,7 +880,11 @@ export default function Pipeline() {
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 className="h-9 border-slate-200 bg-slate-50/60 pl-9 text-sm"
-                placeholder="Buscar cuenta, proyecto o contacto…"
+                placeholder={
+                  share
+                    ? "Buscar cuenta o proyecto…"
+                    : "Buscar cuenta, proyecto o contacto…"
+                }
                 aria-label="Buscar oportunidades"
                 value={filter.q ?? ""}
                 onChange={(e) => update("q", e.target.value)}
@@ -942,7 +1012,7 @@ export default function Pipeline() {
           )}
         </div>
       )}
-      {tab === "Oportunidades" && (
+      {tab === "Oportunidades" && !share && (
         <div className="flex flex-wrap items-center gap-2">
           {[
             { scope: "", label: "Todas" },
@@ -1003,7 +1073,7 @@ export default function Pipeline() {
             variant="outline"
             className="h-8 text-sm"
             onClick={() =>
-              void queryClient.invalidateQueries({ queryKey: [base] })
+              void queryClient.invalidateQueries({ queryKey: [dataBase] })
             }
           >
             Reintentar
@@ -1275,7 +1345,7 @@ export default function Pipeline() {
               <OpportunityList
                 rows={visibleRows.slice(0, 5)}
                 loading={rows.isLoading}
-                onOpen={openOpportunity}
+                onOpen={share ? undefined : openOpportunity}
                 compact
               />
             ) : (
@@ -1291,7 +1361,7 @@ export default function Pipeline() {
                     <Button variant="outline" onClick={clearFilters}>
                       Limpiar filtros
                     </Button>
-                  ) : !snapshot ? (
+                  ) : !snapshot && !share ? (
                     <Button
                       variant="outline"
                       className="gap-2"
@@ -1324,7 +1394,7 @@ export default function Pipeline() {
                     Ver todas
                   </Button>
                 )}
-                {["Pipeline", "Validación CRM"].map((scope) => (
+                {(share ? [] : ["Pipeline", "Validación CRM"]).map((scope) => (
                   <Button
                     key={scope}
                     variant={alertScope === scope ? "secondary" : "outline"}
@@ -1690,7 +1760,7 @@ export default function Pipeline() {
                         <OpportunityList
                           rows={items ?? []}
                           loading={false}
-                          onOpen={openOpportunity}
+                          onOpen={share ? undefined : openOpportunity}
                           sort={filter.sort}
                           onSort={(v) => update("sort", v)}
                         />
@@ -1701,7 +1771,7 @@ export default function Pipeline() {
                   <OpportunityList
                     rows={visibleRows}
                     loading={rows.isLoading}
-                    onOpen={openOpportunity}
+                    onOpen={share ? undefined : openOpportunity}
                     sort={filter.sort}
                     onSort={(v) => update("sort", v)}
                   />
@@ -1734,7 +1804,7 @@ export default function Pipeline() {
                     <Button variant="outline" onClick={clearFilters}>
                       Limpiar filtros
                     </Button>
-                  ) : tab === "Oportunidades" && !snapshot ? (
+                  ) : tab === "Oportunidades" && !snapshot && !share ? (
                     <Button variant="outline" onClick={newOpportunity}>
                       Nueva oportunidad
                     </Button>
@@ -2141,30 +2211,57 @@ export default function Pipeline() {
           </div>
         </Panel>
       )}
-      <ShareDialog open={shareOpen} onOpenChange={setShareOpen} />
-      <OpportunityEditor
-        opportunity={editing}
-        readOnly={!!snapshot}
-        busy={busy}
-        error={error}
-        onClose={() => setEditing(null)}
-        onSave={async (data, reason) => {
-          const id = editing?.id;
-          await mutate(
-            id ? "/opportunities/" + id : "/opportunities",
-            id ? "PATCH" : "POST",
-            {
-              data,
-              reason,
-              ...(id
-                ? { version: editing?.version }
-                : { requestKey: createKey.current }),
-            },
-          );
-          setEditing(null);
-          setSuccess(id ? "Oportunidad actualizada." : "Oportunidad creada.");
-        }}
-      />
+      {tab === "Status" && (
+        <Panel
+          title="Status del pipeline"
+          description={`${monthLabel(period)} · cartera actual`}
+          action={<FileText className="h-4 w-4 text-slate-400" />}
+        >
+          <div className="p-5">
+            <SummaryPreview text={text.data?.text} loading={text.isLoading} />
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <Button
+                className="h-9 gap-2 text-sm"
+                disabled={!text.data?.text}
+                onClick={() => void copyStatus()}
+              >
+                {copied ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+                {copied ? "Status copiado" : "Copiar Status"}
+              </Button>
+            </div>
+          </div>
+        </Panel>
+      )}
+      {!share && <ShareDialog open={shareOpen} onOpenChange={setShareOpen} />}
+      {!share && (
+        <OpportunityEditor
+          opportunity={editing}
+          readOnly={!!snapshot}
+          busy={busy}
+          error={error}
+          onClose={() => setEditing(null)}
+          onSave={async (data, reason) => {
+            const id = editing?.id;
+            await mutate(
+              id ? "/opportunities/" + id : "/opportunities",
+              id ? "PATCH" : "POST",
+              {
+                data,
+                reason,
+                ...(id
+                  ? { version: editing?.version }
+                  : { requestKey: createKey.current }),
+              },
+            );
+            setEditing(null);
+            setSuccess(id ? "Oportunidad actualizada." : "Oportunidad creada.");
+          }}
+        />
+      )}
     </PageShell>
   );
 }
