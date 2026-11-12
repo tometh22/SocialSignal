@@ -78,19 +78,20 @@ async function deliverLink(link: Link) {
   return sent;
 }
 
-export async function createInvitedUser(input: { firstName: string; lastName: string; email: string; permissions: string[]; isAdmin: boolean }) {
-  assertAccountEmailConfigured();
+export async function createInvitedUser(input: { firstName: string; lastName: string; email: string; permissions: string[]; isAdmin: boolean; isActive: boolean }) {
+  if (input.isActive) assertAccountEmailConfigured();
   // The account cannot be accessed with an administrator-chosen/default password.
   const password = await hashPassword(randomBytes(48).toString("hex"));
   const { user, link } = await transaction(async client => {
     const existing = await client.query("SELECT id FROM users WHERE lower(email)=lower($1)", [input.email]);
     if (existing.rowCount) throw Object.assign(new Error("El email ya está registrado"), { statusCode: 409 });
     const result = await client.query(`INSERT INTO users(first_name,last_name,email,password,permissions,is_admin,is_active)
-      VALUES($1,$2,$3,$4,$5,$6,true) RETURNING ${publicColumns}`, [input.firstName, input.lastName, input.email, password, input.permissions, input.isAdmin]);
+      VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING ${publicColumns}`, [input.firstName, input.lastName, input.email, password, input.permissions, input.isAdmin, input.isActive]);
     const user = result.rows[0];
-    const link = await reserveLink(client, user.id, "invitation");
+    const link = input.isActive ? await reserveLink(client, user.id, "invitation") : null;
     return { user, link };
   });
+  if (!link) return { ...user, invitation: { status: "none" } satisfies InvitationStatus };
   const sent = await deliverLink(link);
   return { ...user, invitation: { status: sent ? "pending" : "failed", expiresAt: link.expiresAt.toISOString() } satisfies InvitationStatus };
 }

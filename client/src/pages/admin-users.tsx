@@ -85,7 +85,9 @@ export default function AdminUsersPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       setModalOpen(false);
       setForm(emptyForm);
-      toast(user.invitation?.status === "failed"
+      toast(user.invitation?.status === "none"
+        ? { title: "Usuario inactivo creado", description: "Podés activarlo y enviarle una invitación desde la lista." }
+        : user.invitation?.status === "failed"
         ? { title: "Usuario creado; falta confirmar el envío", description: "Reenviá la invitación desde la lista en un minuto.", variant: "destructive" }
         : { title: "Usuario creado e invitación enviada", description: "Recibirá un enlace para crear su contraseña, válido por 48 horas." });
     },
