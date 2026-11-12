@@ -252,7 +252,7 @@ export function executiveSummary(
       ? "Pendiente"
       : `USD ${Number(v).toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
   return [
-    `Pipeline comercial · ${period} · corte ${new Date(createdAt).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })}`,
+    `Pipeline comercial · ${period} · corte ${new Date(createdAt).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hourCycle: "h23" })}`,
     `Abiertas: ${s.open}. Bruto: ${val(s.gross)} (${s.valueCoverage}/${s.open}). Ponderado: ${val(s.weighted)} (${s.weightedCoverage}/${s.open}).`,
     ...s.stages.map(
       (v) =>

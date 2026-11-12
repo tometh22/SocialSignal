@@ -173,6 +173,7 @@ describe("Pipeline comercial: reglas canónicas", () => {
   it("resumen muestra pendientes y cobertura", () => {
     const text = executiveSummary([row()], "2026-11", "2026-11-12T00:22:51Z");
     expect(text).toContain("Bruto: Pendiente (0/1)");
+    expect(text).toContain("11/11/2026, 21:22:51");
     expect(text).toContain("Comparación anterior: Pendiente");
   });
 });

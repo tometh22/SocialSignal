@@ -51,7 +51,7 @@ El anexo comercial no está incluido como fixture ni como archivo público. Mant
 
    La aplicación valida el actor CRM y los vínculos. Un reintento conserva el corte y las claves existentes.
 
-La vista previa preparada para este trabajo verificó el anexo fuera de línea. Falta conciliar contra la base de Mind: no había `DATABASE_URL` del entorno. No se ejecutó carga ni migración productiva. La facturación Warner mensual sigue pendiente de conciliación con Finanzas; la referencia declarada se muestra separada y solo con permiso financiero.
+La conciliación y carga productiva se completaron el 12/11/2026: 77 alcances y un corte histórico, con 78 eventos de auditoría. Se verificaron los vínculos existentes sin crear leads ni contactos duplicados. La revisión de Finanzas confirmó ausencia de eventos reales en `revenue_events` y únicamente proyecciones de noviembre en `income_sot`; por eso el porcentaje facturado permanece pendiente. La referencia declarada se muestra separada y solo con permiso financiero. La diferencia entre el paquete vigente de PepsiCo y sus partidas históricas quedó documentada, conservando el histórico y dejando los importes de esas partidas pendientes en la cartera actual.
 
 ## Verificación
 

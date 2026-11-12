@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.14.41 — 2026-11-12
+
+- El resumen comercial muestra la hora del corte en formato de 24 horas de Buenos Aires, sin depender del ciclo horario regional del servidor. Conserva datos y cortes existentes; regresión de fecha UTC a hora local.
+
 ## 1.14.40 — 2026-11-12
 
 - Incorpora Pipeline comercial al CRM: resumen ejecutivo, oportunidades, alertas, concentración, cierre mensual y registro, con interfaz adaptable y ficha comercial guiada.
