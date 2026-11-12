@@ -1935,13 +1935,13 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
   const { user } = useAuth();
   const { toast } = useToast();
   const [newNote, setNewNote] = useState('');
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingEntry, setEditingEntry] = useState<{ id: number; type: 'note' | 'update' } | null>(null);
   const [editText, setEditText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const newNoteRef = useRef<HTMLTextAreaElement>(null);
   const editNoteRef = useRef<HTMLTextAreaElement>(null);
   useAutoResize(newNoteRef, newNote);
-  useAutoResize(editNoteRef, editText, editingId !== null);
+  useAutoResize(editNoteRef, editText, editingEntry !== null);
   const currentUserId = (user as any)?.id;
 
   const notesUrl = projectId
@@ -1967,10 +1967,11 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
   });
   // The compact thread counts notes AND updates. Read the same update query here
   // so opening its history includes all counted entries, not just field changes.
+  const updatesCacheKey = projectId
+    ? ['/api/status-semanal', projectId, 'updates']
+    : ['/api/status-semanal/custom', customItemId, 'updates'];
   const { data: updates = [], isLoading: updatesLoading, isError: updatesError } = useQuery<UpdateEntry[]>({
-    queryKey: projectId
-      ? ['/api/status-semanal', projectId, 'updates']
-      : ['/api/status-semanal/custom', customItemId, 'updates'],
+    queryKey: updatesCacheKey,
     queryFn: async () => {
       const r = await authFetch(projectId
         ? `/api/status-semanal/${projectId}/updates`
@@ -2009,10 +2010,13 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
   });
 
   const editMutation = useMutation({
-    mutationFn: ({ noteId, content }: { noteId: number; content: string }) =>
-      mutationFetch(`/api/status-semanal/notes/${noteId}`, 'PATCH', { content }),
+    mutationFn: ({ id, type, content }: { id: number; type: 'note' | 'update'; content: string }) =>
+      mutationFetch(`/api/status-semanal/${type === 'note' ? 'notes' : 'updates'}/${id}`, 'PATCH', { content }),
     onSuccess: () => {
-      setEditingId(null);
+      setEditingEntry(null);
+      queryClient.refetchQueries({ queryKey: updatesCacheKey });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
+      if (customItemId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
       queryClient.refetchQueries({ queryKey: activityCacheKey });
       queryClient.refetchQueries({ queryKey: notesCacheKey });
     },
@@ -2048,7 +2052,8 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
         )}
         {timeline.map((entry, idx) => {
           if (entry.type === 'note' || entry.type === 'update') {
-            const isOwn = entry.authorId === currentUserId;
+            const isOwn = currentUserId != null && entry.authorId === currentUserId;
+            const isEditing = editingEntry?.id === entry.id && editingEntry.type === entry.type;
             return (
               <div id={entry.type === "note" ? `mind-note-${entry.id}` : undefined} key={`${entry.type}_${entry.id}`} data-testid={`activity-${entry.type}-${entry.id}`} className={cn("group flex gap-2 py-1 rounded-lg", typeof window !== "undefined" && new URLSearchParams(window.location.search).get("noteId") === String(entry.id) && entry.type === "note" && "bg-indigo-50 ring-2 ring-indigo-200")}>
                 <div className={cn("h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5", isOwn ? "bg-indigo-100 text-indigo-700" : "bg-teal-100 text-teal-700")}>
@@ -2067,7 +2072,7 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  {entry.type === 'note' && editingId === entry.id ? (
+                  {isEditing ? (
                     <div className="space-y-1">
                       <Textarea
                         ref={editNoteRef}
@@ -2078,9 +2083,9 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
                         onKeyDown={e => {
                           if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
-                            if (editText.trim()) editMutation.mutate({ noteId: entry.id, content: editText });
+                            if (editText.trim() && !editMutation.isPending) editMutation.mutate({ id: entry.id, type: entry.type, content: editText });
                           } else if (e.key === 'Escape') {
-                            setEditingId(null);
+                            setEditingEntry(null);
                           }
                         }}
                         className="resize-y overflow-auto text-[11px] min-h-[32px] bg-white px-2.5 py-1.5 leading-relaxed"
@@ -2088,11 +2093,11 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
                       <div className="flex gap-1">
                         <Button size="sm" className="h-6 px-2 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white"
                           disabled={!editText.trim() || editMutation.isPending}
-                          onClick={() => editMutation.mutate({ noteId: entry.id, content: editText })}>
+                          onClick={() => editMutation.mutate({ id: entry.id, type: entry.type, content: editText })}>
                           {editMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Guardar'}
                         </Button>
                         <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]"
-                          onClick={() => setEditingId(null)}>
+                          onClick={() => setEditingEntry(null)}>
                           Cancelar
                         </Button>
                       </div>
@@ -2101,14 +2106,14 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
                     <StatusText className={embedded ? "text-sm leading-7 py-1" : "text-[11px] bg-white border border-slate-100 rounded-md px-2.5 py-1.5"}>{entry.content}</StatusText>
                   )}
                 </div>
-                {entry.type === 'note' && isOwn && editingId !== entry.id && (
-                  <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
-                    <button onClick={() => { setEditingId(entry.id); setEditText(entry.content); }} className="p-0.5 text-slate-300 hover:text-indigo-400">
+                {isOwn && !isEditing && (
+                  <div className="flex flex-col gap-0.5 shrink-0 mt-0.5">
+                    <button aria-label={entry.type === 'note' ? 'Editar comentario' : 'Editar update'} onClick={() => { setEditingEntry({ id: entry.id, type: entry.type }); setEditText(entry.content); }} className="p-1 text-slate-500 hover:text-indigo-600">
                       <Pencil className="h-3 w-3" />
                     </button>
-                    <button onClick={() => deleteMutation.mutate(entry.id)} className="p-0.5 text-slate-300 hover:text-red-400">
+                    {entry.type === 'note' && <button aria-label="Eliminar comentario" onClick={() => deleteMutation.mutate(entry.id)} className="p-1 text-slate-500 hover:text-red-600">
                       <Trash2 className="h-3 w-3" />
-                    </button>
+                    </button>}
                   </div>
                 )}
               </div>
