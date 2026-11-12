@@ -73,7 +73,7 @@ function Field({
 }) {
   return (
     <label className={`block space-y-1.5 ${wide ? "sm:col-span-2" : ""}`}>
-      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+      <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
         {title}
       </span>
       {children}
@@ -94,7 +94,7 @@ function SectionIntro({
 }) {
   return (
     <div className="mb-5">
-      <h3 className="font-semibold tracking-tight">{title}</h3>
+      <h3 className="text-lg font-semibold tracking-tight sm:text-xl">{title}</h3>
       <p className="mt-1 text-sm text-muted-foreground">{description}</p>
     </div>
   );
@@ -297,7 +297,7 @@ export function OpportunityEditor({
     >
       <DialogContent className="flex max-w-[1000px] max-h-[92dvh] flex-col gap-0 overflow-hidden border-slate-200 p-0 sm:p-0">
         <DialogHeader className="border-b bg-slate-50/80 px-5 pb-5 pt-6 text-left sm:px-7 dark:bg-slate-900/40">
-          <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             <Building2 className="h-3.5 w-3.5" /> Cartera comercial{" "}
             <ChevronRight className="h-3 w-3" />
             {readOnly
@@ -316,15 +316,15 @@ export function OpportunityEditor({
           <div className="flex flex-wrap items-center gap-2 pt-2">
             <Badge
               variant="secondary"
-              className="border bg-white font-medium dark:bg-slate-900"
+              className="border bg-white text-sm font-medium dark:bg-slate-900"
             >
               {draft.stage}
             </Badge>
-            <Badge variant="outline" className="font-normal">
+            <Badge variant="outline" className="text-sm font-normal">
               {draft.scope}
             </Badge>
             {readOnly && (
-              <Badge variant="outline" className="gap-1 text-slate-500">
+              <Badge variant="outline" className="gap-1 text-sm text-slate-500">
                 <ShieldCheck className="h-3 w-3" />
                 Solo lectura
               </Badge>
@@ -332,7 +332,7 @@ export function OpportunityEditor({
             {draft.leadId && (
               <a
                 href={`/crm/${draft.leadId}`}
-                className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                className="ml-auto inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
               >
                 Abrir en CRM
                 <ArrowUpRight className="h-3.5 w-3.5" />
@@ -342,7 +342,7 @@ export function OpportunityEditor({
         </DialogHeader>
         <div className="grid grid-cols-3 border-b bg-background px-5 py-4 sm:px-7">
           <div className="border-r pr-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground">
               Valor total USD
             </p>
             <p className="mt-1 text-lg font-semibold tabular-nums">
@@ -350,7 +350,7 @@ export function OpportunityEditor({
             </p>
           </div>
           <div className="border-r px-3 sm:px-5">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground">
               Probabilidad
             </p>
             <p className="mt-1 text-lg font-semibold tabular-nums">
@@ -360,7 +360,7 @@ export function OpportunityEditor({
             </p>
           </div>
           <div className="pl-3 sm:pl-5">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground">
               Valor ponderado
             </p>
             <p className="mt-1 text-lg font-semibold tabular-nums">
@@ -378,12 +378,12 @@ export function OpportunityEditor({
                 key={name}
                 type="button"
                 onClick={() => setSection(name)}
-                className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2.5 text-left text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${section === name ? "bg-white text-primary shadow-sm ring-1 ring-slate-200 dark:bg-slate-900" : "text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-800"}`}
+                className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${section === name ? "bg-white text-primary shadow-sm ring-1 ring-slate-200 dark:bg-slate-900" : "text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-800"}`}
               >
                 <Icon className="h-4 w-4" />
                 {name}
                 {name === "Evidencia" && (
-                  <span className="ml-auto rounded bg-slate-100 px-1.5 text-[10px] text-slate-500">
+                  <span className="ml-auto rounded bg-slate-100 px-1.5 text-xs text-slate-500">
                     {draft.sources.length}
                   </span>
                 )}
@@ -476,7 +476,7 @@ export function OpportunityEditor({
                         <span className="block text-sm font-medium">
                           Alcance vigente para el cálculo
                         </span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-sm text-muted-foreground">
                           Excluí alternativas no elegidas, revisiones
                           reemplazadas y componentes ya incluidos en un paquete.
                         </span>
@@ -573,7 +573,7 @@ export function OpportunityEditor({
                       <summary className="cursor-pointer text-sm font-medium">
                         Equivalencia aprobada a USD
                       </summary>
-                      <p className="mb-4 mt-2 text-xs text-muted-foreground">
+                      <p className="mb-4 mt-2 text-sm text-muted-foreground">
                         Si todavía no hay equivalencia aprobada, mantené el
                         valor total USD pendiente.
                       </p>
@@ -760,7 +760,7 @@ export function OpportunityEditor({
                       <p className="text-sm font-medium">
                         Todavía no hay fuentes vinculadas
                       </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="mt-1 text-sm text-muted-foreground">
                         Agregá una propuesta, ficha de Mind o intercambio
                         comercial.
                       </p>
@@ -772,7 +772,7 @@ export function OpportunityEditor({
                       className="rounded-xl border bg-background p-4 shadow-sm"
                     >
                       <div className="mb-3 flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-100 text-xs font-semibold text-slate-500">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-100 text-sm font-semibold text-slate-500">
                           {index + 1}
                         </span>
                         <h5 className="min-w-0 flex-1 truncate text-sm font-semibold">
@@ -811,7 +811,7 @@ export function OpportunityEditor({
                       </div>
                       {readOnly ? (
                         <>
-                          <p className="break-all text-xs text-muted-foreground">
+                          <p className="break-all text-sm text-muted-foreground">
                             {source.url}
                           </p>
                           <p className="mt-2 text-sm">
@@ -904,13 +904,13 @@ export function OpportunityEditor({
                           <Check className="h-4 w-4" />
                           Lead vinculado
                         </p>
-                        <p className="mt-1 text-xs text-emerald-700">
+                        <p className="mt-1 text-sm text-emerald-700">
                           {draft.account} · CRM #{draft.leadId}
                         </p>
                       </div>
                       <a
                         href={`/crm/${draft.leadId}`}
-                        className="text-xs font-semibold text-emerald-700 underline"
+                        className="text-sm font-semibold text-emerald-700 underline"
                       >
                         Ver ficha
                       </a>
@@ -933,7 +933,7 @@ export function OpportunityEditor({
                         </div>
                       </Field>
                       {leads.isFetching && (
-                        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <p className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Loader2 className="h-3 w-3 animate-spin" />
                           Buscando en CRM…
                         </p>
@@ -973,7 +973,7 @@ export function OpportunityEditor({
                                 <span className="block text-sm font-medium">
                                   {lead.companyName}
                                 </span>
-                                <span className="text-xs text-muted-foreground">
+                                <span className="text-sm text-muted-foreground">
                                   {lead.opportunityName ||
                                     lead.primaryContact?.name ||
                                     "Sin alcance documentado"}
@@ -985,7 +985,7 @@ export function OpportunityEditor({
                         </div>
                       )}
                       {leads.isError && (
-                        <p role="alert" className="text-xs text-destructive">
+                        <p role="alert" className="text-sm text-destructive">
                           No se pudieron cargar los leads. Probá nuevamente.
                         </p>
                       )}
@@ -1039,17 +1039,17 @@ export function OpportunityEditor({
                   {draft.quotationId && (
                     <a
                       href={`/quotations/${draft.quotationId}`}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                      className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
                     >
                       Abrir cotización
                       <ArrowUpRight className="h-3.5 w-3.5" />
                     </a>
                   )}
                   <details className="rounded-xl border p-4">
-                    <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">
+                    <summary className="cursor-pointer text-sm font-semibold text-muted-foreground">
                       Identificadores y vínculos pendientes de conciliación
                     </summary>
-                    <p className="my-3 text-xs text-muted-foreground">
+                    <p className="my-3 text-sm text-muted-foreground">
                       Usá identificadores verificados cuando el registro no
                       aparezca en la búsqueda.
                     </p>
@@ -1103,14 +1103,14 @@ export function OpportunityEditor({
           {(localError || error) && (
             <p
               role="alert"
-              className="mb-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700"
+              className="mb-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700"
             >
               {localError || error}
             </p>
           )}
           {readOnly ? (
             <div className="flex items-center justify-between">
-              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <ShieldCheck className="h-4 w-4" />
                 Este corte conserva los datos al momento de guardarlo.
               </p>
@@ -1121,7 +1121,7 @@ export function OpportunityEditor({
           ) : (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <label className="min-w-0 flex-1 space-y-1.5">
-                <span className="text-[11px] font-semibold text-muted-foreground">
+                <span className="text-sm font-semibold text-muted-foreground">
                   Motivo de la actualización
                 </span>
                 <Input

@@ -1,4 +1,6 @@
-import { visibleRows, canSeeQuotations } from "./access";
+import { warnerFinancialSummaryText } from "../../shared/pipeline-exposure";
+import { loadPipelineBilling } from "./finance";
+import { visibleRows, canSeeQuotations, canSeeFinance } from "./access";
 import { Router, type Express, type RequestHandler } from "express";
 import { pool } from "../db";
 import { requirePermission } from "../middleware/requirePermission";
@@ -555,6 +557,13 @@ export function registerPipelineRoutes(
             [p],
           )
         ).rows.map((r) => r.reason);
+      const financialAccess = canSeeFinance(req.user);
+      let billing;
+      if (financialAccess && !s.snapshot) {
+        try { billing = await loadPipelineBilling(p); }
+        catch { /* Commercial summary remains available; financial verification is pending. */ }
+      }
+      const financialText = warnerFinancialSummaryText({canSeeFinance: financialAccess, billing, snapshot: !!s.snapshot});
       res.json({
         text: executiveSummary(
           s.rows,
@@ -563,7 +572,7 @@ export function registerPipelineRoutes(
           s.threshold,
           comparison,
           canSeeQuotations(req.user) ? decisions : [],
-        ),
+        ) + (financialText ? "\n" + financialText : ""),
       });
     }),
   );

@@ -115,6 +115,45 @@ export function summarizeBilling(
   };
 }
 
+/** Call only after finance authorization. Reads current data, never a frozen financial snapshot. */
+export async function loadPipelineBilling(
+  period: string,
+): Promise<PipelineBilling> {
+  periodSchema.parse(period);
+  const { pool } = await import("../db");
+  const [{ rows: raw }, { rows: mappings }] = await Promise.all([
+    pool.query(
+      `SELECT r.id,r.client_name,r.amount_usd,r.invoice_period,r.confirmed,r.is_estimate,r.status,r.source_tab,r.source_row_id,r.period_closed,p.client_id
+      FROM revenue_events r LEFT JOIN active_projects p ON p.id=r.project_id WHERE r.invoice_period=$1 ORDER BY r.id`,
+      [period],
+    ),
+    pool.query(`SELECT DISTINCT p.client_id,c.name,p.data->>'warnerBasis' AS basis FROM pipeline_opportunities p JOIN clients c ON c.id=p.client_id
+      WHERE p.data->>'warner'='true' AND nullif(trim(p.data->>'warnerBasis'),'') IS NOT NULL`),
+  ]);
+  const events: BillingEvent[] = raw.map((r) => ({
+    id: r.id,
+    clientName: r.client_name,
+    clientId: r.client_id ?? null,
+    amountUsd: String(r.amount_usd),
+    invoicePeriod: r.invoice_period,
+    confirmed: r.confirmed,
+    isEstimate: r.is_estimate,
+    status: r.status,
+    sourceTab: r.source_tab,
+    sourceRowId: r.source_row_id,
+    periodClosed: r.period_closed,
+  }));
+  return summarizeBilling(
+    events,
+    mappings.map((m) => ({
+      clientId: m.client_id,
+      name: m.name,
+      basis: m.basis,
+    })),
+    period,
+  );
+}
+
 /** No data queries run before both the CRM and finance gates have passed. */
 export function registerPipelineFinanceRoutes(
   app: Express,
@@ -135,48 +174,13 @@ export function registerPipelineFinanceRoutes(
           .status(400)
           .json({ message: "Indicá el período de facturación como YYYY-MM." });
       try {
-        const { pool } = await import("../db");
-        const [{ rows: raw }, { rows: mappings }] = await Promise.all([
-          pool.query(
-            `SELECT r.id,r.client_name,r.amount_usd,r.invoice_period,r.confirmed,r.is_estimate,r.status,r.source_tab,r.source_row_id,r.period_closed,p.client_id
-      FROM revenue_events r LEFT JOIN active_projects p ON p.id=r.project_id WHERE r.invoice_period=$1 ORDER BY r.id`,
-            [parsed.data.period],
-          ),
-          pool.query(`SELECT DISTINCT p.client_id,c.name,p.data->>'warnerBasis' AS basis FROM pipeline_opportunities p JOIN clients c ON c.id=p.client_id
-      WHERE p.data->>'warner'='true' AND nullif(trim(p.data->>'warnerBasis'),'') IS NOT NULL`),
-        ]);
-        const events: BillingEvent[] = raw.map((r) => ({
-          id: r.id,
-          clientName: r.client_name,
-          clientId: r.client_id ?? null,
-          amountUsd: String(r.amount_usd),
-          invoicePeriod: r.invoice_period,
-          confirmed: r.confirmed,
-          isEstimate: r.is_estimate,
-          status: r.status,
-          sourceTab: r.source_tab,
-          sourceRowId: r.source_row_id,
-          periodClosed: r.period_closed,
-        }));
-        res.json(
-          summarizeBilling(
-            events,
-            mappings.map((m) => ({
-              clientId: m.client_id,
-              name: m.name,
-              basis: m.basis,
-            })),
-            parsed.data.period,
-          ),
-        );
+        res.json(await loadPipelineBilling(parsed.data.period));
       } catch (error) {
         console.error("Pipeline billing read failed", error);
-        res
-          .status(503)
-          .json({
-            message:
-              "No se pudo consultar la facturación. Reintentá sin usar estimaciones como facturas.",
-          });
+        res.status(503).json({
+          message:
+            "No se pudo consultar la facturación. Reintentá sin usar estimaciones como facturas.",
+        });
       }
     },
   );
