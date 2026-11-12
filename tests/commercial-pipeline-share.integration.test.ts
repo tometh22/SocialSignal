@@ -9,7 +9,16 @@ suite("Pipeline compartido / PostgreSQL", () => {
   let pool: any, server: Server, base: string;
   const secret = "NOTA-INTERNA-NO-PUBLICAR";
   beforeAll(async () => {
-    process.env.DATABASE_URL = process.env.PIPELINE_TEST_DATABASE_URL;
+    // Schema propio: la suite comparte la base de CI con la del pipeline (mismas tablas base).
+    const schema = `pipeline_share_${process.pid}`;
+    const { Client } = await import("pg");
+    const admin = new Client({ connectionString: process.env.PIPELINE_TEST_DATABASE_URL });
+    await admin.connect();
+    await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE; CREATE SCHEMA ${schema}`);
+    await admin.end();
+    const url = new URL(process.env.PIPELINE_TEST_DATABASE_URL!);
+    url.searchParams.set("options", `-c search_path=${schema}`);
+    process.env.DATABASE_URL = url.toString();
     ({ pool } = await import("../server/db"));
     await pool.query(
       `CREATE TABLE crm_stages(key text,label text);CREATE TABLE users(id serial PRIMARY KEY,first_name text,last_name text);CREATE TABLE clients(id serial PRIMARY KEY);CREATE TABLE quotation_groups(id serial PRIMARY KEY);CREATE TABLE quotations(id serial PRIMARY KEY);CREATE TABLE crm_leads(id serial PRIMARY KEY,stage text,company_name text,client_id integer,assigned_to integer);CREATE TABLE crm_contacts(id serial PRIMARY KEY,lead_id integer,name text,is_primary boolean);INSERT INTO users(first_name,last_name) VALUES('Editor','Prueba');`,
