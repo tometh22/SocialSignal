@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/command";
 import { OpportunityEditor } from "@/components/pipeline/opportunity-editor";
 import { OpportunityList } from "@/components/pipeline/opportunity-list";
+import { ShareDialog } from "@/components/pipeline/share-dialog";
 import { MonthPicker, monthLabel } from "@/components/pipeline/month-picker";
 import { SummaryPreview } from "@/components/pipeline/summary-preview";
 import {
@@ -72,6 +73,7 @@ import {
   LockKeyhole,
   Plus,
   RefreshCw,
+  Share2,
   Search,
   ShieldCheck,
   Target,
@@ -106,7 +108,7 @@ const navigation = [
   {
     label: "Cierre mensual",
     icon: ClipboardCheck,
-    description: "Conciliá, guardá un corte y compartí el resumen.",
+    description: "Conciliá, guardá un corte y copiá el Status.",
   },
   {
     label: "Registro",
@@ -484,6 +486,7 @@ export default function Pipeline() {
     [decision, setDecision] = useState(""),
     [showFilters, setShowFilters] = useState(false),
     [copied, setCopied] = useState(false),
+    [shareOpen, setShareOpen] = useState(false),
     [logOffset, setLogOffset] = useState(0),
     [success, setSuccess] = useState("");
   const { isAdmin, hasPermission } = usePermissions();
@@ -502,6 +505,7 @@ export default function Pipeline() {
     ...(snapshot ? { snapshotId: snapshot } : {}),
   }).toString();
   const universeQs = snapshot ? `snapshotId=${snapshot}` : "";
+  const statusPath = "/executive-summary?" + qs + "&period=" + period;
   const useData = (path: string, enabled = true) =>
     useQuery<any>({
       queryKey: [base, path],
@@ -523,10 +527,7 @@ export default function Pipeline() {
       tab === "Cierre mensual" && !snapshot,
     ),
     settings = useData("/settings", tab === "Concentración" && isAdmin),
-    text = useData(
-      "/executive-summary?" + qs + "&period=" + period,
-      tab === "Cierre mensual",
-    ),
+    text = useData(statusPath, tab === "Cierre mensual"),
     cut = useData("/cuts/" + snapshot, !!snapshot),
     accounts = useData(
       "/opportunities?" + universeQs + "&group=account&limit=1",
@@ -594,6 +595,43 @@ export default function Pipeline() {
     createKey.current = crypto.randomUUID();
     setError("");
     setEditing(opportunitySchema.parse({ account: "Nueva cuenta" }));
+  };
+  /** Copia el Status (texto plano) desde cualquier vista, sin pasar por Cierre mensual. */
+  const copyStatus = async () => {
+    setError("");
+    const load = () =>
+      queryClient
+        .fetchQuery({
+          queryKey: [base, statusPath],
+          queryFn: () => authFetchJson(base + statusPath),
+        })
+        .then((d: any) => String(d?.text ?? ""));
+    const done = () => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    };
+    try {
+      // Safari exige escribir en el portapapeles dentro del clic: se le pasa la promesa.
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write)
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/plain": load().then(
+              (t) => new Blob([t], { type: "text/plain" }),
+            ),
+          }),
+        ]);
+      else await navigator.clipboard.writeText(await load());
+      done();
+    } catch {
+      try {
+        await navigator.clipboard.writeText(await load());
+        done();
+      } catch {
+        setError(
+          "No se pudo copiar el Status. Abrí Cierre mensual y copialo desde ahí.",
+        );
+      }
+    }
   };
   const openOpportunity = (r: Opportunity) => {
     setError("");
@@ -696,15 +734,27 @@ export default function Pipeline() {
           </span>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          {canReadQuotes && !snapshot && (
+            <Button
+              variant="outline"
+              className="h-9 shrink-0 gap-2 text-sm"
+              onClick={() => setShareOpen(true)}
+            >
+              <Share2 className="h-4 w-4" />
+              Compartir
+            </Button>
+          )}
           <Button
             variant="outline"
             className="h-9 shrink-0 gap-2 text-sm"
-            aria-label="Resumen para Fede"
-            onClick={() => navigate("Cierre mensual")}
+            onClick={() => void copyStatus()}
           >
-            <ClipboardCheck className="h-4 w-4" />
-            <span className="sm:hidden">Resumen</span>
-            <span className="hidden sm:inline">Resumen para Fede</span>
+            {copied ? (
+              <Check className="h-4 w-4 text-emerald-600" />
+            ) : (
+              <ClipboardCheck className="h-4 w-4" />
+            )}
+            {copied ? "Status copiado" : "Copiar Status"}
           </Button>
           <Button
             variant="outline"
@@ -1913,8 +1963,8 @@ export default function Pipeline() {
               </Panel>
             </div>
             <Panel
-              title="Resumen para Fede"
-              description={`${monthLabel(effectivePeriod)} · listo para revisar y compartir manualmente`}
+              title="Status del pipeline"
+              description={`${monthLabel(effectivePeriod)} · listo para copiar y compartir`}
               action={<FileText className="h-4 w-4 text-slate-400" />}
             >
               <div className="p-5">
@@ -1926,22 +1976,14 @@ export default function Pipeline() {
                   <Button
                     className="h-9 gap-2 text-sm"
                     disabled={!text.data?.text}
-                    onClick={() =>
-                      navigator.clipboard
-                        .writeText(text.data.text)
-                        .then(() => {
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 2500);
-                        })
-                        .catch((e) => setError(e.message))
-                    }
+                    onClick={() => void copyStatus()}
                   >
                     {copied ? (
                       <Check className="h-4 w-4" />
                     ) : (
                       <Copy className="h-4 w-4" />
                     )}
-                    {copied ? "Copiado" : "Copiar resumen"}
+                    {copied ? "Status copiado" : "Copiar Status"}
                   </Button>
                   <Button
                     variant="outline"
@@ -1955,7 +1997,7 @@ export default function Pipeline() {
                       );
                       const a = document.createElement("a");
                       a.href = url;
-                      a.download = `pipeline-${effectivePeriod}.txt`;
+                      a.download = `status-pipeline-${effectivePeriod}.txt`;
                       a.click();
                       URL.revokeObjectURL(url);
                     }}
@@ -2099,6 +2141,7 @@ export default function Pipeline() {
           </div>
         </Panel>
       )}
+      <ShareDialog open={shareOpen} onOpenChange={setShareOpen} />
       <OpportunityEditor
         opportunity={editing}
         readOnly={!!snapshot}

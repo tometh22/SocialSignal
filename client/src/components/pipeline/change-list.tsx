@@ -37,6 +37,8 @@ export const fieldLabels: Record<string, string> = {
   threshold: "Umbral operativo",
   steps: "Checklist",
   period: "Período",
+  label: "Destinatario",
+  expiresAt: "Vencimiento",
 };
 const order = Object.keys(fieldLabels);
 const byOrder = (a: { key: string }, b: { key: string }) =>
