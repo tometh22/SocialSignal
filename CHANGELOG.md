@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.14.45 — 2026-11-12
+
+- El Registro del Pipeline comercial muestra las altas y conciliaciones como "datos iniciales": solo los campos con valor, en el orden y con las etiquetas de la ficha. Deja de listar "vacío → vacío" e identificadores internos (lead, cliente, cotización, huella de carga). Detectado al revisar las 78 entradas productivas. Sin cambios de datos.
+
 ## 1.14.44 — 2026-11-12
 
 - Pipeline comercial más fácil de leer: el total por etapa y la proporción de cada una; la cartera se ordena por cuenta, etapa, valor, ponderado o fecha (en el servidor, antes de paginar) y toda la fila abre la ficha; en celulares cada oportunidad es una tarjeta.

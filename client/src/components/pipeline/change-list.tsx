@@ -2,13 +2,23 @@ import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { civilDate, money, pct, pendingText } from "./ui";
 
+// Solo se muestran estos campos, en este orden y con las etiquetas de la ficha.
+// Los identificadores internos (leadId, clientId, inputHash…) quedan fuera.
 export const fieldLabels: Record<string, string> = {
   account: "Cuenta",
   project: "Proyecto",
   stage: "Etapa",
+  stageReason: "Fundamento de la etapa",
   status: "Estado",
   scope: "Alcance",
+  exclusionReason: "Motivo de exclusión",
+  eligible: "Vigencia",
   usd: "Valor USD",
+  valueNote: "Fundamento del importe",
+  originalAmount: "Precio original",
+  currency: "Moneda original",
+  priceBasis: "Base del precio",
+  durationMonths: "Duración · meses",
   probability: "Probabilidad",
   probabilityReason: "Motivo de probabilidad",
   probabilitySource: "Fuente de probabilidad",
@@ -16,34 +26,22 @@ export const fieldLabels: Record<string, string> = {
   next: "Próximo paso",
   nextDate: "Fecha próximo paso",
   owner: "Responsable",
-  ownerId: "Responsable",
   contact: "Contacto",
+  confidence: "Confianza",
+  warner: "Grupo Warner",
+  warnerBasis: "Fundamento del vínculo Warner",
   evidence: "Evidencia",
   evidenceDate: "Fecha de evidencia",
   sources: "Fuentes",
   notes: "Notas",
-  confidence: "Confianza",
-  warner: "Grupo Warner",
-  eligible: "Vigencia",
-  valueNote: "Fundamento del importe",
   threshold: "Umbral operativo",
   steps: "Checklist",
   period: "Período",
 };
-// Campos técnicos que no aportan a la lectura del cambio.
-const hidden = new Set([
-  "id",
-  "version",
-  "reason",
-  "requestKey",
-  "payload",
-  "created_at",
-  "created_by",
-  "updated_at",
-  "updated_by",
-  "importKey",
-  "alerts",
-]);
+const order = Object.keys(fieldLabels);
+const byOrder = (a: { key: string }, b: { key: string }) =>
+  order.indexOf(a.key) - order.indexOf(b.key);
+const shown = (k: string) => k in fieldLabels;
 const empty = (v: unknown) =>
   v === null || v === undefined || v === "" || (Array.isArray(v) && !v.length);
 
@@ -51,6 +49,7 @@ export function formatValue(key: string, v: unknown): string {
   if (empty(v)) return "vacío";
   if (typeof v === "boolean") return v ? "Sí" : "No";
   if (key === "usd") return `USD ${money(v)}`;
+  if (key === "originalAmount") return money(v);
   if (key === "probability" || key === "threshold") return pct(v);
   if (key === "steps" && Array.isArray(v))
     return `${v.filter(Boolean).length}/${v.length} pasos`;
@@ -67,35 +66,57 @@ export function formatValue(key: string, v: unknown): string {
 }
 
 type Change = { key: string; before?: unknown; after: unknown };
-/** Normaliza los distintos formatos auditados (edición, alta, umbral, corte…). */
-export function describeChanges(changes: any): Change[] {
-  if (!changes || typeof changes !== "object") return [];
-  if (changes.after && typeof changes.after === "object") {
-    return Object.keys(changes.after)
-      .filter(
-        (k) =>
-          !hidden.has(k) &&
-          JSON.stringify(changes.after[k]) !==
-            JSON.stringify(changes.before?.[k]),
-      )
-      .map((k) => ({
-        key: k,
-        before: changes.before?.[k] ?? null,
-        after: changes.after[k],
-      }));
+export type ChangeSet = {
+  /** edit: antes → después · create: datos iniciales · values: valores registrados. */
+  mode: "edit" | "create" | "values";
+  items: Change[];
+};
+/** Normaliza los distintos formatos auditados (edición, alta, conciliación, umbral…). */
+export function describeChanges(changes: any): ChangeSet {
+  if (!changes || typeof changes !== "object")
+    return { mode: "values", items: [] };
+  const after = changes.after;
+  if (after && typeof after === "object") {
+    const before = changes.before;
+    if (!before || typeof before !== "object")
+      return {
+        mode: "create",
+        items: Object.keys(after)
+          .filter((k) => shown(k) && !empty(after[k]))
+          .map((k) => ({ key: k, after: after[k] }))
+          .sort(byOrder),
+      };
+    return {
+      mode: "edit",
+      items: Object.keys({ ...before, ...after })
+        .filter(
+          (k) =>
+            shown(k) &&
+            JSON.stringify(after[k] ?? null) !==
+              JSON.stringify(before[k] ?? null),
+        )
+        .map((k) => ({
+          key: k,
+          before: before[k] ?? null,
+          after: after[k] ?? null,
+        }))
+        .sort(byOrder),
+    };
   }
-  return Object.keys(changes)
-    .filter((k) => !hidden.has(k) && !empty(changes[k]))
-    .map((k) => ({ key: k, after: changes[k] }));
+  return {
+    mode: "values",
+    items: Object.keys(changes)
+      .filter((k) => shown(k) && !empty(changes[k]))
+      .map((k) => ({ key: k, after: changes[k] }))
+      .sort(byOrder),
+  };
 }
 
 export function ChangeList({ changes }: { changes: any }) {
-  const list = describeChanges(changes);
+  const { items: list } = describeChanges(changes);
   if (!list.length)
     return (
-      <p className={cn("text-xs", pendingText)}>
-        Sin cambios de campos: es un registro de decisión.
-      </p>
+      <p className={cn("text-xs", pendingText)}>Sin campos para mostrar.</p>
     );
   return (
     <dl className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-slate-50/50 text-sm">
@@ -104,9 +125,7 @@ export function ChangeList({ changes }: { changes: any }) {
           key={key}
           className="grid gap-x-4 gap-y-1 px-3 py-2 sm:grid-cols-[170px_minmax(0,1fr)]"
         >
-          <dt className="font-medium text-slate-600">
-            {fieldLabels[key] ?? key}
-          </dt>
+          <dt className="font-medium text-slate-600">{fieldLabels[key]}</dt>
           <dd className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
             {before !== undefined && (
               <>
