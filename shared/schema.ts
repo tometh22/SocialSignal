@@ -5728,3 +5728,13 @@ export const financialAuditEvents = pgTable("financial_audit_events", {
 }));
 
 export type FinancialAuditEvent = typeof financialAuditEvents.$inferSelect;
+
+// Independent commercial scopes; native lead fields remain owned by CRM.
+export const pipelineOpportunities = pgTable('pipeline_opportunities', {
+ id:serial('id').primaryKey(), importKey:text('import_key').unique(), leadId:integer('lead_id').references(()=>crmLeads.id), clientId:integer('client_id').references(()=>clients.id), ownerId:integer('owner_id').references(()=>users.id), contactId:integer('contact_id').references(()=>crmContacts.id), quotationId:integer('quotation_id').references(()=>quotations.id), quotationGroupId:integer('quotation_group_id').references(()=>quotationGroups.id),
+ usd:numeric('usd',{precision:14,scale:2}), probability:numeric('probability',{precision:5,scale:2}), closeDate:date('close_date'), evidenceDate:date('evidence_date'), data:jsonb('data').notNull(),version:integer('version').notNull().default(1),createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),updatedAt:timestamp('updated_at',{withTimezone:true}).notNull().defaultNow(),
+}, t=>[index('pipeline_lead_idx').on(t.leadId),index('pipeline_client_idx').on(t.clientId),index('pipeline_owner_idx').on(t.ownerId),index('pipeline_close_idx').on(t.closeDate)]);
+export const pipelineCuts=pgTable('pipeline_cuts',{id:serial('id').primaryKey(),period:text('period').notNull(),version:integer('version').notNull(),requestKey:text('request_key').notNull().unique(),payload:jsonb('payload').notNull(),createdBy:integer('created_by').references(()=>users.id),createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow()},t=>[unique().on(t.period,t.version)]);
+export const pipelineLog=pgTable('pipeline_log',{id:serial('id').primaryKey(),actorId:integer('actor_id').references(()=>users.id),opportunityId:integer('opportunity_id').references(()=>pipelineOpportunities.id),period:text('period'),kind:text('kind').notNull(),reason:text('reason').notNull(),changes:jsonb('changes').notNull().default({}),createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow()});
+export const pipelineChecklists=pgTable('pipeline_checklists',{period:text('period').primaryKey(),steps:jsonb('steps').notNull().default([false,false,false,false]),version:integer('version').notNull().default(1)});
+export const pipelineSettings=pgTable('pipeline_settings',{id:integer('id').primaryKey(),threshold:numeric('threshold',{precision:5,scale:2}).notNull().default('50'),version:integer('version').notNull().default(1)});

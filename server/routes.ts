@@ -1,3 +1,5 @@
+import { registerPipelineFinanceRoutes } from "./pipeline/finance";
+import { registerPipelineRoutes } from "./pipeline/routes";
 import { guardAbsenceCancellation } from "./services/absence-cancellation";
 import { registerNotificationRoutes } from "./routes-notifications";
 import { registerTrainingRoutes } from "./routes-training";
@@ -1084,6 +1086,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Setup authentication with storage
   const { requireAuth, resolveUserFromSessionCookie } = setupAuth(app, storage);
+  registerPipelineRoutes(app, requireAuth);
+  registerPipelineFinanceRoutes(app, requireAuth);
   registerBiRoutes(app, pool, requireAuth);
   registerSearchRoutes(app, requireAuth, accessibleTaskProjectIds);
   registerPerformanceRoutes(app, pool, requireAuth);

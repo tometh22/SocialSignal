@@ -210,10 +210,11 @@ const authoredTrainingLessons: AuthoredLesson[] = [
       audience: "internal",
       any: ["crm"],
     },
-    covers: ["/crm", "/crm/:id"],
+    covers: ["/crm", "/crm/:id", "/crm/pipeline"],
     description: "Mantené oportunidades, actividades y próximos pasos.",
     explanation: [
       "Abrí CRM para revisar el pipeline y filtrar oportunidades. Entrá a una oportunidad para consultar sus datos, actividades y recordatorios.",
+      "Pipeline comercial separa cartera abierta, validación y confirmadas. Revisá cobertura y evidencia antes de interpretar bruto o ponderado; guardá el cierre mensual y copiá el resumen para compartirlo manualmente.",
       "Después de una conversación, registrá la actividad y el próximo paso. Actualizá la etapa según lo que realmente ocurrió, no solo por tener una reunión agendada.",
     ],
     example:

@@ -1052,6 +1052,7 @@ export default function CRMPage() {
         icon={<Target className="h-5 w-5" />}
         actions={(
           <>
+          <Button variant="outline" onClick={() => { window.location.href = "/crm/pipeline"; }}>Pipeline comercial</Button>
           <StageManagerDialog stages={stages} onRefresh={refetchStages} />
           <Button variant="outline" onClick={handleRefresh} className="gap-1.5">
             <RefreshCw className="h-4 w-4" /> Actualizar

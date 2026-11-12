@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.40 — 2026-11-12
+
+- Incorpora Pipeline comercial al CRM: resumen ejecutivo, oportunidades, alertas, concentración, cierre mensual y registro, con interfaz adaptable y ficha comercial guiada.
+- Calcula bruto, ponderado y cobertura desde evidencia validada; separa confirmadas, validación CRM y facturación real. Respeta acceso CRM, cotizaciones y finanzas.
+- Agrega alcances vinculados, cortes inmutables, auditoría transaccional, concurrencia optimista y carga histórica idempotente con conciliación previa. Migración aditiva 0096.
+- Prepara la conciliación del corte comercial de noviembre sin convertir proyecciones en facturación ni completar importes o probabilidades desconocidos.
+
 ## 1.14.39 — 2026-11-11
 
 - Capacidad conserva la modalidad por proyecto y semana: modificar una semana no altera la planificación histórica. Recupera las bases históricas inequívocas sin sumar modalidades alternativas.

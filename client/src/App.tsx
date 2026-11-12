@@ -44,6 +44,7 @@ const CurrencyDemo = lazy(() => import("@/pages/currency-demo"));
 const GoogleSheetsManager = lazy(() => import("@/pages/google-sheets-manager"));
 const ExecutiveOperativo = lazy(() => import("@/pages/Executive/Operativo"));
 const ExecutiveFinanciero = lazy(() => import("@/pages/Executive/Financiero"));
+const CRMPipelinePage = lazy(() => import("@/pages/crm-pipeline"));
 const CRMPage = lazy(() => import("@/pages/crm"));
 const CRMLeadPage = lazy(() => import("@/pages/crm-lead"));
 const NotificationsPage = lazy(() => import("@/pages/notifications"));
@@ -327,6 +328,7 @@ function AppRoutes() {
 
                   {/* CRM Ventas */}
                   <ProtectedRoute path="/crm" component={CRMPage} requiredPermission="crm" />
+                  <ProtectedRoute path="/crm/pipeline" component={CRMPipelinePage} requiredPermission="crm" />
                   <ProtectedRoute path="/crm/:id" component={CRMLeadPage} requiredPermission="crm" />
                   <ProtectedRoute path="/review" component={ReviewHubPage} requiredPermission="status" />
                   <ProtectedRoute path="/review/objectives" component={StatusObjectivesPage} requiredPermission="operations" />
