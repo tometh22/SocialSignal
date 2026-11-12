@@ -1,3 +1,4 @@
+import { commercialPipelineMigrationSql } from "./migrations/commercial-pipeline";
 import { deliverableNameCompatibilityMigrationSql } from "./migrations/deliverable-name-compatibility";
 import { payrollDocumentModesMigrationSql } from "./migrations/payroll-document-modes";
 import { capacityPlanningMigrationSql } from "./migrations/capacity-planning";
@@ -96,6 +97,7 @@ async function applyPendingMigrations() {
   };
 
   try {
+    await run('0096 commercial pipeline', commercialPipelineMigrationSql);
     await run('0086 MCP OAuth grants', mcpOauthMigrationSql);
     await run('0095 MCP Status confirmations', mcpStatusActionsMigrationSql);
     await run('0094 interactive training', trainingMigrationSql);
