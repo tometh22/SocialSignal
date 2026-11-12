@@ -19,7 +19,10 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { OpportunityEditor } from "@/components/pipeline/opportunity-editor";
+import {
+  OpportunityEditor,
+  stageColors,
+} from "@/components/pipeline/opportunity-editor";
 import {
   opportunitySchema,
   stages,
@@ -104,14 +107,6 @@ const alertTypes = [
   "Evidencia desactualizada",
   "Sin fecha objetivo",
 ];
-const stageColors: Record<string, string> = {
-  Prospección: "bg-slate-400",
-  "Reunión / demo": "bg-sky-500",
-  Propuesta: "bg-indigo-500",
-  Negociación: "bg-amber-500",
-  Confirmada: "bg-emerald-500",
-  "Sin etapa verificada": "bg-slate-300",
-};
 const fieldLabels: Record<string, string> = {
   account: "Cuenta",
   project: "Proyecto",
@@ -164,6 +159,48 @@ const dateTime = (value: string) =>
     hour: "2-digit",
     minute: "2-digit",
   });
+// Escala tipográfica compartida por todas las vistas del módulo.
+const tableHead =
+  "bg-slate-50/80 text-xs font-medium uppercase tracking-wider text-slate-500";
+const cardBase = "rounded-2xl border border-slate-200/80 bg-card shadow-sm";
+const isPending = (value: unknown) => value === null || value === undefined;
+/** Muestra un importe o un "Pendiente" atenuado, para que el dato faltante no compita con los reales. */
+function Amount({
+  value,
+  format = money,
+  className,
+}: {
+  value: unknown;
+  format?: (v: unknown) => string;
+  className?: string;
+}) {
+  return isPending(value) ? (
+    <span className="font-normal text-slate-400">Pendiente</span>
+  ) : (
+    <span className={cn("tabular-nums", className)}>{format(value)}</span>
+  );
+}
+function SectionHeading({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description?: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="min-w-0">
+        <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+        {description && (
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        )}
+      </div>
+      {action}
+    </div>
+  );
+}
 function Panel({
   title,
   description,
@@ -178,15 +215,10 @@ function Panel({
   className?: string;
 }) {
   return (
-    <section
-      className={cn(
-        "overflow-hidden rounded-2xl border border-slate-200/80 bg-card shadow-sm",
-        className,
-      )}
-    >
+    <section className={cn("overflow-hidden", cardBase, className)}>
       {title && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-5 py-4">
-          <div>
+        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
+          <div className="min-w-0">
             <h2 className="text-base font-semibold tracking-tight">{title}</h2>
             {description && (
               <p className="mt-1 text-sm text-muted-foreground">
@@ -194,7 +226,7 @@ function Panel({
               </p>
             )}
           </div>
-          {action}
+          {action && <div className="shrink-0">{action}</div>}
         </div>
       )}
       {children}
@@ -255,6 +287,7 @@ function Coverage({ n = 0, total = 0 }: { n?: number; total?: number }) {
 function Metric({
   title,
   value,
+  unit,
   icon: Icon,
   subtitle,
   coverage,
@@ -262,37 +295,60 @@ function Metric({
   onClick,
 }: {
   title: string;
+  /** `null`/`undefined` se muestran como "Pendiente" atenuado. */
   value: ReactNode;
+  unit?: string;
   icon: LucideIcon;
   subtitle?: string;
   coverage?: { n: number; total: number };
   highlight?: boolean;
   onClick?: () => void;
 }) {
+  const pending = isPending(value) || value === "Pendiente";
   return (
     <div
       className={cn(
-        "relative flex min-h-[132px] flex-col rounded-2xl border bg-card p-5 shadow-sm",
+        "relative flex min-h-[136px] flex-col rounded-2xl border bg-card p-5 shadow-sm",
         highlight ? "border-amber-200 bg-amber-50/40" : "border-slate-200/80",
       )}
     >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      <div className="flex items-center justify-between gap-3">
+        <p
+          className="truncate text-sm font-medium text-muted-foreground"
+          title={title}
+        >
+          {title}
+        </p>
         <Icon
           className={cn(
-            "h-4 w-4",
+            "h-4 w-4 shrink-0",
             highlight ? "text-amber-600" : "text-slate-400",
           )}
         />
       </div>
-      <p className="text-3xl font-semibold tracking-tight tabular-nums">
-        {value}
+      <p className="mt-2 flex h-9 items-baseline gap-1.5">
+        {pending ? (
+          <span className="text-xl font-medium text-slate-400">Pendiente</span>
+        ) : (
+          <>
+            <span className="text-3xl font-semibold tracking-tight tabular-nums">
+              {value}
+            </span>
+            {unit && (
+              <span className="text-sm font-medium text-muted-foreground">
+                {unit}
+              </span>
+            )}
+          </>
+        )}
       </p>
-      <div className="mt-auto pt-3">
+      <div className="mt-auto pt-4">
         {coverage ? (
           <Coverage {...coverage} />
         ) : (
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
+          <p className="text-sm leading-snug text-muted-foreground">
+            {subtitle}
+          </p>
         )}
       </div>
       {onClick && (
@@ -380,7 +436,7 @@ function Picker({
 }
 function StageBadge({ stage }: { stage: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-sm font-medium text-slate-700">
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium leading-5 text-slate-700">
       <span
         className={cn(
           "h-1.5 w-1.5 rounded-full",
@@ -402,40 +458,31 @@ function OpportunityTable({
   onOpen: (r: Opportunity) => void;
   compact?: boolean;
 }) {
+  const cell = "px-2.5 py-3.5 align-top";
+  const head = "whitespace-nowrap px-2.5 py-3 font-medium";
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
+        <thead className={tableHead}>
           <tr>
-            <th className="min-w-[240px] px-5 py-3 font-medium">
+            <th className={cn(head, "min-w-[200px] pl-5")}>
               Cuenta y oportunidad
             </th>
-            <th className="min-w-[155px] px-3 py-3 font-medium">
-              Situación comercial
-            </th>
-            <th className="px-3 py-3 text-right font-medium">Valor USD</th>
+            <th className={cn(head, "min-w-[140px]")}>Situación</th>
+            <th className={cn(head, "text-right")}>Valor USD</th>
             {!compact && (
-              <>
-                <th className="px-3 py-3 text-right font-medium">
-                  Probabilidad
-                </th>
-                <th className="px-3 py-3 text-right font-medium">
-                  Ponderado USD
-                </th>
-              </>
+              <th className={cn(head, "text-right")}>Ponderado USD</th>
             )}
-            <th className="min-w-[150px] px-3 py-3 font-medium">
+            <th className={cn(head, "min-w-[160px]")}>
               {compact ? "Próximo paso" : "Seguimiento"}
             </th>
+            {!compact && <th className={head}>Responsable</th>}
             {!compact && (
-              <th className="min-w-[145px] px-3 py-3 font-medium">
-                Responsable
+              <th className={cn(head, "hidden min-w-[170px] 2xl:table-cell")}>
+                Fuente
               </th>
             )}
-            {!compact && (
-              <th className="min-w-[180px] px-3 py-3 font-medium">Fuente</th>
-            )}
-            <th className="w-12 px-3 py-3">
+            <th className="w-10 px-2 py-3">
               <span className="sr-only">Abrir ficha</span>
             </th>
           </tr>
@@ -444,136 +491,172 @@ function OpportunityTable({
           {loading
             ? Array.from({ length: 4 }, (_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: compact ? 5 : 9 }, (_, j) => (
+                  {Array.from({ length: compact ? 5 : 8 }, (_, j) => (
                     <td className="px-5 py-5" key={j}>
                       <div className="h-4 animate-pulse rounded bg-slate-100" />
                     </td>
                   ))}
                 </tr>
               ))
-            : rows.map((r) => (
-                <tr
-                  className="group transition-colors hover:bg-slate-50/80"
-                  key={r.id ?? r.importKey}
-                >
-                  <td className="px-5 py-3">
-                    <button
-                      onClick={() => onOpen(r)}
-                      className="block max-w-[340px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    >
-                      <span className="font-semibold text-slate-900 group-hover:text-primary">
-                        {r.account}
-                      </span>
-                      <span className="mt-1 block leading-relaxed text-muted-foreground">
-                        {r.project || "Alcance por definir"}
-                      </span>
-                    </button>
-                    {!compact && (
-                      <span className="mt-1.5 block text-xs text-slate-400">
-                        {r.contact || "Contacto pendiente"}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3">
-                    <StageBadge stage={r.stage} />
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                      {r.status} · {r.scope}
-                    </p>
-                    {!compact && (
-                      <span className="mt-1 inline-block text-xs text-slate-400">
-                        Confianza {r.confidence?.toLowerCase()}
-                      </span>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-right font-medium tabular-nums">
-                    {money(r.usd)}
-                  </td>
-                  {!compact && (
-                    <>
-                      <td className="px-3 py-4 text-right tabular-nums">
-                        {pct(r.probability)}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-right tabular-nums text-muted-foreground">
-                        {money(metrics([r]).weighted)}
-                      </td>
-                    </>
-                  )}
-                  <td className="max-w-[240px] px-3 py-4">
-                    <p className="line-clamp-2 leading-relaxed text-slate-600">
-                      {compact
-                        ? r.next || "Definir próximo paso"
-                        : civilDate(r.closeDate)}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {compact
-                        ? civilDate(r.nextDate)
-                        : `Evidencia: ${civilDate(r.evidenceDate)}`}
-                    </p>
-                    {r.alerts?.length > 0 && (
+            : rows.map((r) => {
+                const weighted = metrics([r]).weighted;
+                return (
+                  <tr
+                    className="group transition-colors hover:bg-slate-50/80"
+                    key={r.id ?? r.importKey}
+                  >
+                    <td className={cn(cell, "pl-5")}>
                       <button
                         onClick={() => onOpen(r)}
-                        className="mt-1.5 inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700"
-                        title={r.alerts.join(" · ")}
+                        className="block max-w-[340px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       >
-                        <AlertCircle className="h-3 w-3" />
-                        {r.alerts.length}{" "}
-                        {r.alerts.length === 1 ? "pendiente" : "pendientes"}
-                      </button>
-                    )}
-                  </td>
-                  {!compact && (
-                    <td className="px-3 py-3">
-                      <span className="inline-flex items-center gap-2">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">
-                          {r.owner
-                            ? r.owner
-                                .split(" ")
-                                .map((s: string) => s[0])
-                                .slice(0, 2)
-                                .join("")
-                            : "—"}
+                        <span className="block font-semibold leading-5 text-slate-900 group-hover:text-primary">
+                          {r.account}
                         </span>
-                        {r.owner || "Sin responsable"}
-                      </span>
-                    </td>
-                  )}
-                  {!compact && (
-                    <td className="max-w-[220px] px-3 py-3">
-                      {r.sources?.[0] ? (
-                        <>
-                          <a
-                            className="inline-flex items-start gap-1 text-sm font-medium text-primary hover:underline"
-                            href={r.sources[0].url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            {r.sources[0].title}
-                            <ArrowUpRight className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                          </a>
-                          {r.sources.length > 1 && (
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              +{r.sources.length - 1} en detalle
-                            </p>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground">Pendiente</span>
+                        <span className="mt-0.5 block leading-5 text-muted-foreground">
+                          {r.project || "Alcance por definir"}
+                        </span>
+                      </button>
+                      {!compact && (
+                        <span className="mt-1 block text-xs text-slate-400">
+                          {r.contact || "Contacto pendiente"}
+                        </span>
                       )}
                     </td>
-                  )}
-                  <td className="px-3 py-3">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-slate-400"
-                      aria-label={`Abrir ${r.account}`}
-                      onClick={() => onOpen(r)}
+                    <td className={cell}>
+                      <StageBadge stage={r.stage} />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {r.status} · {r.scope}
+                      </p>
+                      {!compact && (
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          Confianza {r.confidence?.toLowerCase()}
+                        </p>
+                      )}
+                    </td>
+                    <td
+                      className={cn(
+                        cell,
+                        "whitespace-nowrap text-right font-medium leading-5",
+                      )}
                     >
-                      <ArrowUpRight className="h-4 w-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+                      <Amount value={r.usd} />
+                    </td>
+                    {!compact && (
+                      <td
+                        className={cn(
+                          cell,
+                          "whitespace-nowrap text-right leading-5",
+                        )}
+                      >
+                        <Amount value={weighted} className="font-medium" />
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {isPending(r.probability)
+                            ? "Sin probabilidad"
+                            : `Probabilidad ${pct(r.probability)}`}
+                        </p>
+                      </td>
+                    )}
+                    <td className={cn(cell, "max-w-[240px]")}>
+                      <p className="line-clamp-2 leading-5 text-slate-700">
+                        {compact ? (
+                          r.next || (
+                            <span className="text-slate-400">
+                              Definir próximo paso
+                            </span>
+                          )
+                        ) : r.closeDate ? (
+                          civilDate(r.closeDate)
+                        ) : (
+                          <span className="text-slate-400">
+                            Sin fecha objetivo
+                          </span>
+                        )}
+                      </p>
+                      <p className="mt-0.5 whitespace-nowrap text-xs text-muted-foreground">
+                        {compact
+                          ? civilDate(r.nextDate)
+                          : `Evidencia: ${civilDate(r.evidenceDate)}`}
+                      </p>
+                      {r.alerts?.length > 0 && (
+                        <button
+                          onClick={() => onOpen(r)}
+                          className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700"
+                          title={r.alerts.join(" · ")}
+                        >
+                          <AlertCircle className="h-3 w-3" />
+                          {r.alerts.length}{" "}
+                          {r.alerts.length === 1 ? "pendiente" : "pendientes"}
+                        </button>
+                      )}
+                    </td>
+                    {!compact && (
+                      <td className={cell}>
+                        <span className="inline-flex items-center gap-2 whitespace-nowrap leading-5">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-500">
+                            {r.owner
+                              ? r.owner
+                                  .split(" ")
+                                  .map((s: string) => s[0])
+                                  .slice(0, 2)
+                                  .join("")
+                              : "—"}
+                          </span>
+                          {r.owner || (
+                            <span className="text-slate-400">
+                              Sin responsable
+                            </span>
+                          )}
+                        </span>
+                      </td>
+                    )}
+                    {!compact && (
+                      <td
+                        className={cn(
+                          cell,
+                          "hidden max-w-[220px] 2xl:table-cell",
+                        )}
+                      >
+                        {r.sources?.[0] ? (
+                          <>
+                            <a
+                              className="inline-flex items-start gap-1 font-medium leading-5 text-primary hover:underline"
+                              href={r.sources[0].url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <span className="line-clamp-2">
+                                {r.sources[0].title}
+                              </span>
+                              <ArrowUpRight className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            </a>
+                            {r.sources.length > 1 && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                +{r.sources.length - 1} en detalle
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <span className="leading-5 text-slate-400">
+                            Pendiente
+                          </span>
+                        )}
+                      </td>
+                    )}
+                    <td className={cn(cell, "px-2 py-2.5")}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-slate-400"
+                        aria-label={`Abrir ${r.account}`}
+                        onClick={() => onOpen(r)}
+                      >
+                        <ArrowUpRight className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
         </tbody>
       </table>
     </div>
@@ -800,7 +883,7 @@ export default function Pipeline() {
           <Link
             href="/crm"
             aria-label="Volver al CRM"
-            className="rounded-lg border bg-card p-2 text-muted-foreground hover:text-foreground"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border bg-card text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -809,7 +892,7 @@ export default function Pipeline() {
           </h1>
           <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
             {snapshot ? (
-              <LockKeyhole className="h-3.5 w-3.5" />
+              <LockKeyhole className="h-4 w-4" />
             ) : (
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             )}
@@ -867,7 +950,7 @@ export default function Pipeline() {
             <Icon className="h-4 w-4" />
             {label}
             {label === "Alertas" && !!data?.alerted && (
-              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
+              <span className="rounded-full bg-amber-100 px-1.5 text-xs font-medium leading-5 tabular-nums text-amber-800">
                 {data.alerted}
               </span>
             )}
@@ -878,9 +961,9 @@ export default function Pipeline() {
         ))}
       </nav>
       {snapshot && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-sm">
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-indigo-950">
-            <LockKeyhole className="h-4 w-4 text-indigo-500" />
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-2.5 text-sm">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-indigo-950">
+            <LockKeyhole className="h-4 w-4 shrink-0 text-indigo-500" />
             <span className="font-medium">
               {selectedCut
                 ? `${selectedCut.period} · versión ${selectedCut.version}`
@@ -888,13 +971,13 @@ export default function Pipeline() {
               · solo lectura
             </span>
             {selectedCut && (
-              <span className="text-xs text-indigo-700">
-                Guardado {dateTime(selectedCut.created_at)}
+              <span className="text-indigo-700/80">
+                · Guardado {dateTime(selectedCut.created_at)}
               </span>
             )}
           </p>
           <button
-            className="inline-flex items-center gap-2 font-medium text-indigo-800"
+            className="inline-flex items-center gap-1.5 font-medium text-indigo-800 hover:text-indigo-950"
             onClick={() => navigate(tab, "")}
           >
             Cartera actual
@@ -903,10 +986,10 @@ export default function Pipeline() {
         </div>
       )}
       {tab === "Oportunidades" && (
-        <div className="rounded-xl border border-border/70 bg-card">
+        <div className={cardBase}>
           <div className="flex flex-wrap items-center gap-2 p-3">
             <div className="relative min-w-[200px] flex-1 sm:max-w-sm">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 className="h-9 border-slate-200 bg-slate-50/60 pl-9 text-sm"
                 placeholder="Buscar cuenta, proyecto o contacto…"
@@ -920,16 +1003,16 @@ export default function Pipeline() {
               className="h-9 gap-2 text-sm"
               onClick={() => setShowFilters((v) => !v)}
             >
-              <ListFilter className="h-3.5 w-3.5" />
+              <ListFilter className="h-4 w-4" />
               Filtros
               {filterCount > 0 && (
-                <span className="rounded-full bg-primary/10 px-1.5 text-primary">
+                <span className="rounded-full bg-primary/10 px-1.5 text-xs leading-5 tabular-nums text-primary">
                   {filterCount}
                 </span>
               )}
               <ChevronDown
                 className={cn(
-                  "h-3 w-3 transition-transform",
+                  "h-3.5 w-3.5 opacity-50 transition-transform",
                   showFilters && "rotate-180",
                 )}
               />
@@ -948,7 +1031,7 @@ export default function Pipeline() {
               />
             )}
             <div className="ml-auto hidden items-center gap-1.5 text-sm text-muted-foreground sm:flex">
-              <ShieldCheck className="h-3.5 w-3.5 text-slate-400" />
+              <ShieldCheck className="h-4 w-4 text-slate-400" />
               Importes respaldados · USD
             </div>
           </div>
@@ -1015,12 +1098,12 @@ export default function Pipeline() {
             </div>
           )}
           {activeFilters.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 border-t border-border/50 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2 border-t border-border/60 px-3 py-2">
               {activeFilters.map(([k, v]) => (
                 <button
                   key={k}
                   onClick={() => update(k, "")}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600"
+                  className="inline-flex h-7 items-center gap-1.5 rounded-md bg-slate-100 px-2 text-xs font-medium text-slate-600 hover:bg-slate-200"
                 >
                   {v === "pending" ? "Sin fecha objetivo" : v}
                   <X className="h-3 w-3" />
@@ -1054,14 +1137,21 @@ export default function Pipeline() {
               key={scope}
               onClick={() => update("scope", scope)}
               className={cn(
-                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium",
+                "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors",
                 (filter.scope ?? "") === scope
                   ? "border-primary/30 bg-primary/5 text-primary"
                   : "border-border bg-card text-slate-600 hover:bg-slate-50",
               )}
             >
               <span>{label}</span>
-              <span className="rounded bg-slate-100 px-1.5 tabular-nums text-slate-700">
+              <span
+                className={cn(
+                  "rounded-md px-1.5 text-xs leading-5 tabular-nums",
+                  (filter.scope ?? "") === scope
+                    ? "bg-primary/10 text-primary"
+                    : "bg-slate-100 text-slate-600",
+                )}
+              >
                 {scopeSummary.isLoading
                   ? "…"
                   : scope
@@ -1080,7 +1170,7 @@ export default function Pipeline() {
       {currentError && (
         <div
           role="alert"
-          className="flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4"
+          className="flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3"
         >
           <div className="flex items-center gap-2 text-sm text-red-800">
             <AlertCircle className="h-4 w-4 shrink-0" />
@@ -1100,7 +1190,7 @@ export default function Pipeline() {
       {success && (
         <p
           role="status"
-          className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-800"
+          className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
         >
           <Check className="h-4 w-4" />
           {success}
@@ -1124,14 +1214,16 @@ export default function Pipeline() {
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric
-              title="Pipeline Value · USD"
-              value={money(data.gross)}
+              title="Pipeline Value"
+              value={isPending(data.gross) ? null : money(data.gross)}
+              unit="USD"
               icon={TrendingUp}
               coverage={{ n: data.valueCoverage, total: data.open }}
             />
             <Metric
-              title="Weighted Pipeline Value · USD"
-              value={money(data.weighted)}
+              title="Weighted Pipeline Value"
+              value={isPending(data.weighted) ? null : money(data.weighted)}
+              unit="USD"
               icon={Target}
               coverage={{ n: data.weightedCoverage, total: data.open }}
             />
@@ -1143,13 +1235,13 @@ export default function Pipeline() {
               onClick={() => navigate("Oportunidades")}
             />
             <Metric
-              title="Oportunidades con alertas"
+              title="Oportunidades en alerta"
               value={data.alerted}
               icon={Bell}
               highlight={data.alerted > 0}
               subtitle={
                 data.alerted
-                  ? "Datos o acciones que requieren atención"
+                  ? "Con datos o acciones que requieren atención"
                   : "Sin alertas en el pipeline abierto"
               }
               onClick={() => navigate("Alertas")}
@@ -1162,13 +1254,20 @@ export default function Pipeline() {
             >
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500">
+                  <thead className={tableHead}>
                     <tr>
-                      <th className="px-5 py-3 font-medium">
-                        Etapa / abiertas
+                      <th className="whitespace-nowrap px-5 py-3 font-medium">
+                        Etapa
                       </th>
-                      <th className="px-4 py-3 font-medium">Bruto USD</th>
-                      <th className="px-4 py-3 font-medium">Ponderado USD</th>
+                      <th className="whitespace-nowrap px-4 py-3 text-right font-medium">
+                        Abiertas
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3 text-right font-medium">
+                        Bruto USD
+                      </th>
+                      <th className="whitespace-nowrap px-5 py-3 text-right font-medium">
+                        Ponderado USD
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1180,10 +1279,13 @@ export default function Pipeline() {
                             stage.stage !== "Sin etapa verificada"),
                       )
                       .map((stage: any) => (
-                        <tr key={stage.stage}>
-                          <td className="px-5 py-3">
+                        <tr
+                          key={stage.stage}
+                          className="transition-colors hover:bg-slate-50/80"
+                        >
+                          <td className="px-5 py-3.5 align-top">
                             <button
-                              className="flex items-center gap-2 text-left font-medium hover:text-primary"
+                              className="inline-flex items-center gap-2 text-left font-medium leading-5 hover:text-primary"
                               onClick={() => {
                                 update("stage", stage.stage);
                                 navigate("Oportunidades");
@@ -1196,24 +1298,26 @@ export default function Pipeline() {
                                 )}
                               />
                               {stage.stage}
-                              <span className="rounded bg-slate-100 px-2 py-0.5 tabular-nums">
-                                {stage.open}
-                              </span>
                             </button>
                           </td>
-                          <td className="px-4 py-3">
-                            <span className="font-semibold tabular-nums">
-                              {money(stage.gross)}
-                            </span>
-                            <span className="mt-1 block text-xs text-muted-foreground">
+                          <td className="px-4 py-3.5 text-right align-top font-medium leading-5 tabular-nums">
+                            {stage.open}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3.5 text-right align-top leading-5">
+                            <Amount
+                              value={stage.gross}
+                              className="font-medium"
+                            />
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
                               {stage.valueCoverage}/{stage.open} con valor
                             </span>
                           </td>
-                          <td className="px-4 py-3">
-                            <span className="font-medium tabular-nums">
-                              {money(stage.weighted)}
-                            </span>
-                            <span className="mt-1 block text-xs text-muted-foreground">
+                          <td className="whitespace-nowrap px-5 py-3.5 text-right align-top leading-5">
+                            <Amount
+                              value={stage.weighted}
+                              className="font-medium"
+                            />
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
                               {stage.weightedCoverage}/{stage.open} respaldadas
                             </span>
                           </td>
@@ -1239,10 +1343,10 @@ export default function Pipeline() {
               <div className="flex h-full flex-col gap-4 p-5">
                 {hasPermission("finance") && (
                   <div>
-                    <p className="text-sm font-medium text-slate-600">
+                    <p className="text-sm font-medium text-muted-foreground">
                       Facturación histórica informada
                     </p>
-                    <p className="mt-1 text-4xl font-semibold tracking-tight text-slate-900">
+                    <p className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
                       ≈80%
                     </p>
                     <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -1251,18 +1355,20 @@ export default function Pipeline() {
                     </p>
                   </div>
                 )}
-                <dl className="space-y-2 border-t border-slate-100 pt-3 text-sm">
-                  <div className="flex justify-between gap-4">
+                <dl className="space-y-2 border-t border-slate-100 pt-4 text-sm">
+                  <div className="flex items-baseline justify-between gap-4">
                     <dt className="text-muted-foreground">Pipeline abierto</dt>
-                    <dd className="text-right font-medium">
+                    <dd className="text-right font-medium tabular-nums">
                       {data.warner.open} de {data.open} oportunidades
                     </dd>
                   </div>
-                  <div className="flex justify-between gap-4">
+                  <div className="flex items-baseline justify-between gap-4">
                     <dt className="text-muted-foreground">
                       Participación en valor
                     </dt>
-                    <dd className="font-medium">{pct(data.warner.valuePct)}</dd>
+                    <dd className="text-right font-medium">
+                      <Amount value={data.warner.valuePct} format={pct} />
+                    </dd>
                   </div>
                 </dl>
                 <p className="text-xs leading-relaxed text-muted-foreground">
@@ -1270,11 +1376,11 @@ export default function Pipeline() {
                   Cobertura de valor: {data.valueCoverage}/{data.open}.
                 </p>
                 <button
-                  className="mt-auto inline-flex items-center gap-2 self-start text-sm font-medium text-primary"
+                  className="mt-auto inline-flex items-center gap-1.5 self-start text-sm font-medium text-primary hover:underline"
                   onClick={() => navigate("Concentración")}
                 >
                   Ver concentración
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </div>
             </Panel>
@@ -1283,14 +1389,13 @@ export default function Pipeline() {
             title="Oportunidades en seguimiento"
             description="Pipeline abierto, ordenado por la última evidencia comercial."
             action={
-              <Button
-                variant="ghost"
-                className="h-7 gap-1 text-sm"
+              <button
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
                 onClick={() => navigate("Oportunidades")}
               >
                 Ver cartera
                 <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
+              </button>
             }
           >
             {rows.isLoading || visibleRows.length ? (
@@ -1331,49 +1436,53 @@ export default function Pipeline() {
       )}
       {tab === "Alertas" && (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold">Alertas de seguimiento</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Datos que faltan para avanzar. Una oportunidad puede tener
-                varias alertas.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              {["Pipeline", "Validación CRM"].map((scope) => (
-                <Button
-                  key={scope}
-                  variant={alertScope === scope ? "secondary" : "outline"}
-                  className="h-9 text-sm"
-                  onClick={() => {
-                    update("scope", scope);
-                    update("alert", "");
-                  }}
-                >
-                  {scope}
-                </Button>
-              ))}
-            </div>
-          </div>
+          <SectionHeading
+            title="Alertas de seguimiento"
+            description="Datos que faltan para avanzar. Una oportunidad puede tener varias alertas."
+            action={
+              <div className="flex gap-2">
+                {["Pipeline", "Validación CRM"].map((scope) => (
+                  <Button
+                    key={scope}
+                    variant={alertScope === scope ? "secondary" : "outline"}
+                    className="h-9 text-sm"
+                    onClick={() => {
+                      update("scope", scope);
+                      update("alert", "");
+                    }}
+                  >
+                    {scope}
+                  </Button>
+                ))}
+              </div>
+            }
+          />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {alertTypes.map((alert) => (
               <button
                 key={alert}
+                aria-pressed={filter.alert === alert}
                 onClick={() =>
                   update("alert", filter.alert === alert ? "" : alert)
                 }
                 className={cn(
-                  "rounded-xl border bg-card p-4 text-left shadow-sm transition-colors",
+                  "flex min-h-[112px] flex-col items-stretch justify-start rounded-2xl border bg-card p-5 text-left shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                   filter.alert === alert
                     ? "border-amber-400 bg-amber-50/60"
-                    : "border-border hover:border-amber-200",
+                    : "border-slate-200/80 hover:border-amber-200",
                 )}
               >
-                <AlertCircle className="mb-2 h-4 w-4 text-amber-600" />
-                <strong className="block text-3xl font-semibold tabular-nums">
-                  {summary.isLoading ? "…" : (data?.alertCounts?.[alert] ?? 0)}
-                </strong>
-                <span className="mt-2 block text-sm font-medium">{alert}</span>
+                <span className="flex items-start justify-between gap-3">
+                  <span className="text-3xl font-semibold leading-9 tracking-tight tabular-nums">
+                    {summary.isLoading
+                      ? "…"
+                      : (data?.alertCounts?.[alert] ?? 0)}
+                  </span>
+                  <AlertCircle className="mt-1 h-4 w-4 shrink-0 text-amber-600" />
+                </span>
+                <span className="mt-2 text-sm font-medium leading-snug text-slate-600">
+                  {alert}
+                </span>
               </button>
             ))}
           </div>
@@ -1383,7 +1492,7 @@ export default function Pipeline() {
         <>
           <div
             className={cn(
-              "grid gap-4",
+              "grid gap-3",
               hasPermission("finance") ? "lg:grid-cols-3" : "lg:grid-cols-2",
             )}
           >
@@ -1397,9 +1506,13 @@ export default function Pipeline() {
             )}
             <Metric
               title="Warner / bruto cuantificado"
-              value={pct(data.warner.valuePct)}
+              value={
+                isPending(data.warner.valuePct)
+                  ? null
+                  : pct(data.warner.valuePct)
+              }
               icon={TrendingUp}
-              subtitle={`USD ${money(data.warner.gross)} de USD ${money(data.gross)} · cobertura ${data.valueCoverage}/${data.open}`}
+              subtitle={`${isPending(data.warner.gross) ? "Warner sin valor" : `USD ${money(data.warner.gross)}`} de USD ${money(data.gross)} · cobertura ${data.valueCoverage}/${data.open}`}
             />
             <Metric
               title="Warner / oportunidades abiertas"
@@ -1408,8 +1521,8 @@ export default function Pipeline() {
               subtitle={`${data.warner.outside.open} oportunidades fuera de Warner. No mide facturación.`}
             />
           </div>
-          <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 text-sm leading-relaxed">
-            <p className="font-medium">Lectura de concentración</p>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/40 px-5 py-4 text-sm leading-relaxed">
+            <p className="font-semibold">Lectura de concentración</p>
             <p className="mt-1 text-muted-foreground">
               Umbral operativo: {data.warner.threshold}%.{" "}
               {data.warner.valuePct === null
@@ -1423,24 +1536,35 @@ export default function Pipeline() {
               oportunidades representan bases diferentes.
             </p>
           </div>
-          <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-            <Panel title="Cartera fuera de Warner">
-              <div className="grid grid-cols-2 gap-5 p-5">
-                <div>
-                  <p className="text-2xl font-semibold tabular-nums">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Panel
+              title="Cartera fuera de Warner"
+              description="Oportunidades abiertas de otras cuentas."
+            >
+              <div className="grid grid-cols-2 divide-x divide-slate-100">
+                <div className="px-5 py-4">
+                  <p className="text-sm text-muted-foreground">
+                    Oportunidades abiertas
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold leading-8 tracking-tight tabular-nums">
                     {data.warner.outside.open}
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    oportunidades abiertas
-                  </p>
                 </div>
-                <div>
-                  <p className="text-2xl font-semibold tabular-nums">
-                    {money(data.warner.outside.gross)}
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    USD · {data.warner.outside.valueCoverage}/
+                <div className="px-5 py-4">
+                  <p className="text-sm text-muted-foreground">
+                    Bruto USD · {data.warner.outside.valueCoverage}/
                     {data.warner.outside.open} con valor
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold leading-8 tracking-tight">
+                    {isPending(data.warner.outside.gross) ? (
+                      <span className="text-xl font-medium text-slate-400">
+                        Pendiente
+                      </span>
+                    ) : (
+                      <span className="tabular-nums">
+                        {money(data.warner.outside.gross)}
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -1462,7 +1586,7 @@ export default function Pipeline() {
                   />
                 }
               >
-                <div className="px-5 py-3">
+                <div className="px-5 py-4">
                   {billing.isLoading ? (
                     <p className="text-sm text-muted-foreground">
                       Conciliando ingresos reales…
@@ -1473,13 +1597,21 @@ export default function Pipeline() {
                     </p>
                   ) : (
                     <>
-                      <div className="flex items-end justify-between gap-4">
+                      <div className="flex items-start justify-between gap-4">
                         <div>
-                          <p className="text-2xl font-semibold tabular-nums">
-                            {pct(billing.data?.warnerSharePct)}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
+                          <p className="text-sm text-muted-foreground">
                             Participación Warner · {effectivePeriod}
+                          </p>
+                          <p className="mt-1 text-2xl font-semibold leading-8 tracking-tight">
+                            {isPending(billing.data?.warnerSharePct) ? (
+                              <span className="text-xl font-medium text-slate-400">
+                                Pendiente
+                              </span>
+                            ) : (
+                              <span className="tabular-nums">
+                                {pct(billing.data?.warnerSharePct)}
+                              </span>
+                            )}
                           </p>
                         </div>
                         <Badge
@@ -1505,7 +1637,7 @@ export default function Pipeline() {
                           {billing.data.eventCount} hechos reales
                         </p>
                       )}
-                      <p className="mt-3 border-t pt-3 text-xs leading-relaxed text-slate-400">
+                      <p className="mt-4 border-t border-slate-100 pt-3 text-xs leading-relaxed text-muted-foreground">
                         Referencia histórica: ≈80% informado el 28/10/2026. No
                         equivale a facturación mensual verificada.
                         {snapshot
@@ -1519,8 +1651,8 @@ export default function Pipeline() {
             )}
           </div>
           {isAdmin && !snapshot && (
-            <details className="rounded-xl border bg-card">
-              <summary className="cursor-pointer px-5 py-4 text-sm font-medium text-muted-foreground">
+            <details className={cardBase}>
+              <summary className="cursor-pointer px-5 py-4 text-sm font-medium text-muted-foreground hover:text-foreground">
                 Configurar umbral operativo
               </summary>
               <form
@@ -1537,7 +1669,7 @@ export default function Pipeline() {
                     .catch(() => {});
                 }}
               >
-                <label className="text-sm">
+                <label className="text-sm font-medium">
                   Umbral (%)
                   <Input
                     className="mt-2 h-9 w-28"
@@ -1549,7 +1681,7 @@ export default function Pipeline() {
                     required
                   />
                 </label>
-                <label className="min-w-[220px] flex-1 text-sm">
+                <label className="min-w-[220px] flex-1 text-sm font-medium">
                   Motivo del cambio
                   <Input
                     className="mt-2 h-9"
@@ -1571,29 +1703,27 @@ export default function Pipeline() {
       )}
       {showList && (
         <>
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <h2 className="text-base font-semibold">
-                {tab === "Concentración"
-                  ? "Oportunidades vinculadas a Warner"
-                  : tab === "Alertas"
-                    ? "Oportunidades para revisar"
-                    : "Cartera comercial"}
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {navigation.find((n) => n.label === tab)?.description}
-              </p>
-            </div>
-            {tab === "Oportunidades" && data && (
-              <p className="text-sm text-muted-foreground">
-                {data.open} abiertas ·{" "}
-                <span className="font-medium text-foreground">
-                  USD {money(data.gross)}
-                </span>{" "}
-                · cobertura {data.valueCoverage}/{data.open}
-              </p>
-            )}
-          </div>
+          <SectionHeading
+            title={
+              tab === "Concentración"
+                ? "Oportunidades vinculadas a Warner"
+                : tab === "Alertas"
+                  ? "Oportunidades para revisar"
+                  : "Cartera comercial"
+            }
+            description={navigation.find((n) => n.label === tab)?.description}
+            action={
+              tab === "Oportunidades" && data ? (
+                <p className="text-sm tabular-nums text-muted-foreground">
+                  {data.open} abiertas ·{" "}
+                  <span className="font-medium text-foreground">
+                    USD {money(data.gross)}
+                  </span>{" "}
+                  · cobertura {data.valueCoverage}/{data.open}
+                </p>
+              ) : undefined
+            }
+          />
           <Panel>
             {rows.isLoading || visibleRows.length ? (
               <>
@@ -1604,20 +1734,25 @@ export default function Pipeline() {
                         ? (r.closeDate?.slice(0, 7) ?? "Sin fecha de cierre")
                         : (r[filter.group] ?? "Sin responsable"),
                     ),
-                  ).map(([name, items]) => {
+                  ).map(([name, items], groupIndex) => {
                     const aggregate = rows.data?.groups?.find(
                       (g: any) => g.name === name,
                     );
                     return (
                       <section key={name}>
-                        <div className="border-y border-slate-200 bg-slate-50 px-5 py-3">
-                          <h3 className="text-base font-semibold">
+                        <div
+                          className={cn(
+                            "border-b border-slate-200 bg-slate-50/60 px-5 py-3",
+                            groupIndex > 0 && "border-t",
+                          )}
+                        >
+                          <h3 className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold">
                             {name}
-                            <span className="ml-2 text-sm font-normal text-muted-foreground">
+                            <span className="font-normal text-muted-foreground">
                               {items?.length} en esta página
                             </span>
                           </h3>
-                          <p className="mt-1 text-sm text-muted-foreground">
+                          <p className="mt-0.5 text-xs text-muted-foreground">
                             Grupo completo · bruto USD {money(aggregate?.gross)}{" "}
                             · ponderado USD {money(aggregate?.weighted)} ·
                             cobertura {aggregate?.valueCoverage ?? 0}/
@@ -1680,40 +1815,35 @@ export default function Pipeline() {
       )}
       {tab === "Cierre mensual" && (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold">
-                Un corte, una conversación clara
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Guardá la cartera completa. El resumen respeta la selección que
-                estás consultando.
-              </p>
-            </div>
-            <label className="flex items-center gap-2 rounded-lg border bg-card px-3 py-1">
-              <CalendarDays className="h-4 w-4 text-slate-400" />
-              <span className="sr-only">Período del corte</span>
-              <Input
-                aria-label="Período del corte"
-                type="month"
-                className="h-8 w-36 border-0 bg-transparent p-0 text-sm shadow-none"
-                value={effectivePeriod}
-                disabled={!!snapshot}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    setPeriod(e.target.value);
-                    cutKey.current = crypto.randomUUID();
-                  }
-                }}
-              />
-            </label>
-          </div>
+          <SectionHeading
+            title="Un corte, una conversación clara"
+            description="Guardá la cartera completa. El resumen respeta la selección que estás consultando."
+            action={
+              <label className="flex h-9 items-center gap-2 rounded-lg border bg-card px-3">
+                <CalendarDays className="h-4 w-4 text-slate-400" />
+                <span className="sr-only">Período del corte</span>
+                <Input
+                  aria-label="Período del corte"
+                  type="month"
+                  className="h-7 w-36 border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+                  value={effectivePeriod}
+                  disabled={!!snapshot}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setPeriod(e.target.value);
+                      cutKey.current = crypto.randomUUID();
+                    }
+                  }}
+                />
+              </label>
+            }
+          />
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(300px,1fr)_minmax(0,1.35fr)]">
             <div className="space-y-4">
               <Panel
                 title={snapshot ? "Checklist del corte" : "Preparar el cierre"}
                 action={
-                  <span className="text-xs text-muted-foreground">
+                  <span className="rounded-md bg-slate-100 px-2 text-xs font-medium leading-6 tabular-nums text-slate-600">
                     {snapshot ? "Guardado" : `${completed}/4 completados`}
                   </span>
                 }
@@ -1732,11 +1862,11 @@ export default function Pipeline() {
                     return (
                       <label
                         key={s}
-                        className="flex cursor-pointer items-start gap-3 px-5 py-4"
+                        className="flex cursor-pointer items-center gap-3 px-5 py-3.5 hover:bg-slate-50/60"
                       >
                         <input
                           type="checkbox"
-                          className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-primary"
+                          className="h-4 w-4 shrink-0 rounded border-slate-300 accent-primary"
                           checked={checked}
                           disabled={!!snapshot || busy || !checklist.data}
                           onChange={(e) => {
@@ -1750,13 +1880,13 @@ export default function Pipeline() {
                           }}
                         />
                         <span>
-                          <span className="block text-xs font-medium uppercase tracking-wider text-slate-400">
+                          <span className="block text-xs font-medium uppercase leading-4 tracking-wider text-slate-400">
                             Paso {i + 1}
                           </span>
                           <span
                             className={cn(
-                              "mt-1 block text-sm",
-                              checked ? "text-muted-foreground" : "font-medium",
+                              "mt-0.5 block text-sm font-medium",
+                              checked && "text-muted-foreground",
                             )}
                           >
                             {s}
@@ -1821,9 +1951,9 @@ export default function Pipeline() {
                         }
                       >
                         {busy ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          <LockKeyhole className="h-3.5 w-3.5" />
+                          <LockKeyhole className="h-4 w-4" />
                         )}
                         Guardar corte
                       </Button>
@@ -1836,7 +1966,7 @@ export default function Pipeline() {
                 description="Cada versión conserva su propia cartera."
               >
                 {cuts.isLoading ? (
-                  <p className="p-5 text-sm text-muted-foreground">
+                  <p className="px-5 py-4 text-sm text-muted-foreground">
                     Cargando cortes…
                   </p>
                 ) : cuts.data?.length ? (
@@ -1851,13 +1981,13 @@ export default function Pipeline() {
                         )}
                       >
                         <span>
-                          <span className="text-sm font-semibold">
-                            {c.period}{" "}
-                            <span className="ml-2 font-normal text-muted-foreground">
+                          <span className="flex items-baseline gap-2 text-sm font-semibold tabular-nums">
+                            {c.period}
+                            <span className="text-xs font-medium text-muted-foreground">
                               v{c.version}
                             </span>
                           </span>
-                          <span className="mt-1 block text-xs text-muted-foreground">
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
                             {dateTime(c.created_at)}
                           </span>
                         </span>
@@ -1866,7 +1996,7 @@ export default function Pipeline() {
                     ))}
                   </div>
                 ) : (
-                  <p className="px-5 py-6 text-sm leading-relaxed text-muted-foreground">
+                  <p className="px-5 py-4 text-sm leading-relaxed text-muted-foreground">
                     Todavía no hay cortes guardados. El primero será la base de
                     las próximas comparaciones.
                   </p>
@@ -1904,9 +2034,9 @@ export default function Pipeline() {
                     }
                   >
                     {copied ? (
-                      <Check className="h-3.5 w-3.5" />
+                      <Check className="h-4 w-4" />
                     ) : (
-                      <Copy className="h-3.5 w-3.5" />
+                      <Copy className="h-4 w-4" />
                     )}
                     {copied ? "Copiado" : "Copiar resumen"}
                   </Button>
@@ -1927,7 +2057,7 @@ export default function Pipeline() {
                       URL.revokeObjectURL(url);
                     }}
                   >
-                    <Download className="h-3.5 w-3.5" />
+                    <Download className="h-4 w-4" />
                     Descargar TXT
                   </Button>
                 </div>
@@ -1952,7 +2082,7 @@ export default function Pipeline() {
               description="Necesitás acceso a cotizaciones para consultar los fundamentos y las fuentes del registro."
             />
           ) : log.isLoading ? (
-            <p className="p-6 text-sm text-muted-foreground">
+            <p className="px-5 py-4 text-sm text-muted-foreground">
               Cargando registro…
             </p>
           ) : !log.data?.length ? (
@@ -1972,17 +2102,17 @@ export default function Pipeline() {
                     )
                   : Object.keys(r.changes ?? {});
                 return (
-                  <article key={r.id} className="flex gap-4 px-5 py-5">
+                  <article key={r.id} className="flex gap-4 px-5 py-4">
                     <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50">
                       <CircleDot className="h-3.5 w-3.5 text-slate-500" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm">
+                        <p className="flex items-center gap-2 text-sm">
                           <span className="font-semibold">
                             {r.actor || `Usuario ${r.actor_id}`}
                           </span>
-                          <span className="ml-2 rounded-md bg-slate-100 px-2 py-0.5 text-xs capitalize text-slate-600">
+                          <span className="rounded-md bg-slate-100 px-2 text-xs font-medium capitalize leading-5 text-slate-600">
                             {r.kind}
                           </span>
                         </p>
@@ -1990,8 +2120,10 @@ export default function Pipeline() {
                           {dateTime(r.created_at)}
                         </time>
                       </div>
-                      <p className="mt-2 text-sm leading-relaxed">{r.reason}</p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
+                      <p className="mt-1.5 text-sm leading-relaxed">
+                        {r.reason}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         {r.period && (
                           <span className="text-xs text-muted-foreground">
                             Período {r.period}
@@ -2000,7 +2132,7 @@ export default function Pipeline() {
                         {changes.slice(0, 8).map((k) => (
                           <span
                             key={k}
-                            className="rounded border border-slate-200 px-1.5 py-0.5 text-xs text-slate-500"
+                            className="rounded-md border border-slate-200 px-1.5 text-xs leading-5 text-slate-500"
                           >
                             {fieldLabels[k] ?? k}
                           </span>
@@ -2012,7 +2144,7 @@ export default function Pipeline() {
                         )}
                       </div>
                       <details className="mt-3">
-                        <summary className="cursor-pointer text-xs text-muted-foreground">
+                        <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
                           Ver detalle del cambio
                         </summary>
                         <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">

@@ -73,7 +73,7 @@ function Field({
 }) {
   return (
     <label className={`block space-y-1.5 ${wide ? "sm:col-span-2" : ""}`}>
-      <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+      <span className="block text-sm font-medium text-slate-700 dark:text-slate-200">
         {title}
       </span>
       {children}
@@ -94,7 +94,7 @@ function SectionIntro({
 }) {
   return (
     <div className="mb-5">
-      <h3 className="text-lg font-semibold tracking-tight sm:text-xl">{title}</h3>
+      <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
       <p className="mt-1 text-sm text-muted-foreground">{description}</p>
     </div>
   );
@@ -123,7 +123,9 @@ function Choice({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="__pending">{placeholder}</SelectItem>
-        {value && !options.some(o => o.value === value) && <SelectItem value={value}>{placeholder}</SelectItem>}
+        {value && !options.some((o) => o.value === value) && (
+          <SelectItem value={value}>{placeholder}</SelectItem>
+        )}
         {options.map((o) => (
           <SelectItem key={o.value} value={o.value}>
             {o.label}
@@ -133,6 +135,14 @@ function Choice({
     </Select>
   );
 }
+export const stageColors: Record<string, string> = {
+  Prospección: "bg-slate-400",
+  "Reunión / demo": "bg-sky-500",
+  Propuesta: "bg-indigo-500",
+  Negociación: "bg-amber-500",
+  Confirmada: "bg-emerald-500",
+  "Sin etapa verificada": "bg-slate-300",
+};
 const cash = (v: string | null | undefined) =>
   v == null || !Number.isFinite(Number(v))
     ? "Pendiente"
@@ -260,9 +270,18 @@ export function OpportunityEditor({
   );
   let result: { weighted: string | null } = { weighted: null };
   try {
-    const calculationData = opportunitySchema.safeParse(Object.fromEntries(Object.keys(opportunitySchema.shape).map(key => [key, draft[key as keyof Opportunity]])));
+    const calculationData = opportunitySchema.safeParse(
+      Object.fromEntries(
+        Object.keys(opportunitySchema.shape).map((key) => [
+          key,
+          draft[key as keyof Opportunity],
+        ]),
+      ),
+    );
     if (calculationData.success) result = metrics([calculationData.data]);
-  } catch { /* An incomplete numeric input remains pending until it is valid. */ }
+  } catch {
+    /* An incomplete numeric input remains pending until it is valid. */
+  }
   const save = async () => {
     setLocalError("");
     try {
@@ -315,16 +334,25 @@ export function OpportunityEditor({
           </DialogDescription>
           <div className="flex flex-wrap items-center gap-2 pt-2">
             <Badge
-              variant="secondary"
-              className="border bg-white text-sm font-medium dark:bg-slate-900"
+              variant="outline"
+              className="gap-1.5 bg-white text-xs font-medium dark:bg-slate-900"
             >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${stageColors[draft.stage] ?? "bg-slate-400"}`}
+              />
               {draft.stage}
             </Badge>
-            <Badge variant="outline" className="text-sm font-normal">
+            <Badge
+              variant="outline"
+              className="bg-white text-xs font-medium dark:bg-slate-900"
+            >
               {draft.scope}
             </Badge>
             {readOnly && (
-              <Badge variant="outline" className="gap-1 text-sm text-slate-500">
+              <Badge
+                variant="outline"
+                className="gap-1 bg-white text-xs font-medium text-slate-500 dark:bg-slate-900"
+              >
                 <ShieldCheck className="h-3 w-3" />
                 Solo lectura
               </Badge>
@@ -332,7 +360,7 @@ export function OpportunityEditor({
             {draft.leadId && (
               <a
                 href={`/crm/${draft.leadId}`}
-                className="ml-auto inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
               >
                 Abrir en CRM
                 <ArrowUpRight className="h-3.5 w-3.5" />
@@ -341,32 +369,41 @@ export function OpportunityEditor({
           </div>
         </DialogHeader>
         <div className="grid grid-cols-3 border-b bg-background px-5 py-4 sm:px-7">
-          <div className="border-r pr-3">
-            <p className="text-sm font-medium text-muted-foreground">
-              Valor total USD
-            </p>
-            <p className="mt-1 text-lg font-semibold tabular-nums">
-              {cash(draft.usd)}
-            </p>
-          </div>
-          <div className="border-r px-3 sm:px-5">
-            <p className="text-sm font-medium text-muted-foreground">
-              Probabilidad
-            </p>
-            <p className="mt-1 text-lg font-semibold tabular-nums">
-              {draft.probability === null
-                ? "Pendiente"
-                : draft.probability + "%"}
-            </p>
-          </div>
-          <div className="pl-3 sm:pl-5">
-            <p className="text-sm font-medium text-muted-foreground">
-              Valor ponderado
-            </p>
-            <p className="mt-1 text-lg font-semibold tabular-nums">
-              {cash(result.weighted)}
-            </p>
-          </div>
+          {[
+            { label: "Valor total USD", text: cash(draft.usd) },
+            {
+              label: "Probabilidad",
+              text:
+                draft.probability === null
+                  ? "Pendiente"
+                  : draft.probability + "%",
+            },
+            { label: "Valor ponderado", text: cash(result.weighted) },
+          ].map(({ label, text }, i) => (
+            <div
+              key={label}
+              className={
+                i === 0
+                  ? "border-r pr-3"
+                  : i === 1
+                    ? "border-r px-3 sm:px-5"
+                    : "pl-3 sm:pl-5"
+              }
+            >
+              <p className="text-sm font-medium text-muted-foreground">
+                {label}
+              </p>
+              <p className="mt-1 text-lg font-semibold leading-7 tabular-nums">
+                {text === "Pendiente" ? (
+                  <span className="text-base font-medium text-slate-400">
+                    Pendiente
+                  </span>
+                ) : (
+                  text
+                )}
+              </p>
+            </div>
+          ))}
         </div>
         <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
           <nav
@@ -383,7 +420,7 @@ export function OpportunityEditor({
                 <Icon className="h-4 w-4" />
                 {name}
                 {name === "Evidencia" && (
-                  <span className="ml-auto rounded bg-slate-100 px-1.5 text-xs text-slate-500">
+                  <span className="ml-auto rounded-md bg-slate-100 px-1.5 text-xs leading-5 tabular-nums text-slate-500">
                     {draft.sources.length}
                   </span>
                 )}

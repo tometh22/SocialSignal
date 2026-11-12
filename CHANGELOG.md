@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.42 — 2026-11-12
+
+- Unifica la interfaz del Pipeline comercial: una sola escala tipográfica para títulos, descripciones, encabezados de tabla y cifras; radios, alturas de controles e iconos consistentes en todas las vistas y en la ficha.
+- Alinea indicadores y tablas: los valores de las tarjetas quedan a la misma altura, las cifras se alinean a la derecha y las filas se leen desde la primera línea. "Pendiente" se muestra atenuado para no competir con importes reales.
+- La cartera entra sin scroll horizontal desde 1280 px: la probabilidad se integra bajo el ponderado y la fuente se muestra en pantallas anchas (sigue disponible en la ficha). Sin cambios de datos ni de API.
+
 ## 1.14.41 — 2026-11-12
 
 - Prioriza indicadores y contenido comercial desde el inicio, compacta el contexto del corte y mejora tamaños de lectura. Agrega conteos por alcance y alerta, manteniendo la estética de Mind.
