@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.52 — 2026-11-13
+
+- Las tarjetas del Pipeline comercial (Resumen, Concentración y Alertas) tienen una ayuda que explica qué mide cada número y cómo se calcula; se abre al pasar el mouse o tocándola en el celular, también en el enlace compartido.
+- La probabilidad es más fácil de encontrar: sección propia "Probabilidad" en la ficha, acceso directo desde la probabilidad de cada oportunidad en la lista (también en celular) y, en la pestaña Probabilidad, la lista de oportunidades abiertas con su probabilidad, de dónde sale y un botón Ajustar.
+
 ## 1.14.51 — 2026-11-13
 
 - En un corte guardado, la ficha muestra la probabilidad y el ponderado congelados en ese corte (con su versión de metodología), sin recalcular con la metodología o la fecha actuales. Los cortes anteriores al modelo indican que se guardaron sin probabilidad del modelo.

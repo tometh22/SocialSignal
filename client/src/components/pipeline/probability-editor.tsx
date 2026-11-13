@@ -136,12 +136,12 @@ export function ProbabilityEditor({
     ? Math.round((Date.parse(localDay()) - Date.parse(manual.at)) / 86_400_000)
     : 0;
   return (
-    <div className="space-y-5 border-t pt-5">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h4 className="flex items-center gap-2 text-sm font-semibold">
             <Gauge className="h-4 w-4 text-slate-500" />
-            Probabilidad de cierre
+            Probabilidad actual
           </h4>
           <p className="mt-1 text-xs text-muted-foreground">
             {isFrozen
