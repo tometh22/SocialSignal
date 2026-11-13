@@ -11,6 +11,7 @@ import {
 } from "@shared/pipeline";
 import {
   scoreOpportunity,
+  type ModelScore,
   type ProbabilityModel,
 } from "@shared/pipeline-probability";
 import { pct, pendingText } from "./ui";
@@ -24,6 +25,9 @@ export type Methodology = {
 };
 
 const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
+
+/** Probabilidad congelada en un corte guardado (la calculó el servidor al guardarlo). */
+export type FrozenScore = (ModelScore & { version?: number }) | null;
 
 /** Probabilidad del modelo para la ficha que se está editando. */
 export function draftScore(
@@ -98,6 +102,7 @@ export function ProbabilityEditor({
   existingClient,
   userName,
   ownProbabilityFields,
+  frozen,
 }: {
   draft: Opportunity;
   change: (key: keyof Opportunity, value: any) => void;
@@ -106,9 +111,17 @@ export function ProbabilityEditor({
   existingClient: boolean;
   userName: string;
   ownProbabilityFields: ReactNode;
+  /**
+   * En un corte guardado se muestra lo que quedó congelado, nunca un recálculo
+   * con la metodología o la fecha actuales. `undefined` = ficha editable.
+   */
+  frozen?: FrozenScore;
 }) {
-  const model = methodology?.model;
-  const score = draftScore(draft, methodology, existingClient);
+  const isFrozen = frozen !== undefined;
+  const model = isFrozen ? undefined : methodology?.model;
+  const score = isFrozen
+    ? frozen
+    : draftScore(draft, methodology, existingClient);
   const own = usableProbability(draft);
   const open = isOpenOpportunity(draft);
   const manual = draft.manualAdjustment;
@@ -131,9 +144,13 @@ export function ProbabilityEditor({
             Probabilidad de cierre
           </h4>
           <p className="mt-1 text-xs text-muted-foreground">
-            {methodology
-              ? `Modelo v${methodology.version} aprobado por ${methodology.approvedBy ?? "el equipo"}. Una probabilidad propia respaldada lo reemplaza.`
-              : "Sin metodología aprobada: solo cuenta una probabilidad propia respaldada."}
+            {isFrozen
+              ? frozen
+                ? `Valor congelado en el corte${frozen.version ? ` con la metodología v${frozen.version}` : ""}.`
+                : "Este corte se guardó sin probabilidad del modelo."
+              : methodology
+                ? `Modelo v${methodology.version} aprobado por ${methodology.approvedBy ?? "el equipo"}. Una probabilidad propia respaldada lo reemplaza.`
+                : "Sin metodología aprobada: solo cuenta una probabilidad propia respaldada."}
           </p>
         </div>
         <div className="text-right">
@@ -192,8 +209,8 @@ export function ProbabilityEditor({
                 .filter((p) => p.kind === "team" || p.kind === "manual")
                 .reduce((s, p) => s + p.points, 0) && (
               <p className="text-xs text-muted-foreground">
-                El criterio del equipo se limita a {signed(score.teamTotal)}{" "}
-                (tope ±{model?.maxTeamAdjustment}).
+                El criterio del equipo se limita a {signed(score.teamTotal)}
+                {model ? ` (tope ±${model.maxTeamAdjustment})` : ""}.
               </p>
             )}
             <div className="flex items-baseline justify-between gap-4 border-t border-slate-200 pt-2 font-semibold">
