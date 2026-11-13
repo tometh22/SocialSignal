@@ -11,7 +11,12 @@ import {
   type Learning,
   type ProbabilityModel,
 } from "@shared/pipeline-probability";
-import { cardBase, civilDate, pendingText, tableHead } from "./ui";
+import { Amount, cardBase, civilDate, pendingText, tableHead } from "./ui";
+import {
+  effectiveProbability,
+  metrics,
+  type Opportunity,
+} from "@shared/pipeline";
 
 const base = "/api/crm/pipeline";
 type MethodologyResponse = {
@@ -98,7 +103,126 @@ function Num({
   );
 }
 
-export function ProbabilityPanel({ isAdmin }: { isAdmin: boolean }) {
+/** Lista de oportunidades abiertas con su probabilidad y un acceso para ajustarla. */
+function OpportunityProbabilities({
+  rows,
+  loading,
+  onAdjust,
+}: {
+  rows: any[];
+  loading: boolean;
+  onAdjust: (r: Opportunity) => void;
+}) {
+  return (
+    <Section
+      title="Probabilidad por oportunidad"
+      description="Tocá Ajustar para tildar las señales que conozcas (prioridad, decisor, si somos más caros…) o cargar una probabilidad propia."
+    >
+      {loading ? (
+        <div className="m-5 h-24 animate-pulse rounded-xl bg-slate-100" />
+      ) : !rows.length ? (
+        <p className="px-5 py-6 text-sm text-muted-foreground">
+          No hay oportunidades abiertas en el pipeline.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className={tableHead}>
+              <tr>
+                <th className="px-5 py-3 font-medium">Oportunidad</th>
+                <th className="px-3 py-3 text-right font-medium">Valor USD</th>
+                <th className="px-3 py-3 text-right font-medium">
+                  Probabilidad
+                </th>
+                <th className="px-3 py-3 font-medium">De dónde sale</th>
+                <th className="px-3 py-3 text-right font-medium">
+                  Ponderado USD
+                </th>
+                <th className="w-24 px-5 py-3">
+                  <span className="sr-only">Ajustar</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map((r) => {
+                const p = effectiveProbability(r);
+                const parts: any[] = r.model?.parts ?? [];
+                const why =
+                  p.basis === "own"
+                    ? `Propia: ${r.probabilityReason ?? "con motivo y fuente"}`
+                    : parts
+                        .map((x) =>
+                          x.kind === "base"
+                            ? `${x.label.replace("Etapa ", "")} ${x.points}`
+                            : `${x.kind === "auto" ? x.label : `Equipo: ${x.label}`} ${x.points > 0 ? "+" : ""}${x.points}`,
+                        )
+                        .join(" · ");
+                return (
+                  <tr key={r.id} className="align-top">
+                    <td className="px-5 py-3">
+                      <span className="block font-medium leading-5">
+                        {r.account}
+                      </span>
+                      <span className="block text-xs leading-5 text-muted-foreground">
+                        {r.project || "Alcance por definir"} · {r.stage}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right">
+                      <Amount value={r.usd} className="font-medium" />
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums">
+                      {p.value === null ? (
+                        <span className={cn("font-normal", pendingText)}>
+                          —
+                        </span>
+                      ) : (
+                        `${Number(p.value)}%`
+                      )}
+                    </td>
+                    <td className="max-w-[360px] px-3 py-3 text-xs leading-5 text-slate-600">
+                      {why || (
+                        <span className={pendingText}>
+                          Sin datos del modelo
+                        </span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right">
+                      <Amount
+                        value={metrics([r]).weighted}
+                        className="font-medium"
+                      />
+                    </td>
+                    <td className="px-5 py-2.5 text-right">
+                      <Button
+                        variant="outline"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => onAdjust(r)}
+                      >
+                        Ajustar
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+export function ProbabilityPanel({
+  isAdmin,
+  rows,
+  loading,
+  onAdjust,
+}: {
+  isAdmin: boolean;
+  rows: any[];
+  loading: boolean;
+  onAdjust: (r: Opportunity) => void;
+}) {
   const methodology = useQuery<MethodologyResponse>({
     queryKey: [base, "/methodology"],
     queryFn: () => authFetchJson(base + "/methodology"),
@@ -163,6 +287,13 @@ export function ProbabilityPanel({ isAdmin }: { isAdmin: boolean }) {
   const row = "flex items-center justify-between gap-4 px-5 py-2.5";
   return (
     <div className="space-y-4">
+      {!edit && (
+        <OpportunityProbabilities
+          rows={rows}
+          loading={loading}
+          onAdjust={onAdjust}
+        />
+      )}
       <Section
         title={
           edit
