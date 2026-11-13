@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.52 — 2026-11-13
+
+- Rendimiento concilia ventas y costos del mes con el resumen financiero usando una misma lectura del Máster, o las fuentes nativas cuando el período ya opera en Mind. Muestra diferencias, costos estimados y datos faltantes.
+- Los presupuestos y costos acumulados quedan en Proyectos acumulados, con el estado del proyecto y markup solo de los cerrados. ARR usa las ventas Fee mensuales. El seguimiento acumulado deja de generar ventas y hechos mensuales en las sincronizaciones automáticas o manuales.
+- Pruebas de bases mensuales y acumuladas, precisión, fuentes incompletas, cierres nativos, permisos y navegación móvil.
+
 ## 1.14.51 — 2026-11-13
 
 - En un corte guardado, la ficha muestra la probabilidad y el ponderado congelados en ese corte (con su versión de metodología), sin recalcular con la metodología o la fecha actuales. Los cortes anteriores al modelo indican que se guardaron sin probabilidad del modelo.
