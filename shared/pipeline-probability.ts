@@ -18,7 +18,9 @@ export const modelStages = [
   "Propuesta",
   "Negociación",
 ] as const;
-const points = z.number().int().min(-50).max(50);
+/** Rango permitido para cualquier peso; las sugerencias del aprendizaje se acotan a él. */
+export const POINT_LIMIT = 50;
+const points = z.number().int().min(-POINT_LIMIT).max(POINT_LIMIT);
 export const teamSignalSchema = z.object({
   key: z.string().regex(/^[a-z0-9-]{2,40}$/),
   label: z.string().trim().min(2).max(80),
@@ -304,8 +306,12 @@ export function learnFromOutcomes(
       suggested:
         observed === null
           ? current
-          : Math.round(
-              shrink(current, observed, reached.length, model.priorWeight),
+          : clamp(
+              Math.round(
+                shrink(current, observed, reached.length, model.priorWeight),
+              ),
+              0,
+              100,
             ),
     };
   });
@@ -357,8 +363,12 @@ export function learnFromOutcomes(
       observedEffect: effect === null ? null : Math.round(effect),
       suggested:
         ready && effect !== null && withS.length >= 5
-          ? Math.round(
-              shrink(s.current, effect, withS.length, model.priorWeight),
+          ? clamp(
+              Math.round(
+                shrink(s.current, effect, withS.length, model.priorWeight),
+              ),
+              -POINT_LIMIT,
+              POINT_LIMIT,
             )
           : s.current,
     };

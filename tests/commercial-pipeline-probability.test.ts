@@ -12,6 +12,7 @@ import {
   suggestedModel,
   scoreSignals,
   probabilityModelSchema,
+  POINT_LIMIT,
   type Outcome,
 } from "../shared/pipeline-probability";
 
@@ -203,7 +204,48 @@ describe("Modelo de probabilidad: aprendizaje", () => {
     const prio = l.signals.find((s) => s.key === "team:prioridad")!;
     expect(l.signalsReady).toBe(true);
     expect(prio).toMatchObject({ n: 10, observedEffect: 100 });
-    expect(prio.suggested).toBe(Math.round((10 * 10 + 100 * 10) / 20));
+    // (10·10 + 100·10) / 20 = 55, fuera del rango permitido: se acota a +50.
+    expect(prio.suggested).toBe(POINT_LIMIT);
+    expect(
+      probabilityModelSchema.safeParse(suggestedModel(referenceModel, l))
+        .success,
+    ).toBe(true);
+  });
+  it("la versión sugerida siempre se puede aprobar, aun con resultados extremos", () => {
+    const signals = [
+      "existing-client",
+      "renewal",
+      "decision-maker",
+      "close-date",
+      "stale",
+      "competition",
+      ...referenceModel.teamSignals.map((t) => `team:${t.key}`),
+    ];
+    const all = (result: "won" | "lost", withSignals: boolean) =>
+      [...Array(40)].map(() => ({
+        result,
+        stagesReached: [
+          "Prospección",
+          "Reunión / demo",
+          "Propuesta",
+          "Negociación",
+        ],
+        signals: withSignals ? signals : [],
+        predictedFinal: 50,
+        predictedModel: 50,
+      }));
+    for (const outcomes of [
+      [...all("won", true), ...all("lost", false)],
+      [...all("lost", true), ...all("won", false)],
+      all("won", true),
+      all("lost", false),
+    ]) {
+      const next = suggestedModel(
+        referenceModel,
+        learnFromOutcomes(referenceModel, outcomes),
+      );
+      expect(probabilityModelSchema.safeParse(next).success).toBe(true);
+    }
   });
   it("mide calibración y error (Brier)", () => {
     const l = learnFromOutcomes(referenceModel, [

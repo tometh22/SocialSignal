@@ -38,6 +38,7 @@ import { pendingText, stageColors } from "./ui";
 import {
   ProbabilityEditor,
   draftScore,
+  type FrozenScore,
   type Methodology,
 } from "./probability-editor";
 import { useAuth } from "@/hooks/use-auth";
@@ -182,6 +183,14 @@ export function OpportunityEditor({
     staleTime: 60000,
   });
   const existingClient = !!(opportunity as any)?.model?.existingClient;
+  // Corte guardado: se usa la probabilidad congelada, nunca un recálculo actual.
+  const frozen: FrozenScore | undefined = readOnly
+    ? ((opportunity as any)?.model ?? null)
+    : undefined;
+  const scoreOf = (d: Opportunity) =>
+    frozen !== undefined
+      ? frozen
+      : draftScore(d, methodology.data, existingClient);
   useEffect(() => {
     setDraft(opportunity ? structuredClone(opportunity) : null);
     setSection("Oportunidad");
@@ -293,9 +302,7 @@ export function OpportunityEditor({
       result = metrics([
         {
           ...calculationData.data,
-          modelProbability:
-            draftScore(calculationData.data, methodology.data, existingClient)
-              ?.probability ?? null,
+          modelProbability: scoreOf(calculationData.data)?.probability ?? null,
         },
       ]);
   } catch {
@@ -395,11 +402,7 @@ export function OpportunityEditor({
               text: (() => {
                 if (usableProbability(draft))
                   return draft.probability + "% · propia";
-                const p = draftScore(
-                  draft,
-                  methodology.data,
-                  existingClient,
-                )?.probability;
+                const p = scoreOf(draft)?.probability;
                 return p == null ? "Pendiente" : `${p}% · modelo`;
               })(),
             },
@@ -728,6 +731,7 @@ export function OpportunityEditor({
                     methodology={methodology.data}
                     existingClient={existingClient}
                     userName={userName}
+                    frozen={frozen}
                     ownProbabilityFields={
                       <div className="grid gap-4 sm:grid-cols-2">
                         {textField(

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.51 — 2026-11-13
+
+- En un corte guardado, la ficha muestra la probabilidad y el ponderado congelados en ese corte (con su versión de metodología), sin recalcular con la metodología o la fecha actuales. Los cortes anteriores al modelo indican que se guardaron sin probabilidad del modelo.
+- Los pesos que sugiere el aprendizaje se acotan al rango permitido (etapas 0–100%, señales ±50), así una versión sugerida siempre se puede aprobar. Sin cambios de datos.
+
 ## 1.14.50 — 2026-11-13
 
 - Modelo de probabilidad del Pipeline comercial: base por etapa, señales automáticas (cliente actual, renovación, decisor y presupuesto, fecha de decisión cercana, sin novedades, licitación) y criterio del equipo (señales de catálogo y ajuste libre con motivo, firma y vencimiento; tope ±25). Una probabilidad propia respaldada siempre lo reemplaza. El Weighted Pipeline Value, las alertas, el orden, el Status y el enlace compartido usan la probabilidad efectiva; Fede ve el número y si es del modelo, nunca el desglose.
