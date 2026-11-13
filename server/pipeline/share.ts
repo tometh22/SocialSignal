@@ -8,6 +8,8 @@ import {
   applyFilters,
   audit,
   currentRows,
+  enrichRows,
+  loadModelContext,
   listRows,
   pipelineFilters,
   transaction,
@@ -220,7 +222,7 @@ export function registerPipelineShareRoutes(
       threshold,
       // Sin contacto: la búsqueda pública no puede usarse para inferirlo.
       rows: applyFilters(
-        (await currentRows())
+        enrichRows(await currentRows(), await loadModelContext())
           .filter(isSharedUniverse)
           .map((r) => ({ ...r, contact: null })),
         f,

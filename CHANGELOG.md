@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.50 — 2026-11-13
+
+- Modelo de probabilidad del Pipeline comercial: base por etapa, señales automáticas (cliente actual, renovación, decisor y presupuesto, fecha de decisión cercana, sin novedades, licitación) y criterio del equipo (señales de catálogo y ajuste libre con motivo, firma y vencimiento; tope ±25). Una probabilidad propia respaldada siempre lo reemplaza. El Weighted Pipeline Value, las alertas, el orden, el Status y el enlace compartido usan la probabilidad efectiva; Fede ve el número y si es del modelo, nunca el desglose.
+- Metodología versionada y aprobada (v1 aprobada por Tomás el 13/11/2026), pestaña Probabilidad con edición solo para admin, y aprendizaje: cada oportunidad que sale del pipeline como ganada o perdida guarda etapas, señales y probabilidad predicha; el panel muestra tasas reales, efecto de cada señal, sugerencias y calibración. Los cortes conservan la versión con la que se calcularon. Migración aditiva 0099.
+
 ## 1.14.49 — 2026-11-12
 
 - El enlace de solo lectura abre el mismo Pipeline comercial de Mind con sus pestañas: Resumen, Oportunidades (búsqueda, filtros, orden y agrupación), Alertas, Concentración y Status para copiar. Sin ficha editable, cierre mensual, registro ni datos financieros, aunque lo abra alguien con sesión.

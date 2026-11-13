@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
+  effectiveProbability,
   metrics,
-  usableProbability,
   usableValue,
   type Opportunity,
 } from "./pipeline";
@@ -29,7 +29,9 @@ export type PublicPipelineRow = ReturnType<typeof publicRow>;
  * el CRM y facturación nunca se incluyen. Importes y probabilidades solo
  * cuando están respaldados.
  */
-export function publicRow(r: Opportunity & { alerts?: string[] }) {
+export function publicRow(
+  r: Opportunity & { alerts?: string[]; modelProbability?: number | null },
+) {
   return {
     id: r.id,
     account: r.account,
@@ -38,7 +40,9 @@ export function publicRow(r: Opportunity & { alerts?: string[] }) {
     status: r.status,
     scope: r.scope,
     usd: usableValue(r) ? r.usd : null,
-    probability: usableProbability(r) ? r.probability : null,
+    // Solo el número y su origen: el desglose (señales del equipo) no sale del equipo.
+    probability: effectiveProbability(r).value,
+    probabilityBasis: effectiveProbability(r).basis,
     weighted: metrics([r]).weighted,
     closeDate: r.closeDate ?? null,
     evidenceDate: r.evidenceDate ?? null,

@@ -15,8 +15,19 @@ import {
   sortSchema,
   sortOpportunities,
   localDay,
+  isOpenOpportunity,
+  usableProbability,
   type Opportunity,
 } from "../../shared/pipeline";
+import {
+  learnFromOutcomes,
+  modelStages,
+  probabilityModelSchema,
+  scoreOpportunity,
+  scoreSignals,
+  suggestedModel,
+  type ProbabilityModel,
+} from "../../shared/pipeline-probability";
 import type { PoolClient } from "pg";
 const version = z.number().int().positive();
 const reason = z.string().trim().min(1).max(4000);
@@ -92,6 +103,86 @@ export function listRows<T extends Opportunity>(
     total: rows.length,
     groups,
   };
+}
+export type ModelContext = {
+  version: number;
+  model: ProbabilityModel;
+  basis: string;
+  approvedBy: string | null;
+  approvedAt: string;
+  existingClients: Set<number>;
+  existingAccounts: Set<string>;
+  today: string;
+} | null;
+/**
+ * Metodología vigente (última versión aprobada) y quiénes son clientes actuales.
+ * Lee con el pool: en bases sin la migración 0099 devuelve null y todo sigue
+ * funcionando como antes (sin probabilidad de modelo).
+ */
+export async function loadModelContext(): Promise<ModelContext> {
+  let m: any;
+  try {
+    m = (
+      await pool.query(
+        "SELECT version, model, basis, approved_by_name, approved_at FROM pipeline_methodology ORDER BY version DESC LIMIT 1",
+      )
+    ).rows[0];
+  } catch {
+    return null;
+  }
+  if (!m) return null;
+  const safe = async (sql: string) => {
+    try {
+      return (await pool.query(sql)).rows;
+    } catch {
+      return [];
+    }
+  };
+  const clients = await safe(
+    "SELECT DISTINCT client_id FROM quotations WHERE status='approved'",
+  );
+  const accounts = await safe(
+    "SELECT DISTINCT lower(COALESCE(l.company_name, p.data->>'account')) AS a FROM pipeline_opportunities p LEFT JOIN crm_leads l ON l.id=p.lead_id WHERE p.data->>'scope'='Cerrada / confirmada'",
+  );
+  return {
+    version: m.version,
+    model: probabilityModelSchema.parse(m.model),
+    basis: m.basis,
+    approvedBy: m.approved_by_name ?? null,
+    approvedAt: new Date(m.approved_at).toISOString(),
+    existingClients: new Set(clients.map((r: any) => r.client_id)),
+    existingAccounts: new Set(accounts.map((r: any) => r.a)),
+    today: localDay(),
+  };
+}
+export function scoreRow(r: Opportunity, ctx: NonNullable<ModelContext>) {
+  const existingClient =
+    (r.clientId != null && ctx.existingClients.has(r.clientId)) ||
+    ctx.existingAccounts.has(r.account.toLowerCase());
+  return {
+    ...scoreOpportunity(r, ctx.model, { existingClient, today: ctx.today }),
+    existingClient,
+    version: ctx.version,
+  };
+}
+/** Agrega la probabilidad del modelo a las oportunidades abiertas. */
+export function enrichRows<T extends Opportunity>(rows: T[], ctx: ModelContext): T[] {
+  if (!ctx) return rows;
+  return rows.map((r) => {
+    if (!isOpenOpportunity(r)) return r;
+    const model = scoreRow(r, ctx);
+    return { ...r, model, modelProbability: model.probability };
+  });
+}
+/** Etapas por las que pasó la oportunidad, según su historial de ediciones. */
+async function stagesReached(c: PoolClient, id: number, current: string) {
+  const { rows } = await c.query(
+    `SELECT DISTINCT s FROM pipeline_log l, LATERAL (VALUES (l.changes->'before'->>'stage'), (l.changes->'after'->>'stage'), (l.changes->>'stage')) v(s)
+     WHERE l.opportunity_id=$1 AND s IS NOT NULL`,
+    [id],
+  );
+  const seen = new Set([current, ...rows.map((r: any) => r.s)]);
+  return modelStages.filter((s) => seen.has(s));
 }
 export async function transaction<T>(fn: (c: PoolClient) => Promise<T>) {
   const c = await pool.connect();
@@ -251,7 +342,7 @@ export function registerPipelineRoutes(
       at = snapshot.payload.evidenceAt ?? snapshot.created_at.toISOString();
       period = snapshot.period;
     } else {
-      rows = await currentRows();
+      rows = enrichRows(await currentRows(), await loadModelContext());
       threshold = Number(
         (await pool.query("SELECT threshold FROM pipeline_settings WHERE id=1"))
           .rows[0].threshold,
@@ -357,9 +448,113 @@ export function registerPipelineRoutes(
             { before: data, after: updated },
             id,
           );
+          // Sale del pipeline como ganada o perdida: se guarda lo que se sabía para aprender.
+          if (
+            old.scope === "Pipeline" &&
+            ["Cerrada / confirmada", "Descartada"].includes(updated.scope)
+          ) {
+            const ctx = await loadModelContext();
+            if (ctx) {
+              const score = isOpenOpportunity(old) ? scoreRow(old, ctx) : null;
+              const own = usableProbability(old) ? Number(old.probability) : null;
+              await c.query(
+                `INSERT INTO pipeline_outcomes(opportunity_id,result,reason,stages_reached,signals,predicted_final,predicted_model,methodology_version,usd,closed_by)
+                 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+                [
+                  id,
+                  updated.scope === "Descartada" ? "lost" : "won",
+                  body.reason,
+                  await stagesReached(c, id!, old.stage),
+                  score ? scoreSignals(score) : [],
+                  own ?? score?.probability ?? null,
+                  score?.modelOnly ?? null,
+                  ctx.version,
+                  old.usd,
+                  req.user.id,
+                ],
+              );
+            }
+          }
           return saved;
         }),
       );
+    }),
+  );
+  router.get(
+    "/methodology",
+    wrap(async (_req, res) => {
+      const ctx = await loadModelContext();
+      const history = ctx
+        ? (
+            await pool.query(
+              "SELECT version, basis, approved_by_name AS \"approvedBy\", approved_at AS \"approvedAt\" FROM pipeline_methodology ORDER BY version DESC",
+            )
+          ).rows
+        : [];
+      res.json(
+        ctx
+          ? {
+              version: ctx.version,
+              model: ctx.model,
+              basis: ctx.basis,
+              approvedBy: ctx.approvedBy,
+              approvedAt: ctx.approvedAt,
+              history,
+            }
+          : null,
+      );
+    }),
+  );
+  router.post(
+    "/methodology",
+    requirePermission("admin"),
+    wrap(async (req, res) => {
+      const b = z
+        .object({
+          model: probabilityModelSchema,
+          basis: z.string().trim().min(10).max(2000),
+          expectedVersion: z.number().int().positive(),
+        })
+        .strict()
+        .parse(req.body);
+      if (b.model.floor >= b.model.ceiling)
+        throw new Error("El mínimo debe ser menor que el máximo");
+      res.json(
+        await transaction(async (c) => {
+          const current = (
+            await c.query("SELECT COALESCE(MAX(version),0) AS v FROM pipeline_methodology")
+          ).rows[0].v;
+          if (current !== b.expectedVersion)
+            throw Object.assign(
+              new Error("La metodología cambió mientras la editabas. Recargá."),
+              { status: 409 },
+            );
+          const name = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || null;
+          const r = await c.query(
+            "INSERT INTO pipeline_methodology(version, model, basis, approved_by, approved_by_name) VALUES($1,$2,$3,$4,$5) RETURNING version",
+            [current + 1, JSON.stringify(b.model), b.basis, req.user.id, name],
+          );
+          await audit(c, req.user.id, "metodología", b.basis, {
+            version: current + 1,
+          });
+          return r.rows[0];
+        }),
+      );
+    }),
+  );
+  router.get(
+    "/learning",
+    wrap(async (_req, res) => {
+      const ctx = await loadModelContext();
+      if (!ctx) return res.json(null);
+      const outcomes = (
+        await pool.query(
+          `SELECT result, stages_reached AS "stagesReached", signals, predicted_final::float AS "predictedFinal", predicted_model::float AS "predictedModel"
+           FROM pipeline_outcomes ORDER BY id`,
+        )
+      ).rows;
+      const learning = learnFromOutcomes(ctx.model, outcomes);
+      res.json({ learning, suggested: suggestedModel(ctx.model, learning) });
     }),
   );
   router.get(
@@ -501,7 +696,8 @@ export function registerPipelineRoutes(
             ])
           ).rows[0];
           if (old) return old;
-          const rows = await currentRows(c),
+          const modelContext = await loadModelContext();
+          const rows = enrichRows(await currentRows(c), modelContext),
             settings = (
               await c.query("SELECT * FROM pipeline_settings WHERE id=1")
             ).rows[0],
@@ -523,6 +719,7 @@ export function registerPipelineRoutes(
             checklist,
             decisions,
             rulesVersion: 1,
+            methodologyVersion: modelContext?.version ?? null,
             staleAfterDays: 30,
             timeZone: "America/Argentina/Buenos_Aires",
             summary: summarize(rows, localDay(), Number(settings.threshold)),

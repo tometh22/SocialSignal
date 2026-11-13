@@ -53,6 +53,7 @@ describe("Pipeline compartido: proyección pública", () => {
         "nextDate",
         "owner",
         "probability",
+        "probabilityBasis",
         "project",
         "scope",
         "stage",

@@ -22,6 +22,7 @@ import {
 import { OpportunityEditor } from "@/components/pipeline/opportunity-editor";
 import { OpportunityList } from "@/components/pipeline/opportunity-list";
 import { ShareDialog } from "@/components/pipeline/share-dialog";
+import { ProbabilityPanel } from "@/components/pipeline/probability-panel";
 import { shareTokenHeader } from "@shared/pipeline-share";
 import { MonthPicker, monthLabel } from "@/components/pipeline/month-picker";
 import { SummaryPreview } from "@/components/pipeline/summary-preview";
@@ -69,6 +70,7 @@ import {
   Copy,
   Download,
   FileText,
+  Gauge,
   History,
   LayoutDashboard,
   ListFilter,
@@ -107,6 +109,13 @@ const navigation = [
     label: "Concentración",
     icon: Building2,
     description: "Exposición a Warner y diversificación de la cartera.",
+  },
+  {
+    label: "Probabilidad",
+    icon: Gauge,
+    description:
+      "Cómo se estima la probabilidad y qué aprende el modelo con cada cierre.",
+    internal: true,
   },
   {
     label: "Cierre mensual",
@@ -2210,6 +2219,9 @@ export function PipelineWorkspace({ share }: { share?: PipelineShare }) {
             </Button>
           </div>
         </Panel>
+      )}
+      {tab === "Probabilidad" && !share && (
+        <ProbabilityPanel isAdmin={isAdmin} />
       )}
       {tab === "Status" && (
         <Panel
