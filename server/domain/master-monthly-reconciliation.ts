@@ -44,7 +44,7 @@ export function buildMasterMonthlyReconciliation(data: MasterScenarioSnapshot, p
     // Broken conversions or unknown planned expenses remain unavailable, not zero.
     if (cost.source === 'master' && cost.amountUsd == null && raw?.[14] === 0
       && [11,12,13,15,16,17,18].every(index => empty(raw[index]))) {
-      placeholders.push(cost.sourceDetail); return false;
+      placeholders.push(cost.sourceDetail ?? cost.id); return false;
     }
     return true;
   });
