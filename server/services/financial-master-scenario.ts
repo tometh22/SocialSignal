@@ -11,6 +11,8 @@ export interface MasterScenarioSnapshot {
   estimates: Rows;
   liabilities: Rows;
   readAt: string;
+  sales?: Rows;
+  performance?: Rows;
 }
 const cache = new ReadCache<MasterScenarioSnapshot>(30_000, 1);
 
@@ -19,14 +21,15 @@ export function getMasterScenarioSnapshot(): Promise<MasterScenarioSnapshot> {
   return cache.get('master', async () => {
     const response = await createSheetsClient().spreadsheets.values.batchGet({
       spreadsheetId,
-      ranges: ["'Resumen Ejecutivo'!A:V", "'Costos directos e indirectos'!A:S", "'Costos estimados'!A:N", "'Pasivo'!A:N"],
+      ranges: ["'Resumen Ejecutivo'!A:V", "'Costos directos e indirectos'!A:S", "'Costos estimados'!A:N", "'Pasivo'!A:N",
+        "'Proyectos confirmados y estimados'!A:V", "'Rendimiento Cliente'!A:J"],
       valueRenderOption: 'UNFORMATTED_VALUE',
     }, { timeout: 20_000 });
-    const [summary, actual, estimates, liabilities] = response.data.valueRanges?.map(range => range.values ?? []) ?? [];
+    const [summary, actual, estimates, liabilities, sales, performance] = response.data.valueRanges?.map(range => range.values ?? []) ?? [];
     if (!summary?.length || !actual?.length || !estimates?.length || !liabilities?.length) {
       throw new Error('El Máster no devolvió todas las fuentes del escenario');
     }
-    const snapshot = { summary, actual, estimates, liabilities, readAt: new Date().toISOString() };
+    const snapshot = { summary, actual, estimates, liabilities, sales, performance, readAt: new Date().toISOString() };
     validateMasterHeaders(snapshot);
     return snapshot;
   });

@@ -7,7 +7,7 @@ import { withJobLock } from "../services/job-lock";
  *   2. FX rates → exchange_rates (UPSERT)
  *   3. Hourly rates → personnel_historical_costs
  *   4. Incomes → income_sot
- *   5. Rendimiento Cliente → financial_sot
+ *   5. Seguimiento acumulado separado del detalle financiero mensual
  *   6. Costos estimados → fact_estimated_cost_month
  *
  * Guard: skips a run if a previous run is still in progress.
@@ -189,25 +189,7 @@ async function runFullPipelineUnlocked() {
       syncFailures.push(`incomes: ${e?.message ?? String(e)}`);
     }
 
-    // 6. Rendimiento Cliente (financial_sot)
-    try {
-      const { importRendimientoCliente } = await import('../etl/rendimiento-cliente');
-      const rc = await importRendimientoCliente();
-      console.log(`✅ [SoT Sync] Rendimiento Cliente: ${rc.inserted} filas`);
-
-      // financial_sot estuvo vacía desde siempre porque este ETL sólo se podía
-      // disparar desde el endpoint manual /internal/sync/financial y nadie lo
-      // llamaba. Es la fuente de ARR y de las vistas de Rendimiento.
-      if (rc.inserted === 0) {
-        throw new Error(`Rendimiento Cliente no persistió ninguna fila. Errores: ${rc.errors.length}`);
-      }
-      if (rc.errors.length > 0) {
-        console.error(`❌ [SoT Sync] Rendimiento Cliente con ${rc.errors.length} errores. Primero: ${rc.errors[0]}`);
-      }
-    } catch (e: any) {
-      console.error('❌ [SoT Sync] Rendimiento Cliente falló:', e?.message);
-      syncFailures.push(`rendimiento-cliente: ${e?.message ?? String(e)}`);
-    }
+    // El seguimiento acumulado se consulta como referencia: no genera ventas mensuales.
 
     // 7. Costos estimados
     try {
