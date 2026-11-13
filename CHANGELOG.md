@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.14.53 — 2026-11-13
+
+- El catálogo de consultas de Mind identifica el seguimiento heredado como presupuestos y costos acumulados, aclara que el mes de análisis puede moverse y dirige las consultas mensuales al resumen financiero. Los hechos nativos se distinguen por su procedencia para evitar volver a mezclar las dos bases al consultar desde asistentes.
+
 ## 1.14.52 — 2026-11-13
 
 - Rendimiento concilia ventas y costos del mes con el resumen financiero usando una misma lectura del Máster, o las fuentes nativas cuando el período ya opera en Mind. Muestra diferencias, costos estimados y datos faltantes.
