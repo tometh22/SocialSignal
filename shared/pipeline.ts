@@ -93,11 +93,27 @@ export const opportunitySchema = z
     exclusionReason: text,
     legacyEstimatedUsd: decimal,
     crmUpdatedAtReference: date,
+    // Señales del modelo de probabilidad (ver shared/pipeline-probability.ts).
+    renewal: z.boolean().default(false),
+    decisionMakerConfirmed: z.boolean().default(false),
+    competition: z.boolean().default(false),
+    teamSignals: z.array(z.string().max(40)).max(30).default([]),
+    manualAdjustment: z
+      .object({
+        points: z.number().int().min(-50).max(50),
+        reason: z.string().trim().min(3).max(500),
+        by: z.string().max(120).nullable().default(null),
+        at: z.string().refine(isValidCivilDate),
+      })
+      .nullable()
+      .default(null),
   })
   .strict();
 export type Opportunity = z.infer<typeof opportunitySchema> & {
   id?: number;
   version?: number;
+  /** Probabilidad del modelo aprobado (%), calculada por el servidor; no se guarda en la ficha. */
+  modelProbability?: number | null;
   importKey?: string;
   nativeStage?: string | null;
 };
@@ -170,11 +186,24 @@ export function usableProbability(r: Opportunity) {
     r.sources.some((s) => s.key === r.probabilitySource)
   );
 }
+/**
+ * Probabilidad con la que se pondera: la propia respaldada (motivo + fuente)
+ * o, si no hay, la del modelo aprobado que calculó el servidor.
+ */
+export function effectiveProbability(r: Opportunity): {
+  value: string | null;
+  basis: "own" | "model" | null;
+} {
+  if (usableProbability(r)) return { value: r.probability, basis: "own" };
+  if (typeof r.modelProbability === "number")
+    return { value: String(r.modelProbability), basis: "model" };
+  return { value: null, basis: null };
+}
 export function alerts(r: Opportunity, day = localDay()) {
   return [
     !r.next && "Sin próximo paso",
     !usableValue(r) && "Sin valor USD",
-    !usableProbability(r) && "Sin probabilidad respaldada",
+    !effectiveProbability(r).value && "Sin probabilidad respaldada",
     (!r.evidenceDate ||
       (Date.parse(day) - Date.parse(r.evidenceDate)) / 86400000 >= 30) &&
       "Evidencia desactualizada",
@@ -193,10 +222,10 @@ export function isOpenOpportunity(r: Opportunity) {
 export function metrics(rows: Opportunity[]) {
   const open = rows.filter(isOpenOpportunity);
   const valued = open.filter(usableValue),
-    weighted = valued.filter(usableProbability);
+    weighted = valued.filter((r) => effectiveProbability(r).value !== null);
   const sum = valued.reduce((a, r) => a + cents(r.usd!), BigInt(0));
   const weight = weighted.reduce(
-    (a, r) => a + cents(r.usd!) * cents(r.probability!),
+    (a, r) => a + cents(r.usd!) * cents(effectiveProbability(r).value!),
     BigInt(0),
   );
   return {
@@ -241,10 +270,12 @@ export function sortOpportunities<T extends Opportunity>(
         return stages.indexOf(r.stage as (typeof stages)[number]);
       case "usd":
         return usableValue(r) ? Number(r.usd) : null;
-      case "weighted":
-        return usableValue(r) && usableProbability(r)
-          ? (Number(r.usd) * Number(r.probability)) / 100
+      case "weighted": {
+        const p = effectiveProbability(r).value;
+        return usableValue(r) && p !== null
+          ? (Number(r.usd) * Number(p)) / 100
           : null;
+      }
       case "closeDate":
         return r.closeDate ?? null;
       case "evidenceDate":
@@ -315,7 +346,7 @@ export function executiveSummary(
       : `USD ${Number(v).toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
   return [
     `Pipeline comercial · ${period} · corte ${new Date(createdAt).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hourCycle: "h23" })}`,
-    `Abiertas: ${s.open}. Bruto: ${val(s.gross)} (${s.valueCoverage}/${s.open}). Ponderado: ${val(s.weighted)} (${s.weightedCoverage}/${s.open}).`,
+    `Abiertas: ${s.open}. Bruto: ${val(s.gross)} (${s.valueCoverage}/${s.open}). Ponderado: ${val(s.weighted)} (${s.weightedCoverage}/${s.open})${rows.some((r) => typeof r.modelProbability === "number") ? "; usa la probabilidad propia o, si no hay, la del modelo aprobado" : ""}.`,
     ...s.stages.map(
       (v) =>
         `${v.stage}: ${v.open} · ${val(v.gross)} (${v.valueCoverage}/${v.open}) · ponderado ${val(v.weighted)} (${v.weightedCoverage}/${v.open})`,

@@ -8,7 +8,12 @@ import {
   ChevronsUpDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { metrics, type Opportunity, type SortKey } from "@shared/pipeline";
+import {
+  effectiveProbability,
+  metrics,
+  type Opportunity,
+  type SortKey,
+} from "@shared/pipeline";
 import {
   Amount,
   StageBadge,
@@ -286,9 +291,19 @@ function OpportunityTable({
                         className="font-medium"
                       />
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        {isPending(r.probability)
-                          ? "Sin probabilidad"
-                          : `Probabilidad ${pct(r.probability)}`}
+                        {(() => {
+                          // Vista compartida: ya viene la efectiva y su origen.
+                          const p =
+                            r.probabilityBasis !== undefined
+                              ? {
+                                  value: r.probability,
+                                  basis: r.probabilityBasis,
+                                }
+                              : effectiveProbability(r);
+                          return isPending(p.value)
+                            ? "Sin probabilidad"
+                            : `Probabilidad ${pct(p.value)}${p.basis === "model" ? " · modelo" : ""}`;
+                        })()}
                       </p>
                     </td>
                   )}

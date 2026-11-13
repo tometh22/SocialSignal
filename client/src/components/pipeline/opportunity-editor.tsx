@@ -35,6 +35,12 @@ import {
 } from "@/components/ui/select";
 import { authFetchJson } from "@/lib/queryClient";
 import { pendingText, stageColors } from "./ui";
+import {
+  ProbabilityEditor,
+  draftScore,
+  type Methodology,
+} from "./probability-editor";
+import { useAuth } from "@/hooks/use-auth";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
@@ -44,6 +50,7 @@ import {
   scopes,
   stages,
   statuses,
+  usableProbability,
   type Opportunity,
 } from "@shared/pipeline";
 
@@ -164,6 +171,17 @@ export function OpportunityEditor({
   const [leadSearch, setLeadSearch] = useState("");
   const search = useDebouncedValue(leadSearch, 250);
   const { hasPermission } = usePermissions();
+  const { user } = useAuth();
+  const userName = [(user as any)?.firstName, (user as any)?.lastName]
+    .filter(Boolean)
+    .join(" ");
+  const methodology = useQuery<Methodology | null>({
+    queryKey: ["/api/crm/pipeline", "/methodology"],
+    queryFn: () => authFetchJson("/api/crm/pipeline/methodology"),
+    enabled: !!opportunity,
+    staleTime: 60000,
+  });
+  const existingClient = !!(opportunity as any)?.model?.existingClient;
   useEffect(() => {
     setDraft(opportunity ? structuredClone(opportunity) : null);
     setSection("Oportunidad");
@@ -271,7 +289,15 @@ export function OpportunityEditor({
         ]),
       ),
     );
-    if (calculationData.success) result = metrics([calculationData.data]);
+    if (calculationData.success)
+      result = metrics([
+        {
+          ...calculationData.data,
+          modelProbability:
+            draftScore(calculationData.data, methodology.data, existingClient)
+              ?.probability ?? null,
+        },
+      ]);
   } catch {
     /* An incomplete numeric input remains pending until it is valid. */
   }
@@ -366,10 +392,16 @@ export function OpportunityEditor({
             { label: "Valor total USD", text: cash(draft.usd) },
             {
               label: "Probabilidad",
-              text:
-                draft.probability === null
-                  ? "Pendiente"
-                  : draft.probability + "%",
+              text: (() => {
+                if (usableProbability(draft))
+                  return draft.probability + "% · propia";
+                const p = draftScore(
+                  draft,
+                  methodology.data,
+                  existingClient,
+                )?.probability;
+                return p == null ? "Pendiente" : `${p}% · modelo`;
+              })(),
             },
             { label: "Valor ponderado", text: cash(result.weighted) },
           ].map(({ label, text }, i) => (
@@ -689,32 +721,41 @@ export function OpportunityEditor({
                       )}
                     </details>
                   )}
-                  <div className="border-t pt-5">
-                    <h4 className="mb-4 text-sm font-semibold">
-                      Probabilidad respaldada
-                    </h4>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      {textField("probability", "Probabilidad de cierre · %", {
-                        hint: "Entre 0 y 100. La etapa no asigna una probabilidad automáticamente.",
-                      })}
-                      <Field title="Evidencia de la probabilidad">
-                        <Choice
-                          value={draft.probabilitySource}
-                          disabled={readOnly}
-                          options={draft.sources
-                            .filter((s) => s.title)
-                            .map((s) => ({ value: s.key, label: s.title }))}
-                          onChange={(v) => change("probabilitySource", v)}
-                          placeholder="Elegir una fuente"
-                        />
-                      </Field>
-                      {textField(
-                        "probabilityReason",
-                        "Motivo de la probabilidad",
-                        { multiline: true, wide: true },
-                      )}
-                    </div>
-                  </div>
+                  <ProbabilityEditor
+                    draft={draft}
+                    change={change as any}
+                    readOnly={readOnly}
+                    methodology={methodology.data}
+                    existingClient={existingClient}
+                    userName={userName}
+                    ownProbabilityFields={
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {textField(
+                          "probability",
+                          "Probabilidad de cierre · %",
+                          {
+                            hint: "Entre 0 y 100.",
+                          },
+                        )}
+                        <Field title="Evidencia de la probabilidad">
+                          <Choice
+                            value={draft.probabilitySource}
+                            disabled={readOnly}
+                            options={draft.sources
+                              .filter((s) => s.title)
+                              .map((s) => ({ value: s.key, label: s.title }))}
+                            onChange={(v) => change("probabilitySource", v)}
+                            placeholder="Elegir una fuente"
+                          />
+                        </Field>
+                        {textField(
+                          "probabilityReason",
+                          "Motivo de la probabilidad",
+                          { multiline: true, wide: true },
+                        )}
+                      </div>
+                    }
+                  />
                   <div className="rounded-xl border border-sky-100 bg-sky-50/50 p-4 dark:bg-slate-900">
                     <h4 className="mb-4 flex items-center gap-2 text-sm font-semibold">
                       <CalendarDays className="h-4 w-4 text-sky-600" />
