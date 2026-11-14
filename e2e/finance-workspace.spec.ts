@@ -63,6 +63,7 @@ test('bank and ledger failures cannot masquerade as empty balances', async ({ pa
 test('project-only users have no financial workspace or actions', async ({ page }) => {
   await page.request.post('/api/login',{data:{email:'e2e-1@example.test',password:'mind-local-test-only'}});
   await page.goto('/finance/rendimiento?period=2026-10');
+  await expect(page).toHaveURL(/unauthorized/);
   await expect(page.getByRole('region',{name:'Área de Finanzas'})).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Revisar cierre',exact:true})).toHaveCount(0);
 });

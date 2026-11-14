@@ -46,7 +46,6 @@ const QuarterlyNpsSurvey = lazy(() => import("@/pages/quarterly-nps-survey"));
 const CurrencyDemo = lazy(() => import("@/pages/currency-demo"));
 const GoogleSheetsManager = lazy(() => import("@/pages/google-sheets-manager"));
 const ExecutiveOperativo = lazy(() => import("@/pages/Executive/Operativo"));
-const FinanceSummaryRedirect = () => <Redirect to={`/dashboard${window.location.search}`} />;
 const CRMPipelinePage = lazy(() => import("@/pages/crm-pipeline"));
 const CRMPage = lazy(() => import("@/pages/crm"));
 const CRMLeadPage = lazy(() => import("@/pages/crm-lead"));
@@ -277,11 +276,11 @@ function AppRoutes() {
                   <ProtectedRoute path="/training/:lessonId" component={TrainingPage} />
                   <ProtectedRoute path="/" component={HomeDashboard} requiredAnyPermission={HOME_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/dashboard" component={ExecutiveDashboardV2} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
-                  <ProtectedRoute path="/dashboard-legacy" component={FinanceSummaryRedirect} />
-                  <ProtectedRoute path="/executive-dashboard-new" component={FinanceSummaryRedirect} />
+                  <ProtectedRoute path="/dashboard-legacy" component={() => <Redirect to={`/dashboard${window.location.search}`} />} />
+                  <ProtectedRoute path="/executive-dashboard-new" component={() => <Redirect to={`/dashboard${window.location.search}`} />} />
                   <ProtectedRoute path="/executive/operativo" component={ExecutiveOperativo} requiredPermission="dashboard" />
-                  <ProtectedRoute path="/executive/economico" component={FinanceSummaryRedirect} />
-                  <ProtectedRoute path="/executive/finanzas" component={FinanceSummaryRedirect} requiredPermission="finance" />
+                  <ProtectedRoute path="/executive/economico" component={() => <Redirect to={`/dashboard${window.location.search}`} />} />
+                  <ProtectedRoute path="/executive/finanzas" component={() => <Redirect to={`/dashboard${window.location.search}`} />} requiredPermission="finance" />
                   <ProtectedRoute path="/principal" component={() => <Redirect to="/" />} />
                   
                   {/* Quotation Management */}
