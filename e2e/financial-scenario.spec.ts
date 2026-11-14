@@ -60,8 +60,7 @@ test('annual exclusions work across search results and pages, can be undone and 
   await panel.getByRole('button', { name: 'Reincorporar todo' }).click();
   await expect(page.getByTestId('scenario-excluded')).toContainText('0 movimientos');
   await panel.getByRole('checkbox', { name: 'Excluir todas las coincidencias', exact: true }).check();
-  await page.getByRole('combobox').filter({ hasText: String(year) }).click();
-  await page.getByRole('option', { name: String(year - 1), exact: true }).click();
+  await page.getByLabel('Mes de referencia de Finanzas').fill(`${year - 1}-10`);
   await page.getByRole('button', { name: 'Simular exclusiones' }).click();
   await expect(page.getByTestId('scenario-excluded')).toContainText('0 movimientos');
   expect(writes).toEqual([]);
