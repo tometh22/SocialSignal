@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { QueryError } from "@/components/query-error";
+import { useFinancePeriod } from "@/hooks/use-finance-period";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -11,14 +13,8 @@ import { CheckCircle, DollarSign, AlertCircle, Clock, ChevronLeft, ChevronRight,
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
-const MONTHS = Array.from({ length: 12 }, (_, i) => ({
-  value: String(i + 1).padStart(2, "0"),
-  label: new Date(2000, i, 1).toLocaleString("es-AR", { month: "long" }),
-}));
-
-const YEARS = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - 1 + i));
-
-function fmtUSD(n: number) {
+function fmtUSD(n: number | null | undefined) {
+  if (n == null) return "Sin datos";
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
@@ -28,14 +24,14 @@ type LedgerPage<T> = {
 };
 
 export default function ActivoPage() {
-  const [year, setYear] = useState(String(new Date().getFullYear()));
-  const [month, setMonth] = useState(String(new Date().getMonth() + 1).padStart(2, "0"));
+  const { period } = useFinancePeriod();
   const [estado, setEstado] = useState("todos");
   const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const period = `${year}-${month}`;
+
+  useEffect(() => { setPage(1); }, [period]);
 
   const { data, isLoading, isFetching, isError, refetch } = useQuery<LedgerPage<any>>({
     queryKey: ["/api/activo", period, estado, page],
@@ -44,12 +40,11 @@ export default function ActivoPage() {
       if (estado !== "todos") params.set("estado", estado);
       return apiRequest(`/api/activo?${params}`, "GET");
     },
-    placeholderData: keepPreviousData,
   });
   const rows = data?.items ?? [];
   const pagination = data?.pagination;
 
-  const { data: summary } = useQuery<any>({
+  const { data: summary, isError: summaryError, refetch: retrySummary } = useQuery<any>({
     queryKey: ["/api/activo/summary", period],
     queryFn: () => apiRequest(`/api/activo/summary?period=${period}`, "GET"),
   });
@@ -70,24 +65,12 @@ export default function ActivoPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div><h1 className="text-2xl font-semibold">Activo — Cuentas a Cobrar</h1><p className="text-muted-foreground text-sm">Facturas emitidas, cobros y saldos registrados en Mind</p></div>
+        <div><h1 className="text-2xl font-semibold">Cuentas por cobrar</h1><p className="text-muted-foreground text-sm">Facturas emitidas, cobros y saldos registrados en Mind</p></div>
         <Button asChild><Link href="/finance/cargar"><UploadCloud className="mr-2 h-4 w-4" />Cargar información</Link></Button>
       </div>
 
       {/* Filtros */}
       <div className="flex gap-3 flex-wrap">
-        <Select value={month} onValueChange={(value) => { setMonth(value); setPage(1); }}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {MONTHS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={year} onValueChange={(value) => { setYear(value); setPage(1); }}>
-          <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-          </SelectContent>
-        </Select>
         <Select value={estado} onValueChange={(value) => { setEstado(value); setPage(1); }}>
           <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -99,35 +82,36 @@ export default function ActivoPage() {
         </Select>
       </div>
 
+      {(isError || summaryError) && <QueryError message="No se pudieron cargar todos los datos del período. Los importes no disponibles se muestran como Sin datos." retry={() => { void refetch(); void retrySummary(); }} />}
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Total</CardTitle>
+            <CardTitle className="text-sm font-medium">Facturas del mes</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent><div className="text-2xl font-bold">{fmtUSD(summary?.total ?? 0)}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold">{fmtUSD(summary?.total)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium">Cobrado</CardTitle>
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
-          <CardContent><div className="text-2xl font-bold text-green-600">{fmtUSD(summary?.cobrado ?? 0)}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold text-green-600">{fmtUSD(summary?.cobrado)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium">Pendiente</CardTitle>
             <Clock className="h-4 w-4 text-yellow-500" />
           </CardHeader>
-          <CardContent><div className="text-2xl font-bold text-yellow-600">{fmtUSD(summary?.pendiente ?? 0)}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold text-yellow-600">{fmtUSD(summary?.pendiente)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium">Vencido</CardTitle>
             <AlertCircle className="h-4 w-4 text-red-500" />
           </CardHeader>
-          <CardContent><div className="text-2xl font-bold text-red-600">{fmtUSD(summary?.vencido ?? 0)}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold text-red-600">{fmtUSD(summary?.vencido)}</div></CardContent>
         </Card>
       </div>
 

@@ -1,18 +1,16 @@
+import { useFinancePeriod } from "@/hooks/use-finance-period";
 /**
  * ARR — ingreso recurrente anualizado.
  *
  * Usa las ventas mensuales de la misma fuente del resumen financiero.
  * MRR = ventas tipo Fee del mes. ARR = MRR × 12.
  */
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CompactPageHeader } from "@/components/ui/compact-page-header";
 import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
 import { PageShell } from "@/components/ui/page-shell";
-import { ToolbarPanel } from "@/components/ui/toolbar-panel";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Repeat, Users, Percent, AlertTriangle, Info } from "lucide-react";
 import {
@@ -21,7 +19,7 @@ import {
 } from "recharts";
 
 const fmt = (n: number | null | undefined) =>
-  n == null ? "—" : `$${n.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  n == null ? "—" : `USD ${n.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
 interface Cliente { clientName: string; mrr: number; arr: number; sharePct: number }
 interface Data {
@@ -49,7 +47,7 @@ const CONCENTRACION_ALERTA = 50;
 const CONCENTRACION_CRITICA = 65;
 
 export default function ArrPage() {
-  const [periodo, setPeriodo] = useState<string | null>(null);
+  const { period: periodo } = useFinancePeriod();
   const { data: resp, isLoading, error } = useQuery<Resp>({
     queryKey: [periodo ? `/api/v2/executive/recurring?period=${periodo}` : `/api/v2/executive/recurring`],
   });
@@ -61,18 +59,10 @@ export default function ArrPage() {
   return (
     <PageShell>
       <CompactPageHeader
-        title="ARR"
+        title="Ingresos recurrentes"
         description="Ventas tipo Fee del mes y su equivalente anualizado, en la misma base del resumen financiero"
       />
 
-      <ToolbarPanel>
-        <Select value={periodo ?? d?.periodKey ?? ""} onValueChange={setPeriodo}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Período" /></SelectTrigger>
-          <SelectContent>
-            {(resp?.periodos ?? []).map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </ToolbarPanel>
 
       {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
       {error && <p className="text-sm text-red-600">No se pudo cargar el ingreso recurrente.</p>}
@@ -88,17 +78,17 @@ export default function ArrPage() {
             <MetricGrid>
               {[
                 {
-                  label: "MRR", icon: Repeat, value: fmt(d.mrr),
+                  label: "Ingreso mensual (MRR)", icon: Repeat, value: fmt(d.mrr),
                   detail: `${d.clientesFee} clientes con fee mensual`,
                   tip: "Facturación de proyectos con Tipo = Fee del mes. No incluye one-shots.",
                 },
                 {
-                  label: "ARR", icon: Repeat, value: fmt(d.arr),
+                  label: "Equivalente anual (ARR)", icon: Repeat, value: fmt(d.arr),
                   detail: "MRR × 12",
                   tip: "Ventas tipo Fee del mes multiplicadas por 12. Es una anualización del mes seleccionado; puede incluir ventas programadas y no acredita facturas emitidas ni contratos de doce meses.",
                 },
                 {
-                  label: "Ingreso recurrente", icon: Percent, value: `${d.feeSharePct.toFixed(1)}%`,
+                  label: "Participación recurrente", icon: Percent, value: `${d.feeSharePct.toFixed(1)}%`,
                   detail: `${fmt(d.mrr)} de ${fmt(d.revenueTotal)}`,
                   tip: "Qué parte de la facturación del mes es recurrente. El resto son proyectos puntuales, que hay que volver a vender cada vez.",
                 },
@@ -106,7 +96,7 @@ export default function ArrPage() {
                   label: top ? `Concentración · ${top.clientName}` : "Concentración",
                   icon: concentrado ? AlertTriangle : Users,
                   value: top ? `${top.sharePct.toFixed(1)}%` : "—",
-                  detail: `HHI ${d.hhi.toFixed(2)} sobre ${d.clientesFee} clientes`,
+                  detail: `${d.clientesFee} clientes con ingresos recurrentes`,
                   tone: (top && top.sharePct >= CONCENTRACION_CRITICA ? "danger"
                     : concentrado ? "warning" : "success") as "danger" | "warning" | "success",
                   tip: "Participación del cliente más grande en el MRR. El índice Herfindahl va de 0 (cartera repartida) a 1 (un solo cliente). Por encima del 50% conviene mirar la fecha de vencimiento de ese contrato.",

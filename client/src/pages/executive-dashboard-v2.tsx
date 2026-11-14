@@ -1,3 +1,5 @@
+import { useFinancePeriod } from "@/hooks/use-finance-period";
+import type { MonthlyReconciliationReport } from "@shared/monthly-reconciliation";
 import { QueryError } from "@/components/query-error";
 /**
  * Executive Dashboard V2 - Reads native financial snapshots from Mind.
@@ -25,10 +27,10 @@ const QUARTERS = [
 ];
 
 const fmt = (n: number | null | undefined) =>
-  n == null ? "—" : `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  n == null ? "—" : `USD ${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const fmtShort = (n: number | null | undefined) =>
-  n == null ? "—" : `$${n.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  n == null ? "—" : `USD ${n.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
 const fmtPct = (n: number | null | undefined) =>
   n == null ? "—" : `${n.toFixed(2)}%`;
@@ -55,8 +57,8 @@ function InfoTip({ label, children, side = "bottom" }: { label: string; children
 export default function ExecutiveDashboardV2() {
   const now = new Date();
   const [viewMode, setViewMode] = useState<"month" | "quarter" | "year" | "custom">("month");
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+  const { period, year, month } = useFinancePeriod();
+  const selectedYear = Number(year), selectedMonth = Number(month);
   const [selectedQuarter, setSelectedQuarter] = useState(Math.ceil((now.getMonth() + 1) / 3));
   const [customStartYear, setCustomStartYear] = useState(now.getFullYear());
   const [customStartMonth, setCustomStartMonth] = useState(1);
@@ -85,9 +87,15 @@ export default function ExecutiveDashboardV2() {
     staleTime: 60_000,
   });
 
-  const d = data?.filtered;
+  const control = useQuery<{ report: MonthlyReconciliationReport }>({
+    queryKey: [`/api/v2/executive/rendimiento?period=${period}`], enabled: viewMode === "month",
+  });
+  const incompleteCosts = viewMode === "month" && control.data?.report.totals.operatingCostUsd === null;
+  const d = data?.filtered && incompleteCosts ? { ...data.filtered, ebitOperativo: null, margenOperativo: null,
+    beneficioNeto: null, margenNeto: null, markup: null } : data?.filtered;
   const allData = data?.data || [];
-  const trend = allData.slice(-12);
+  const trendEnd = viewMode === "year" ? `${selectedYear}-12` : viewMode === "quarter" ? `${selectedYear}-${String(selectedQuarter * 3).padStart(2, "0")}` : viewMode === "custom" ? `${customEndYear}-${String(customEndMonth).padStart(2, "0")}` : period;
+  const trend = allData.filter((row: any) => row.periodKey <= trendEnd).slice(-12);
 
   const kpiColor = (val: number | null | undefined, good: number) => {
     if (val == null) return "text-slate-500";
@@ -101,14 +109,16 @@ export default function ExecutiveDashboardV2() {
   return (
     <PageShell width="wide" spacing="compact">
       <CompactPageHeader
-        eyebrow="Finanzas"
         title="Resumen financiero"
-        description="Indicadores ejecutivos en tiempo real desde la fuente financiera maestra."
-        icon={<Wallet className="h-5 w-5" />}
+        description="Ventas, costos, ganancia y dinero disponible del período."
+        className="!border-0 !bg-transparent !p-0 !shadow-none"
+        actions={<Button variant="outline" size="sm" onClick={() => { void refetch(); if (viewMode === 'month') void control.refetch(); }} disabled={isFetching}>Actualizar datos</Button>}
       />
 
+      <details className="rounded-xl border bg-card p-3"><summary className="cursor-pointer text-sm font-medium">Comparar trimestre, año o rango personalizado</summary>
       <ToolbarPanel
-        title="Período"
+        className="mt-3 !border-0 !p-0 !shadow-none"
+        title="Vista del resumen"
         description="Compará un mes, trimestre, año o rango personalizado."
         ariaLabel="Selector de período financiero"
       >
@@ -137,7 +147,7 @@ export default function ExecutiveDashboardV2() {
               </Select>
               <Select value={String(customStartYear)} onValueChange={(v) => setCustomStartYear(parseInt(v))}>
                 <SelectTrigger className="h-11 w-full sm:w-24" aria-label="Año inicial"><SelectValue /></SelectTrigger>
-                <SelectContent>{[2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                <SelectContent>{Array.from({ length: 6 }, (_, index) => now.getFullYear() + 1 - index).map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
               </Select>
               <span className="hidden px-1 text-slate-400 sm:inline" aria-hidden="true">→</span>
               <Select value={String(customEndMonth)} onValueChange={(v) => setCustomEndMonth(parseInt(v))}>
@@ -146,27 +156,18 @@ export default function ExecutiveDashboardV2() {
               </Select>
               <Select value={String(customEndYear)} onValueChange={(v) => setCustomEndYear(parseInt(v))}>
                 <SelectTrigger className="h-11 w-full sm:w-24" aria-label="Año final"><SelectValue /></SelectTrigger>
-                <SelectContent>{[2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                <SelectContent>{Array.from({ length: 6 }, (_, index) => now.getFullYear() + 1 - index).map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           ) : (
             <>
-              {viewMode === "month" && (
-                <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
-                  <SelectTrigger className="h-11 w-28" aria-label="Mes"><SelectValue /></SelectTrigger>
-                  <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent>
-                </Select>
-              )}
               {viewMode === "quarter" && (
                 <Select value={String(selectedQuarter)} onValueChange={(v) => setSelectedQuarter(parseInt(v))}>
                   <SelectTrigger className="h-11 w-48" aria-label="Trimestre"><SelectValue /></SelectTrigger>
                   <SelectContent>{QUARTERS.map(q => <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>)}</SelectContent>
                 </Select>
               )}
-              <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-                <SelectTrigger className="h-11 w-24" aria-label="Año"><SelectValue /></SelectTrigger>
-                <SelectContent>{[2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-              </Select>
+
             </>
           )}
 
@@ -175,7 +176,8 @@ export default function ExecutiveDashboardV2() {
           </Button>
         </div>
       </ToolbarPanel>
-      {d?.fuenteDatos && <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+      </details>
+      {viewMode !== "month" && d?.fuenteDatos && <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <Badge variant="outline">Fuente: {d.fuenteDatos === 'master' ? 'Máster' : d.fuenteDatos === 'cierre' ? 'Cierre Mind' : d.fuenteDatos === 'mixta' ? 'Máster y Mind, según el mes' : 'Mind'}</Badge>
         {data.sourceReadAt && (d.fuenteDatos === 'master' || d.fuenteDatos === 'mixta') && <span>Consultado: {new Date(data.sourceReadAt).toLocaleString('es-AR')}</span>}
       </div>}
@@ -204,12 +206,12 @@ export default function ExecutiveDashboardV2() {
         <>
           {/* Period indicator */}
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className={`text-sm px-3 py-1 ${viewMode !== "month" ? "border-indigo-300 text-indigo-700 bg-indigo-50" : ""}`}>
+            {viewMode !== "month" && <Badge variant="outline" className="text-sm px-3 py-1 border-indigo-300 text-indigo-700 bg-indigo-50">
               {viewMode === "quarter" ? `Q${selectedQuarter} ${selectedYear}` :
                viewMode === "year" ? `Año ${selectedYear}` :
                viewMode === "custom" ? `${MONTHS[customStartMonth - 1]} ${customStartYear} → ${MONTHS[customEndMonth - 1]} ${customEndYear}` :
                `${d.monthLabel} — ${d.year}`}
-            </Badge>
+            </Badge>}
             {viewMode === "quarter" && (
               <Badge className="text-[10px] bg-indigo-100 text-indigo-700 border border-indigo-200">
                 Trimestral · {(d as any)._closedMonthCount ?? "?"} meses cerrados
@@ -228,6 +230,25 @@ export default function ExecutiveDashboardV2() {
             )}
           </div>
 
+          <MetricGrid>
+            <MetricCard label="Ventas del período" value={fmt(d.ventasDelMes)} icon={<DollarSign />} detail="Sin IVA · pueden incluir ventas programadas" />
+            <MetricCard label="Costos operativos" value={fmt(d.ventasDelMes != null && d.ebitOperativo != null ? d.ventasDelMes - d.ebitOperativo : null)} icon={<TrendingDown />} detail={incompleteCosts ? 'Pendientes de completar' : 'Base del resultado operativo'} />
+            <MetricCard label={d.beneficioNetoParcial ? 'Ganancia neta (parcial)' : 'Ganancia neta'} value={fmt(d.beneficioNeto)} icon={<TrendingUp />} detail="Después de ajustes e impuestos de la fuente" />
+            <MetricCard label="Caja disponible" value={fmt(d.activoLiquido)} icon={<Wallet />} detail="Saldo informado · distinto del resultado del mes" />
+          </MetricGrid>
+          {viewMode === "month" && <Card data-testid="finance-data-status"><CardContent className="space-y-2 pt-4 text-sm">
+            <p className="font-semibold">Estado de los datos · {period}</p>
+            {control.isLoading ? <p className="text-muted-foreground">Comprobando ventas y costos…</p>
+              : control.error ? <QueryError message="No se pudo comprobar la conciliación de este mes." retry={control.refetch} />
+              : control.data && <>
+                <div className="flex flex-wrap gap-2"><Badge variant="outline">{control.data.report.source === 'master' ? 'Fuente: Máster' : control.data.report.source === 'cierre' ? 'Fuente: cierre Mind' : 'Fuente: Mind'}</Badge>
+                <Badge variant="outline">{control.data.report.costBasis === 'estimated' ? 'Costos estimados' : control.data.report.costBasis === 'actual' ? 'Costos cargados' : 'Costos incompletos'}</Badge>
+                <Badge variant={control.data.report.status === 'matched' ? 'secondary' : 'destructive'}>{control.data.report.status === 'matched' ? 'Ventas y costos conciliados' : control.data.report.status === 'difference' ? 'Diferencias por revisar' : 'Faltan datos para conciliar'}</Badge></div>
+                <p className="text-xs text-muted-foreground">La conciliación comprueba totales. La aprobación del cierre es un paso separado.</p>
+                {control.data.report.status !== 'matched' && control.data.report.warnings.length > 0 && <div className="text-amber-800"><p>Hay gastos o importes pendientes. Completalos antes de usar el resultado de este mes.</p><details className="mt-1"><summary className="cursor-pointer text-xs">Ver registros pendientes</summary>{control.data.report.warnings.map((warning, index) => <p key={index} className="mt-2 text-xs">{warning}</p>)}</details></div>}
+              </>}
+          </CardContent></Card>}
+          <details className="rounded-xl border bg-card p-4"><summary className="cursor-pointer text-sm font-semibold">Indicadores de rentabilidad: resultado operativo, márgenes y markup</summary><div className="mt-4">
           {/* KPI Cards */}
           <TooltipProvider delayDuration={200}>
           <MetricGrid>
@@ -243,7 +264,7 @@ export default function ExecutiveDashboardV2() {
                 label: viewMode === "quarter" ? "Ventas del Trimestre" : viewMode === "year" ? "Ventas del Año" : viewMode === "custom" ? "Ventas del Período" : "Ventas del Mes",
                 value: fmt(d.ventasDelMes), pct: null, color: "text-emerald-700", icon: DollarSign,
                 tone: "success" as const,
-                tooltip: "Total facturado sin IVA en el período seleccionado. Fuente: columna 'Ventas del mes' del sheet Resumen Ejecutivo.",
+                tooltip: "Ventas sin IVA según la fuente del período. El Máster puede incluir ventas programadas: no acredita la emisión de facturas.",
               },
               {
                 label: "Cashflow",
@@ -264,7 +285,7 @@ export default function ExecutiveDashboardV2() {
                 label: d.markupMesesProyectados ? "Markup (ejecutado)" : "Markup",
                 value: d.markup != null ? `${d.markup.toFixed(2)}×` : "—", pct: null, color: kpiColor(d.markup, 2.5), icon: TrendingUp,
                 tone: d.markup == null ? "neutral" as const : d.markup >= 2.5 ? "success" as const : d.markup >= 0 ? "warning" as const : "danger" as const,
-                tooltip: "Ventas / Costos Directos del equipo. Indica cuántas veces los ingresos superan el costo directo. Estándar Epical: ≥2.5x. Excelente: ≥3.0x."
+                tooltip: d.fuenteDatos === "master" ? "En el Máster compara el valor y los costos acumulados de los proyectos cerrados en el mes de análisis. No es el margen de las ventas mensuales." : d.fuenteDatos === "mixta" ? "El período reúne bases de Máster y Mind. Revisá cada mes antes de comparar el markup." : "Ventas divididas por el costo directo del equipo del período. Es una razón, no un porcentaje de margen."
                   + (d.markupMesesCerrados ? ` Calculado sobre los ${d.markupMesesCerrados} meses cerrados del período.` : ""),
               },
               ...(d.markupProyectado != null ? [{
@@ -287,7 +308,7 @@ export default function ExecutiveDashboardV2() {
                     + `Revisá esos períodos en Mind antes de cerrar.`
                   : "EBIT − Impuestos. Ganancia final del período después de todos los costos e impuestos. Equivale al Margen Neto aplicado sobre las ventas.",
               },
-            ].map((kpi, i) => (
+            ].filter(kpi => !kpi.label.startsWith("Ventas") && !kpi.label.startsWith("Beneficio Neto") && kpi.label !== "Cashflow").map((kpi, i) => (
               <MetricCard
                 key={i}
                 label={(
@@ -305,6 +326,7 @@ export default function ExecutiveDashboardV2() {
             ))}
           </MetricGrid>
           </TooltipProvider>
+          </div></details>
 
           {/* P&L + Balance */}
           <div className="grid lg:grid-cols-2 gap-6">
@@ -319,8 +341,8 @@ export default function ExecutiveDashboardV2() {
                 <TooltipProvider delayDuration={200}>
                 {[
                   { label: viewMode === "quarter" ? "Ventas del trimestre" : viewMode === "year" ? "Ventas del año" : viewMode === "custom" ? "Ventas del período" : "Ventas del mes", value: d.ventasDelMes, bold: false, pct: 100, tooltip: "Total facturado sin IVA en el período." },
-                  { label: "– Costos (implícito)", value: d.ventasDelMes != null && d.ebitOperativo != null ? -(d.ventasDelMes - d.ebitOperativo) : null, bold: false, pct: d.ventasDelMes ? ((d.ventasDelMes - (d.ebitOperativo || 0)) / d.ventasDelMes * 100) : null, negative: true, tooltip: "Ventas − EBIT. Incluye costos directos del equipo + costos indirectos de operación." },
-                  { label: "= EBIT Operativo", value: d.ebitOperativo, bold: true, pct: d.margenOperativo, tooltip: "Earnings Before Interest & Taxes. Resultado operativo antes de impuestos." },
+                  { label: "– Costos operativos", value: d.ventasDelMes != null && d.ebitOperativo != null ? -(d.ventasDelMes - d.ebitOperativo) : null, bold: false, pct: d.ventasDelMes ? ((d.ventasDelMes - (d.ebitOperativo || 0)) / d.ventasDelMes * 100) : null, negative: true, tooltip: "Ventas − EBIT. Incluye costos directos del equipo + costos indirectos de operación." },
+                  { label: "= EBIT Operativo", value: d.ebitOperativo, bold: true, pct: d.margenOperativo, tooltip: "Resultado operativo antes de los ajustes al neto e impuestos de la fuente." },
                   { label: !d.beneficioNetoParcial && d.beneficioNeto != null && d.ebitOperativo != null && d.beneficioNeto > d.ebitOperativo ? "+ Recuperos y ajustes al neto" : "– Ajustes al neto", value: !d.beneficioNetoParcial && d.ebitOperativo != null && d.beneficioNeto != null ? -(d.ebitOperativo - d.beneficioNeto) : null, bold: false, negative: true, tooltip: d.beneficioNetoParcial ? "No se calcula la diferencia: EBIT y neto cubren distintos meses." : "Diferencia entre EBIT y neto según la fuente: incluye impuestos, provisiones y el tratamiento de bonos." },
                   { label: d.beneficioNetoParcial ? "= Beneficio Neto (parcial)" : "= Beneficio Neto", value: d.beneficioNeto, bold: true, pct: d.margenNeto, tooltip: "Ganancia final después de todos los costos e impuestos." },
                 ].map((row, i) => (

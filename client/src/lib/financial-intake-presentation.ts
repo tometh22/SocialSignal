@@ -18,23 +18,23 @@ type IntakeImpact = {
 
 const INTAKE_IMPACTS: Record<FinancialIntakeDocumentKind, IntakeImpact> = {
   customer_invoice: {
-    destinations: ["Activo", "Ingresos"],
+    destinations: ["Cuentas por cobrar", "Ingresos"],
     description: () => "Crea la cuenta a cobrar y reconoce el ingreso, sin duplicar un fee ya informado.",
   },
   customer_collection: {
-    destinations: ["Cashflow", "Activo"],
+    destinations: ["Caja y bancos", "Cuentas por cobrar"],
     description: () => "Registra el ingreso de dinero e intenta aplicarlo a la factura del cliente.",
   },
   supplier_invoice: {
-    destinations: ["Pasivo", "Costos"],
+    destinations: ["Cuentas por pagar", "Costos"],
     description: () => "Crea la cuenta a pagar y lleva el costo al proyecto, estructura o provisión elegida.",
   },
   supplier_payment: {
-    destinations: ["Cashflow", "Pasivo"],
+    destinations: ["Caja y bancos", "Cuentas por pagar"],
     description: () => "Registra el egreso e intenta aplicarlo a la factura del proveedor.",
   },
   bank_statement: {
-    destinations: ["Cashflow"],
+    destinations: ["Caja y bancos"],
     description: (lineCount) => `Crea ${lineCount || "los"} movimiento${lineCount === 1 ? "" : "s"} del extracto y deja las excepciones para conciliar.`,
   },
   fee_confirmation: {
@@ -52,7 +52,7 @@ const INTAKE_IMPACTS: Record<FinancialIntakeDocumentKind, IntakeImpact> = {
     description: () => "Actualiza el IPC o inflación mensual usado por los cálculos financieros.",
   },
   tax_settlement: {
-    destinations: ["Pasivo", "Resultado impositivo"],
+    destinations: ["Cuentas por pagar", "Resultado impositivo"],
     description: () => "Crea la obligación a pagar y el ajuste impositivo, sin duplicarlo como costo operativo.",
   },
   provision: {
@@ -76,7 +76,7 @@ export function getFinancialIntakeImpact(kind: FinancialIntakeDocumentKind, line
 const LINKED_RECORD_LABELS: Record<string, string> = {
   activo_entry: "Cuenta a cobrar",
   pasivo_entry: "Cuenta a pagar",
-  cashflow_transaction: "Movimiento de Cashflow",
+  cashflow_transaction: "Movimiento bancario",
   financial_document_application: "Pago o cobro conciliado",
   revenue_event: "Ingreso reconocido",
   revenue_event_linked: "Factura vinculada al fee",

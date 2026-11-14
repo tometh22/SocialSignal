@@ -1,3 +1,4 @@
+import { useFinancePeriod } from "@/hooks/use-finance-period";
 /**
  * Proyección — ejecutado vs proyectado del ejercicio.
  *
@@ -9,7 +10,6 @@
  * Los costos usan la base consistente con el EBIT (ventas − EBIT, sin impuestos
  * ARG/USA ni intereses). Verificado contra el Looker: coincide al centavo.
  */
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,6 @@ import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
 import { PageShell } from "@/components/ui/page-shell";
 import { ToolbarPanel } from "@/components/ui/toolbar-panel";
 import { CostScenario } from "@/components/finance/cost-scenario";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Target, TrendingUp, DollarSign, Info } from "lucide-react";
 import {
@@ -27,7 +26,7 @@ import {
 } from "recharts";
 
 const fmt = (n: number | null | undefined) =>
-  n == null ? "—" : `$${n.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  n == null ? "—" : `USD ${n.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
 interface ProyeccionMes {
   periodKey: string;
@@ -64,14 +63,13 @@ function InfoTip({ children }: { children: string }) {
 }
 
 export default function ProyeccionPage() {
-  const currentYear = new Date().getFullYear();
-  const [year, setYear] = useState(currentYear);
+  const { year: selectedFinanceYear } = useFinancePeriod();
+  const year = Number(selectedFinanceYear);
 
   const { data, isLoading, error } = useQuery<Proyeccion>({
     queryKey: [`/api/v2/executive/proyeccion?year=${year}`],
   });
 
-  const years = [currentYear + 1, currentYear, currentYear - 1, currentYear - 2];
 
   const chartData = (data?.meses ?? []).map((m) => ({
     mes: m.monthLabel.slice(3),
@@ -85,17 +83,11 @@ export default function ProyeccionPage() {
   return (
     <PageShell>
       <CompactPageHeader
-        title="Proyección"
+        title="Proyección del año"
         description="Ejecutado contra proyectado del ejercicio, con la base anual del Máster"
       />
 
       <ToolbarPanel>
-        <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-          </SelectContent>
-        </Select>
         {data && (
           <Badge variant="outline" className="ml-2">
             {data.mesesCerrados} cerrados · {data.mesesProyectados} proyectados

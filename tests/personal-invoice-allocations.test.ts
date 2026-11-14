@@ -26,7 +26,7 @@ describe("team cost and invoice integration contracts", () => {
     expect(app).toContain('/operations/liquidaciones-equipo');
     expect(app).toContain('/finance/facturas-equipo');
     expect(sidebar).toContain('title: "Cierre del equipo"');
-    expect(sidebar).toContain('title: "Facturas equipo"');
+    expect(source("client/src/components/finance/workspace.tsx")).toContain("Facturas del equipo");
     expect(operationsPage).toContain("Operaciones completa");
     expect(operationsPage).not.toContain("Administración completa");
     expect(financePage).toContain("Aprobar y crear Pasivo");

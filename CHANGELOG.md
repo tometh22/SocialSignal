@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.55 — 2026-11-14
+
+- Finanzas reúne Resumen, Caja, Cobros y pagos, Clientes y proyectos y Proyección en una navegación común, con acciones de carga, facturas del equipo y cierre según permisos. Los enlaces existentes se conservan.
+- Mes de referencia compartido entre vistas, conservado al navegar, recargar y volver atrás. Los desgloses anuales indican el ejercicio completo. Nombres y destinos de carga en lenguaje directo.
+- El resumen destaca ventas, costos operativos, ganancia neta y caja; muestra el estado de conciliación y los importes pendientes. Márgenes, markup y comparaciones de períodos quedan en detalle desplegable. Los costos incompletos no producen una ganancia aparentemente definitiva.
+- Caja, cuentas por cobrar, cuentas por pagar, provisiones y cierre distinguen datos no disponibles de valores cero y ofrecen reintento. Sin cambios en importes registrados ni permisos de acceso.
+
 ## 1.14.54 — 2026-11-14
 
 - Las tarjetas del Pipeline comercial (Resumen, Concentración y Alertas) tienen una ayuda que explica qué mide cada número y cómo se calcula; se abre al pasar el mouse o tocándola en el celular, también en el enlace compartido.

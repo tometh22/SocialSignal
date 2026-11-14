@@ -101,12 +101,14 @@ describe("financial native integration contracts", () => {
     expect(intake).toContain("Curva REM / tipos de cambio futuros");
   });
 
-  it("separa la carga de la gestión y los reportes en la navegación", () => {
+  it("agrupa Finanzas y conserva las acciones operativas según permisos", () => {
     const sidebar = read("client/src/components/layout/sidebar-fixed.tsx");
-    expect(sidebar).toContain('title: "Carga financiera"');
-    expect(sidebar).toContain('title: "Gestión financiera"');
-    expect(sidebar).toContain('title: "Reportes financieros"');
-    expect(sidebar.indexOf('title: "Carga financiera"')).toBeLessThan(sidebar.indexOf('title: "Reportes financieros"'));
+    const workspace = read("client/src/components/finance/workspace.tsx");
+    expect(sidebar).toContain('title: "Finanzas"');
+    expect(sidebar).not.toContain('title: "Carga financiera"');
+    expect(workspace).toContain("hasPermission('finance')");
+    expect(workspace).toContain("Cargar información");
+    expect(workspace).toContain("Revisar cierre");
   });
 
   it("hace explícitos los tres pasos y permite buscar y revisar un lote antes de procesarlo", () => {
@@ -122,16 +124,16 @@ describe("financial native integration contracts", () => {
     const intake = read("client/src/pages/financial-intake.tsx");
     expect(intake).toContain("Al confirmar, Mind actualizará");
     expect(intake).toContain("Resultado de la carga");
-    expect(intake).toContain("único lugar para ingresar información financiera y económica");
+    expect(intake).toContain("revisá el borrador y confirmá su registro");
   });
 });
 
 describe("financial intake presentation", () => {
   it("muestra el impacto doble de facturas, cobros, pagos e impuestos", () => {
-    expect(getFinancialIntakeImpact("customer_invoice").destinations).toEqual(["Activo", "Ingresos"]);
-    expect(getFinancialIntakeImpact("customer_collection").destinations).toEqual(["Cashflow", "Activo"]);
-    expect(getFinancialIntakeImpact("supplier_payment").destinations).toEqual(["Cashflow", "Pasivo"]);
-    expect(getFinancialIntakeImpact("tax_settlement").destinations).toEqual(["Pasivo", "Resultado impositivo"]);
+    expect(getFinancialIntakeImpact("customer_invoice").destinations).toEqual(["Cuentas por cobrar", "Ingresos"]);
+    expect(getFinancialIntakeImpact("customer_collection").destinations).toEqual(["Caja y bancos", "Cuentas por cobrar"]);
+    expect(getFinancialIntakeImpact("supplier_payment").destinations).toEqual(["Caja y bancos", "Cuentas por pagar"]);
+    expect(getFinancialIntakeImpact("tax_settlement").destinations).toEqual(["Cuentas por pagar", "Resultado impositivo"]);
   });
 
   it("informa cuántos movimientos generará un extracto", () => {
