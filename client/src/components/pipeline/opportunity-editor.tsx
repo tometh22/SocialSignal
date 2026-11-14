@@ -4,6 +4,7 @@ import {
   ArrowUpRight,
   Building2,
   CalendarDays,
+  Gauge,
   Check,
   ChevronRight,
   FileText,
@@ -62,10 +63,13 @@ export interface OpportunityEditorProps {
   error?: string;
   onClose: () => void;
   onSave: (data: Opportunity, reason: string) => Promise<void>;
+  /** Sección con la que se abre la ficha (por ejemplo "Probabilidad"). */
+  initialSection?: string;
 }
 const sections = [
   { name: "Oportunidad", icon: Target },
   { name: "Valor y cierre", icon: CalendarDays },
+  { name: "Probabilidad", icon: Gauge },
   { name: "Evidencia", icon: FileText },
   { name: "Vínculos", icon: Link2 },
 ] as const;
@@ -164,6 +168,7 @@ export function OpportunityEditor({
   error = "",
   onClose,
   onSave,
+  initialSection,
 }: OpportunityEditorProps) {
   const [draft, setDraft] = useState<Opportunity | null>(opportunity);
   const [section, setSection] = useState<string>("Oportunidad");
@@ -193,7 +198,7 @@ export function OpportunityEditor({
       : draftScore(d, methodology.data, existingClient);
   useEffect(() => {
     setDraft(opportunity ? structuredClone(opportunity) : null);
-    setSection("Oportunidad");
+    setSection(initialSection ?? "Oportunidad");
     setReason("");
     setLocalError("");
     setLeadSearch("");
@@ -724,6 +729,30 @@ export function OpportunityEditor({
                       )}
                     </details>
                   )}
+                  <div className="rounded-xl border border-sky-100 bg-sky-50/50 p-4 dark:bg-slate-900">
+                    <h4 className="mb-4 flex items-center gap-2 text-sm font-semibold">
+                      <CalendarDays className="h-4 w-4 text-sky-600" />
+                      Próxima acción comercial
+                    </h4>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {textField("next", "Próximo paso", {
+                        multiline: true,
+                        wide: true,
+                      })}
+                      {textField("nextDate", "Fecha del próximo paso", {
+                        type: "date",
+                        hint: "Es distinta de la fecha objetivo de cierre.",
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+              {section === "Probabilidad" && (
+                <>
+                  <SectionIntro
+                    title="Probabilidad de cierre"
+                    description="El modelo la estima con la etapa y las señales. Ajustala tildando lo que sepas de esta oportunidad o cargando una probabilidad propia."
+                  />
                   <ProbabilityEditor
                     draft={draft}
                     change={change as any}
@@ -760,22 +789,6 @@ export function OpportunityEditor({
                       </div>
                     }
                   />
-                  <div className="rounded-xl border border-sky-100 bg-sky-50/50 p-4 dark:bg-slate-900">
-                    <h4 className="mb-4 flex items-center gap-2 text-sm font-semibold">
-                      <CalendarDays className="h-4 w-4 text-sky-600" />
-                      Próxima acción comercial
-                    </h4>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      {textField("next", "Próximo paso", {
-                        multiline: true,
-                        wide: true,
-                      })}
-                      {textField("nextDate", "Fecha del próximo paso", {
-                        type: "date",
-                        hint: "Es distinta de la fecha objetivo de cierre.",
-                      })}
-                    </div>
-                  </div>
                 </>
               )}
               {section === "Evidencia" && (

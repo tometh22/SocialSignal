@@ -34,6 +34,7 @@ import {
 import {
   Amount,
   BigValue,
+  InfoTip,
   cardBase,
   civilDate,
   dateTime,
@@ -141,6 +142,17 @@ const tabsFor = (shared: boolean) =>
   navigation.filter((n) =>
     shared ? !("internal" in n) : !("sharedOnly" in n),
   );
+const alertInfo: Record<string, string> = {
+  "Sin próximo paso":
+    "Oportunidades abiertas sin un próximo paso comercial definido.",
+  "Sin valor USD":
+    "Sin importe respaldado: falta el valor, su fundamento o una fuente (por ejemplo, la cotización).",
+  "Sin probabilidad respaldada":
+    "Sin probabilidad propia ni del modelo, por ejemplo cuando la etapa no está verificada.",
+  "Evidencia desactualizada":
+    "La última evidencia comercial tiene más de 30 días: conviene confirmar si sigue viva.",
+  "Sin fecha objetivo": "Falta la fecha estimada de decisión o cierre.",
+};
 const alertTypes = [
   "Sin próximo paso",
   "Sin valor USD",
@@ -261,8 +273,11 @@ function Metric({
   coverage,
   highlight = false,
   onClick,
+  info,
 }: {
   title: string;
+  /** Explicación del indicador, en un tooltip junto al título. */
+  info?: ReactNode;
   /** `null`/`undefined` se muestran como "Pendiente" atenuado. */
   value: ReactNode;
   unit?: string;
@@ -279,19 +294,32 @@ function Metric({
         highlight ? "border-amber-200 bg-amber-50/40" : "border-slate-200/80",
       )}
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-1.5">
         <p
           className="truncate text-sm font-medium text-muted-foreground"
           title={title}
         >
           {title}
         </p>
-        <Icon
-          className={cn(
-            "h-4 w-4 shrink-0",
-            highlight ? "text-amber-600" : "text-slate-400",
-          )}
-        />
+        {/* La ayuda reemplaza al ícono decorativo para no recortar el título. */}
+        {info ? (
+          <InfoTip
+            label={title}
+            className={cn(
+              "-mr-1 h-4 w-4",
+              highlight && "text-amber-600 hover:text-amber-700",
+            )}
+          >
+            {info}
+          </InfoTip>
+        ) : (
+          <Icon
+            className={cn(
+              "h-4 w-4 shrink-0",
+              highlight ? "text-amber-600" : "text-slate-400",
+            )}
+          />
+        )}
       </div>
       <div className="mt-2">
         <BigValue value={value} unit={unit} />
@@ -526,6 +554,7 @@ export function PipelineWorkspace({ share }: { share?: PipelineShare }) {
     [showFilters, setShowFilters] = useState(false),
     [copied, setCopied] = useState(false),
     [shareOpen, setShareOpen] = useState(false),
+    [editorSection, setEditorSection] = useState<string | undefined>(),
     [logOffset, setLogOffset] = useState(0),
     [success, setSuccess] = useState("");
   const permissions = usePermissions();
@@ -538,7 +567,7 @@ export function PipelineWorkspace({ share }: { share?: PipelineShare }) {
   const alertScope =
     filter.scope === "Validación CRM" ? "Validación CRM" : "Pipeline";
   const qs = new URLSearchParams({
-    ...(tab === "Resumen"
+    ...(tab === "Resumen" || tab === "Probabilidad"
       ? {}
       : tab === "Concentración"
         ? filter.sort
@@ -571,8 +600,14 @@ export function PipelineWorkspace({ share }: { share?: PipelineShare }) {
     });
   const summary = useData("/summary?" + qs),
     rows = useData(
-      `/${tab === "Alertas" ? "alerts" : "opportunities"}?${qs}&offset=${offset}${tab === "Concentración" ? "&warner=true" : tab === "Resumen" ? "&scope=Pipeline" : ""}`,
-      ["Resumen", "Oportunidades", "Alertas", "Concentración"].includes(tab),
+      `/${tab === "Alertas" ? "alerts" : "opportunities"}?${qs}&offset=${offset}${tab === "Concentración" ? "&warner=true" : tab === "Resumen" ? "&scope=Pipeline" : tab === "Probabilidad" ? "&scope=Pipeline&sort=-usd&limit=100" : ""}`,
+      [
+        "Resumen",
+        "Oportunidades",
+        "Alertas",
+        "Concentración",
+        "Probabilidad",
+      ].includes(tab),
     ),
     cuts = useData("/cuts", !share),
     log = useData(
@@ -697,8 +732,9 @@ export function PipelineWorkspace({ share }: { share?: PipelineShare }) {
       }
     }
   };
-  const openOpportunity = (r: Opportunity) => {
+  const openOpportunity = (r: Opportunity, section?: string) => {
     setError("");
+    setEditorSection(section);
     setEditing(r);
   };
   // El orden y la agrupación son formas de ver la cartera, no filtros.
@@ -1121,6 +1157,15 @@ export function PipelineWorkspace({ share }: { share?: PipelineShare }) {
               unit="USD"
               icon={TrendingUp}
               coverage={{ n: data.valueCoverage, total: data.open }}
+              info={
+                <>
+                  Suma del valor en USD de las oportunidades abiertas del
+                  pipeline que tienen importe respaldado (cotización o fuente).
+                  No incluye confirmadas, descartadas ni en validación. La
+                  cobertura indica cuántas abiertas tienen importe (
+                  {data.valueCoverage} de {data.open}).
+                </>
+              }
             />
             <Metric
               title="Weighted Pipeline Value"
@@ -1128,6 +1173,15 @@ export function PipelineWorkspace({ share }: { share?: PipelineShare }) {
               unit="USD"
               icon={Target}
               coverage={{ n: data.weightedCoverage, total: data.open }}
+              info={
+                <>
+                  Lo que se espera cerrar: suma de valor × probabilidad de cada
+                  oportunidad abierta con importe. Usa la probabilidad propia
+                  respaldada o, si no hay, la del modelo (etapa, señales y
+                  criterio del equipo). Cobertura: {data.weightedCoverage} de{" "}
+                  {data.open} con importe y probabilidad.
+                </>
+              }
             />
             <Metric
               title="Oportunidades abiertas"
@@ -1135,6 +1189,7 @@ export function PipelineWorkspace({ share }: { share?: PipelineShare }) {
               icon={Users}
               subtitle="Alcances vigentes en el pipeline"
               onClick={() => navigate("Oportunidades")}
+              info="Propuestas y conversaciones vigentes con alcance Pipeline. No cuenta confirmadas, descartadas ni las que están en Validación CRM. Tocá la tarjeta para verlas."
             />
             <Metric
               title="Oportunidades en alerta"
@@ -1147,6 +1202,7 @@ export function PipelineWorkspace({ share }: { share?: PipelineShare }) {
                   : "Sin alertas en el pipeline abierto"
               }
               onClick={() => navigate("Alertas")}
+              info="Oportunidades abiertas con al menos un pendiente: sin próximo paso, sin valor USD, sin probabilidad, sin novedades hace más de 30 días o sin fecha objetivo. Una oportunidad puede tener varias alertas."
             />
           </div>
           <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,1fr)]">
@@ -1425,68 +1481,75 @@ export function PipelineWorkspace({ share }: { share?: PipelineShare }) {
               const active = filter.alert === alert;
               const clear = !summary.isLoading && count === 0 && !active;
               return (
-                <button
-                  key={alert}
-                  aria-pressed={active}
-                  disabled={clear}
-                  onClick={() => update("alert", active ? "" : alert)}
-                  className={cn(
-                    "group flex min-h-[132px] flex-col items-stretch justify-start rounded-2xl border p-4 text-left sm:p-5 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                    active
-                      ? "border-amber-400 bg-amber-50 ring-1 ring-amber-300"
-                      : clear
-                        ? "cursor-default border-slate-200/80 bg-slate-50/60 shadow-none"
-                        : "border-slate-200/80 bg-card hover:border-amber-300 hover:bg-amber-50/30",
-                  )}
-                >
-                  <span className="flex items-start justify-between gap-3">
+                <div key={alert} className="relative">
+                  <button
+                    aria-pressed={active}
+                    disabled={clear}
+                    onClick={() => update("alert", active ? "" : alert)}
+                    className={cn(
+                      "group flex h-full min-h-[132px] w-full flex-col items-stretch justify-start rounded-2xl border p-4 text-left sm:p-5 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                      active
+                        ? "border-amber-400 bg-amber-50 ring-1 ring-amber-300"
+                        : clear
+                          ? "cursor-default border-slate-200/80 bg-slate-50/60 shadow-none"
+                          : "border-slate-200/80 bg-card hover:border-amber-300 hover:bg-amber-50/30",
+                    )}
+                  >
+                    <span className="flex items-start justify-between gap-3">
+                      <span
+                        className={cn(
+                          "text-3xl font-semibold leading-9 tracking-tight tabular-nums",
+                          clear && pendingText,
+                        )}
+                      >
+                        {summary.isLoading ? "…" : count}
+                      </span>
+                      {clear ? (
+                        <CheckCheck className="mt-1 h-4 w-4 shrink-0 text-emerald-500" />
+                      ) : (
+                        <AlertCircle className="mt-1 h-4 w-4 shrink-0 text-amber-600" />
+                      )}
+                    </span>
                     <span
                       className={cn(
-                        "text-3xl font-semibold leading-9 tracking-tight tabular-nums",
-                        clear && pendingText,
+                        "mt-2 text-sm font-medium leading-snug",
+                        clear ? pendingText : "text-slate-700",
                       )}
                     >
-                      {summary.isLoading ? "…" : count}
+                      {alert}
                     </span>
-                    {clear ? (
-                      <CheckCheck className="mt-1 h-4 w-4 shrink-0 text-emerald-500" />
-                    ) : (
-                      <AlertCircle className="mt-1 h-4 w-4 shrink-0 text-amber-600" />
-                    )}
-                  </span>
-                  <span
-                    className={cn(
-                      "mt-2 text-sm font-medium leading-snug",
-                      clear ? pendingText : "text-slate-700",
-                    )}
+                    <span
+                      className={cn(
+                        "mt-auto inline-flex items-center gap-1 pt-3 text-xs font-medium",
+                        active
+                          ? "text-amber-800"
+                          : clear
+                            ? "text-emerald-700"
+                            : "text-amber-700 opacity-70 group-hover:opacity-100",
+                      )}
+                    >
+                      {active ? (
+                        <>
+                          Filtrando · quitar
+                          <X className="h-3 w-3" />
+                        </>
+                      ) : clear ? (
+                        "Al día"
+                      ) : (
+                        <>
+                          Ver oportunidades
+                          <ArrowRight className="h-3 w-3" />
+                        </>
+                      )}
+                    </span>
+                  </button>
+                  <InfoTip
+                    label={alert}
+                    className="absolute right-[38px] top-[14px] sm:right-[42px] sm:top-[18px]"
                   >
-                    {alert}
-                  </span>
-                  <span
-                    className={cn(
-                      "mt-auto inline-flex items-center gap-1 pt-3 text-xs font-medium",
-                      active
-                        ? "text-amber-800"
-                        : clear
-                          ? "text-emerald-700"
-                          : "text-amber-700 opacity-70 group-hover:opacity-100",
-                    )}
-                  >
-                    {active ? (
-                      <>
-                        Filtrando · quitar
-                        <X className="h-3 w-3" />
-                      </>
-                    ) : clear ? (
-                      "Al día"
-                    ) : (
-                      <>
-                        Ver oportunidades
-                        <ArrowRight className="h-3 w-3" />
-                      </>
-                    )}
-                  </span>
-                </button>
+                    {alertInfo[alert]}
+                  </InfoTip>
+                </div>
               );
             })}
           </div>
@@ -1506,6 +1569,7 @@ export function PipelineWorkspace({ share }: { share?: PipelineShare }) {
                 value="≈80%"
                 icon={Building2}
                 subtitle="Referencia informada el 28/10/2026. No equivale a facturación mensual verificada."
+                info="Participación de Warner en la facturación de Epical según la referencia informada el 28/10/2026. Es un dato histórico, no la facturación mensual conciliada."
               />
             )}
             <Metric
@@ -1517,12 +1581,14 @@ export function PipelineWorkspace({ share }: { share?: PipelineShare }) {
               }
               icon={TrendingUp}
               subtitle={`${isPending(data.warner.gross) ? "Warner sin valor" : `USD ${money(data.warner.gross)}`} de USD ${money(data.gross)} · cobertura ${data.valueCoverage}/${data.open}`}
+              info={`Qué parte del Pipeline Value corresponde a oportunidades de Warner. Solo cuenta las que tienen importe; con el umbral operativo (${data.warner.threshold}%) se mide la concentración.`}
             />
             <Metric
               title="Warner / oportunidades abiertas"
               value={`${data.warner.open} de ${data.open}`}
               icon={Users}
               subtitle="Cuenta oportunidades; no mide dependencia económica."
+              info="Cantidad de oportunidades abiertas de Warner sobre el total del pipeline. Mide cantidad de alcances, no cuánto dinero representan."
             />
           </div>
           <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/40 px-5 py-3.5 text-sm leading-relaxed">
@@ -2221,7 +2287,12 @@ export function PipelineWorkspace({ share }: { share?: PipelineShare }) {
         </Panel>
       )}
       {tab === "Probabilidad" && !share && (
-        <ProbabilityPanel isAdmin={isAdmin} />
+        <ProbabilityPanel
+          isAdmin={isAdmin}
+          rows={rows.data?.rows ?? []}
+          loading={rows.isLoading}
+          onAdjust={(r) => openOpportunity(r, "Probabilidad")}
+        />
       )}
       {tab === "Status" && (
         <Panel
@@ -2252,6 +2323,7 @@ export function PipelineWorkspace({ share }: { share?: PipelineShare }) {
       {!share && (
         <OpportunityEditor
           opportunity={editing}
+          initialSection={editorSection}
           readOnly={!!snapshot}
           busy={busy}
           error={error}

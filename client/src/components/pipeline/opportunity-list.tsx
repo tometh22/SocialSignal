@@ -29,7 +29,7 @@ type Props = {
   rows: any[];
   loading: boolean;
   /** Sin `onOpen` la lista es de solo lectura (enlace compartido): no abre la ficha. */
-  onOpen?: (r: Opportunity) => void;
+  onOpen?: (r: Opportunity, section?: string) => void;
   compact?: boolean;
   /** Orden activo, p. ej. "usd" o "-usd". */
   sort?: string;
@@ -68,6 +68,32 @@ function AlertsBadge({ r, onOpen }: { r: any; onOpen: Props["onOpen"] }) {
       <AlertCircle className="h-3 w-3" />
       {r.alerts.length} {r.alerts.length === 1 ? "pendiente" : "pendientes"}
     </button>
+  );
+}
+/** Probabilidad efectiva (propia o del modelo); con `onOpen`, abre la ficha en esa sección. */
+function ProbabilityTag({ r, onOpen }: { r: any; onOpen: Props["onOpen"] }) {
+  const p =
+    r.probabilityBasis !== undefined
+      ? { value: r.probability, basis: r.probabilityBasis }
+      : effectiveProbability(r);
+  if (isPending(p.value)) return null;
+  const text = `${pct(p.value)}${p.basis === "model" ? " · modelo" : ""}`;
+  return onOpen ? (
+    <button
+      type="button"
+      title="Ajustar la probabilidad"
+      onClick={(e) => {
+        stop(e);
+        onOpen(r, "Probabilidad");
+      }}
+      className="rounded-full bg-indigo-50 px-2 text-xs font-medium leading-5 text-indigo-700"
+    >
+      {text}
+    </button>
+  ) : (
+    <span className="rounded-full bg-indigo-50 px-2 text-xs font-medium leading-5 text-indigo-700">
+      {text}
+    </span>
   );
 }
 function FollowUp({ r, compact }: { r: any; compact: boolean }) {
@@ -300,9 +326,24 @@ function OpportunityTable({
                                   basis: r.probabilityBasis,
                                 }
                               : effectiveProbability(r);
-                          return isPending(p.value)
+                          const text = isPending(p.value)
                             ? "Sin probabilidad"
                             : `Probabilidad ${pct(p.value)}${p.basis === "model" ? " · modelo" : ""}`;
+                          return onOpen ? (
+                            <button
+                              type="button"
+                              title="Ajustar la probabilidad"
+                              onClick={(e) => {
+                                stop(e);
+                                onOpen(r, "Probabilidad");
+                              }}
+                              className="underline decoration-dotted underline-offset-2 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            >
+                              {text}
+                            </button>
+                          ) : (
+                            text
+                          );
                         })()}
                       </p>
                     </td>
@@ -422,6 +463,7 @@ function OpportunityCards({ rows, loading, onOpen, compact = false }: Props) {
                 <span className="text-xs text-muted-foreground">
                   {r.status}
                 </span>
+                <ProbabilityTag r={r} onOpen={onOpen} />
               </div>
               <CardMeta>
                 <FollowUp r={r} compact={compact} />
