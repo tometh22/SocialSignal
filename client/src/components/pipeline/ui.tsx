@@ -1,5 +1,12 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /**
  * Piezas visuales compartidas por la página del Pipeline comercial y la ficha.
@@ -134,5 +141,50 @@ export function StageBadge({ stage }: { stage: string }) {
       />
       {stage}
     </span>
+  );
+}
+
+/**
+ * Ícono de ayuda con explicación. Se abre al pasar el mouse, con el teclado o
+ * tocándolo (en celular no hay hover). Queda por encima de las tarjetas clickeables.
+ */
+export function InfoTip({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <TooltipProvider delayDuration={120}>
+      <Tooltip open={open} onOpenChange={setOpen}>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label={`Qué mide ${label}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen((v) => !v);
+            }}
+            className={cn(
+              "relative z-10 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+              className,
+            )}
+          >
+            <Info className="h-3.5 w-3.5" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="top"
+          align="start"
+          className="max-w-xs text-xs font-normal leading-relaxed"
+        >
+          {children}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
