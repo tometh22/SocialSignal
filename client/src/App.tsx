@@ -1,3 +1,5 @@
+import { FinancePeriodProvider } from "@/hooks/use-finance-period";
+import { FinanceWorkspace } from "@/components/finance/workspace";
 import { Switch, Route, Redirect, useLocation, useSearch } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import ErrorBoundary from "@/components/error-boundary";
@@ -44,7 +46,6 @@ const QuarterlyNpsSurvey = lazy(() => import("@/pages/quarterly-nps-survey"));
 const CurrencyDemo = lazy(() => import("@/pages/currency-demo"));
 const GoogleSheetsManager = lazy(() => import("@/pages/google-sheets-manager"));
 const ExecutiveOperativo = lazy(() => import("@/pages/Executive/Operativo"));
-const ExecutiveFinanciero = lazy(() => import("@/pages/Executive/Financiero"));
 const CRMPipelinePage = lazy(() => import("@/pages/crm-pipeline"));
 const CRMPage = lazy(() => import("@/pages/crm"));
 const CRMLeadPage = lazy(() => import("@/pages/crm-lead"));
@@ -263,6 +264,7 @@ function AppRoutes() {
             <TrainingInvitation />
             <main className={isReviewRoom ? "app-main flex-1 min-h-0 flex flex-col overflow-hidden" : "app-main flex-1 overflow-y-auto overflow-x-hidden"}>
               <div className={isReviewRoom ? "app-content status-room-content max-w-full" : "app-content max-w-full p-3 sm:p-5 lg:p-6"}>
+                <FinanceWorkspace />
                 <Suspense fallback={<AppRouteFallback />}>
                 <Switch>
                   {/* Unauthorized */}
@@ -274,11 +276,11 @@ function AppRoutes() {
                   <ProtectedRoute path="/training/:lessonId" component={TrainingPage} />
                   <ProtectedRoute path="/" component={HomeDashboard} requiredAnyPermission={HOME_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/dashboard" component={ExecutiveDashboardV2} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
-                  <ProtectedRoute path="/dashboard-legacy" component={() => <Redirect to="/dashboard" />} />
-                  <ProtectedRoute path="/executive-dashboard-new" component={() => <Redirect to="/dashboard" />} />
+                  <ProtectedRoute path="/dashboard-legacy" component={() => <Redirect to={`/dashboard${window.location.search}`} />} />
+                  <ProtectedRoute path="/executive-dashboard-new" component={() => <Redirect to={`/dashboard${window.location.search}`} />} />
                   <ProtectedRoute path="/executive/operativo" component={ExecutiveOperativo} requiredPermission="dashboard" />
-                  <ProtectedRoute path="/executive/economico" component={() => <Redirect to="/dashboard" />} />
-                  <ProtectedRoute path="/executive/finanzas" component={ExecutiveFinanciero} requiredPermission="finance" />
+                  <ProtectedRoute path="/executive/economico" component={() => <Redirect to={`/dashboard${window.location.search}`} />} />
+                  <ProtectedRoute path="/executive/finanzas" component={() => <Redirect to={`/dashboard${window.location.search}`} />} requiredPermission="finance" />
                   <ProtectedRoute path="/principal" component={() => <Redirect to="/" />} />
                   
                   {/* Quotation Management */}
@@ -405,7 +407,7 @@ function App() {
       <AuthProvider>
         <ChatProvider>
           <ImageRefreshProvider>
-            <AppRoutes />
+            <FinancePeriodProvider><AppRoutes /></FinancePeriodProvider>
 
             <Toaster />
           </ImageRefreshProvider>

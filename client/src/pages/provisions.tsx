@@ -1,3 +1,5 @@
+import { QueryError } from "@/components/query-error";
+import { useFinancePeriod } from "@/hooks/use-finance-period";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -14,29 +16,21 @@ import { Link } from "wouter";
 import { Label } from "@/components/ui/label";
 import { statusLabel } from "@/lib/status-labels";
 
-const MONTHS = Array.from({ length: 12 }, (_, i) => ({
-  value: String(i + 1).padStart(2, "0"),
-  label: new Date(2000, i, 1).toLocaleString("es-AR", { month: "long" }),
-}));
-
-const YEARS = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - 1 + i));
-
-function fmtUSD(n: number) {
+function fmtUSD(n: number | null | undefined) {
+  if (n == null) return "Sin datos";
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 export default function ProvisionsPage() {
-  const [year, setYear] = useState(String(new Date().getFullYear()));
-  const [month, setMonth] = useState(String(new Date().getMonth() + 1).padStart(2, "0"));
+  const { period } = useFinancePeriod();
   const [releaseRow, setReleaseRow] = useState<any | null>(null);
   const [releaseAmount, setReleaseAmount] = useState("");
   const [releaseNote, setReleaseNote] = useState("");
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const period = `${year}-${month}`;
 
-  const { data: rows = [], isLoading } = useQuery<any[]>({
+  const { data: provisionData, isLoading, isError, refetch } = useQuery<any[]>({
     queryKey: ["/api/provisions", period],
     queryFn: () => apiRequest(`/api/provisions?period=${period}`, "GET"),
   });
@@ -59,6 +53,7 @@ export default function ProvisionsPage() {
     onError: (error: Error) => toast({ title: "No se pudo liberar", description: error.message, variant: "destructive" }),
   });
 
+  const rows = provisionData ?? [];
   const totalActivo = rows.filter(r => r.tipo === "NUEVA_PROVISION" && ["APPROVED", "ACTIVE"].includes(r.status)).reduce((s, r) => s + parseFloat(r.remainingAmount ?? r.montoProvision ?? "0"), 0);
   const totalRecupero = rows.filter(r => r.tipo === "RECUPERO" && ["APPROVED", "ACTIVE"].includes(r.status)).reduce((s, r) => s + parseFloat(r.montoProvision ?? "0"), 0);
 
@@ -74,20 +69,9 @@ export default function ProvisionsPage() {
 
       {/* Filtros */}
       <div className="flex gap-3 flex-wrap">
-        <Select value={month} onValueChange={setMonth}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {MONTHS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={year} onValueChange={setYear}>
-          <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-          </SelectContent>
-        </Select>
       </div>
 
+      {isError && <QueryError message="No se pudieron cargar las provisiones del período." retry={refetch} />}
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card>
@@ -95,18 +79,18 @@ export default function ProvisionsPage() {
             <CardTitle className="text-sm font-medium">Provisiones activas</CardTitle>
             <ShieldAlert className="h-4 w-4 text-yellow-500" />
           </CardHeader>
-          <CardContent><div className="text-2xl font-bold">{fmtUSD(totalActivo)}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold">{fmtUSD(provisionData ? totalActivo : null)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium">Recuperos</CardTitle>
             <ShieldAlert className="h-4 w-4 text-green-500" />
           </CardHeader>
-          <CardContent><div className="text-2xl font-bold text-green-600">{fmtUSD(totalRecupero)}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold text-green-600">{fmtUSD(provisionData ? totalRecupero : null)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Neto</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">{fmtUSD(totalActivo - totalRecupero)}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold">{fmtUSD(provisionData ? totalActivo - totalRecupero : null)}</div></CardContent>
         </Card>
       </div>
 
@@ -115,7 +99,7 @@ export default function ProvisionsPage() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center h-32 text-muted-foreground">Cargando...</div>
-          ) : rows.length === 0 ? (
+          ) : isError ? <p className="p-6 text-sm text-muted-foreground">No se puede confirmar si hay registros hasta recuperar la conexión.</p> : rows.length === 0 ? (
             <div className="flex items-center justify-center h-32 text-muted-foreground">
               No hay provisiones para {period}
             </div>

@@ -1,3 +1,5 @@
+import { QueryError } from "@/components/query-error";
+import { useFinancePeriod } from "@/hooks/use-finance-period";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -13,14 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { DollarSign, ArrowUp, ArrowDown, Wallet, Settings2, UploadCloud, Ban } from "lucide-react";
 
-const MONTHS = Array.from({ length: 12 }, (_, i) => ({
-  value: String(i + 1).padStart(2, "0"),
-  label: new Date(2000, i, 1).toLocaleString("es-AR", { month: "long" }),
-}));
-
-const YEARS = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - 1 + i));
-
-function fmtUSD(n: number) {
+function fmtUSD(n: number | null | undefined) {
+  if (n == null) return "Sin datos";
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
@@ -43,8 +39,7 @@ interface CashflowBalance {
 interface FinancialAccount { id: number; name: string; bankName?: string | null; currency: string; openingBalance: string; isActive: boolean }
 
 export default function CashflowPage() {
-  const [year, setYear] = useState(String(new Date().getFullYear()));
-  const [month, setMonth] = useState(String(new Date().getMonth() + 1).padStart(2, "0"));
+  const { period, year, month } = useFinancePeriod();
   const [banco, setBanco] = useState("todos");
   const [tipo, setTipo] = useState("todos");
   const [accountOpen, setAccountOpen] = useState(false);
@@ -55,13 +50,12 @@ export default function CashflowPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
 
-  const period = `${year}-${month}`;
 
   // Last day of selected month
   const lastDay = new Date(parseInt(year), parseInt(month), 0);
   const dateStr = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
 
-  const { data: rows = [], isLoading } = useQuery<CashflowRow[]>({
+  const { data: movementData, isLoading, isError, refetch } = useQuery<CashflowRow[]>({
     queryKey: ["/api/cashflow", period, banco, tipo],
     queryFn: () => {
       const params = new URLSearchParams({ period });
@@ -71,7 +65,7 @@ export default function CashflowPage() {
     },
   });
 
-  const { data: balance } = useQuery<CashflowBalance>({
+  const { data: balance, isError: balanceError, refetch: retryBalance } = useQuery<CashflowBalance>({
     queryKey: ["/api/cashflow/balance", dateStr],
     queryFn: () => apiRequest(`/api/cashflow/balance?date=${dateStr}`, "GET"),
     enabled: !!dateStr,
@@ -105,6 +99,7 @@ export default function CashflowPage() {
     else if (reason != null) toast({ title: "Ingresá un motivo de al menos 5 caracteres", variant: "destructive" });
   };
 
+  const rows = movementData ?? [];
   const operatingRows = rows.filter((row) => !row.transferGroupId);
   const ingresos = operatingRows.filter(r => r.tipoMovimiento === "Ingreso").reduce((s, r) => s + parseFloat(r.montoUSD ?? "0"), 0);
   const egresos = operatingRows.filter(r => r.tipoMovimiento === "Egreso").reduce((s, r) => s + parseFloat(r.montoUSD ?? "0"), 0);
@@ -112,24 +107,12 @@ export default function CashflowPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div><h1 className="text-2xl font-semibold">Cashflow</h1><p className="text-muted-foreground text-sm">Movimientos y saldos registrados directamente en Mind</p></div>
+        <div><h1 className="text-2xl font-semibold">Caja y bancos</h1><p className="text-muted-foreground text-sm">Movimientos y saldos registrados directamente en Mind</p></div>
         <div className="flex gap-2"><Button variant="outline" asChild><Link href="/finance/cargar"><UploadCloud className="mr-2 h-4 w-4" />Cargar movimientos</Link></Button><Dialog open={accountOpen} onOpenChange={setAccountOpen}><DialogTrigger asChild><Button variant="outline"><Settings2 className="mr-2 h-4 w-4" />Cuentas</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Cuentas financieras</DialogTitle></DialogHeader><div className="space-y-2">{accounts.map((account) => <div key={account.id} className="flex items-center justify-between rounded-lg border p-3 text-sm"><span>{account.name}</span><Badge variant="outline">{account.currency} · inicial {account.openingBalance}</Badge></div>)}</div><div className="grid gap-3 border-t pt-4"><div><Label>Nombre / banco</Label><Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Ej. Santander USD" /></div><div className="grid grid-cols-2 gap-3"><div><Label>Moneda</Label><Select value={accountCurrency} onValueChange={setAccountCurrency}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="USD">USD</SelectItem><SelectItem value="ARS">ARS</SelectItem><SelectItem value="EUR">EUR</SelectItem></SelectContent></Select></div><div><Label>Saldo inicial</Label><Input type="number" value={openingBalance} onChange={(e) => setOpeningBalance(e.target.value)} /></div></div><div><Label>Fecha del saldo inicial</Label><Input type="date" value={openingBalanceDate} onChange={(e) => setOpeningBalanceDate(e.target.value)} /></div><Button disabled={!accountName.trim() || !openingBalanceDate || accountMutation.isPending} onClick={() => accountMutation.mutate()}>Agregar cuenta</Button></div></DialogContent></Dialog></div>
       </div>
 
       {/* Filtros */}
       <div className="flex gap-3 flex-wrap">
-        <Select value={month} onValueChange={setMonth}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {MONTHS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={year} onValueChange={setYear}>
-          <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-          </SelectContent>
-        </Select>
         <Select value={banco} onValueChange={setBanco}>
           <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -147,6 +130,7 @@ export default function CashflowPage() {
         </Select>
       </div>
 
+      {(isError || balanceError) && <QueryError message="No se pudieron cargar los movimientos o los saldos bancarios." retry={() => { void refetch(); void retryBalance(); }} />}
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
@@ -154,38 +138,38 @@ export default function CashflowPage() {
             <CardTitle className="text-sm font-medium">Ingresos</CardTitle>
             <ArrowUp className="h-4 w-4 text-green-500" />
           </CardHeader>
-          <CardContent><div className="text-2xl font-bold text-green-600">{fmtUSD(ingresos)}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold text-green-600">{fmtUSD(movementData ? ingresos : null)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium">Egresos</CardTitle>
             <ArrowDown className="h-4 w-4 text-red-500" />
           </CardHeader>
-          <CardContent><div className="text-2xl font-bold text-red-600">{fmtUSD(egresos)}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold text-red-600">{fmtUSD(movementData ? egresos : null)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Neto</CardTitle>
+            <CardTitle className="text-sm font-medium">Movimiento neto del mes</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${ingresos - egresos >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {fmtUSD(ingresos - egresos)}
+              {fmtUSD(movementData ? ingresos - egresos : null)}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Saldo Total</CardTitle>
+            <CardTitle className="text-sm font-medium">Saldo de todas las cuentas</CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent><div className="text-2xl font-bold">{fmtUSD(balance?.totalUSD ?? 0)}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold">{fmtUSD(balance?.totalUSD)}</div><p className="mt-1 text-xs text-muted-foreground">Al cierre de {period}, sin filtrar por banco.</p></CardContent>
         </Card>
       </div>
 
       {/* Saldos por banco */}
       {balance?.balances && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {Object.entries(balance.balances as Record<string, number>).map(([bank, saldo]) => (
             <Card key={bank}>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{bank}</CardTitle></CardHeader>
@@ -200,7 +184,7 @@ export default function CashflowPage() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center h-32 text-muted-foreground">Cargando...</div>
-          ) : rows.length === 0 ? (
+          ) : isError ? <p className="p-6 text-sm text-muted-foreground">No se puede confirmar si hay registros hasta recuperar la conexión.</p> : rows.length === 0 ? (
             <div className="flex items-center justify-center h-32 text-muted-foreground">
               No hay movimientos para {period}
             </div>

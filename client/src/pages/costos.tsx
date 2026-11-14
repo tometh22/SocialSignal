@@ -1,3 +1,4 @@
+import { useFinancePeriod } from "@/hooks/use-finance-period";
 /**
  * Costos — desglose por concepto, por tipo y por equipo.
  *
@@ -7,7 +8,6 @@
  * Verificado contra el Looker (2026): Tomi Criado 54.267,46 · Honorarios Oxean
  * 54.045,32 · Vicky Puricelli 44.310,06 · Tarjeta USA 43.900 · Youscan 35.446,70.
  */
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,6 @@ import { CompactPageHeader } from "@/components/ui/compact-page-header";
 import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
 import { PageShell } from "@/components/ui/page-shell";
 import { ToolbarPanel } from "@/components/ui/toolbar-panel";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Coins, Layers, Users, Info } from "lucide-react";
 import {
@@ -24,7 +23,7 @@ import {
 } from "recharts";
 
 const fmt = (n: number | null | undefined) =>
-  n == null ? "—" : `$${n.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  n == null ? "—" : `USD ${n.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
 interface Concepto { concepto: string; montoUsd: number; sharePct: number }
 interface Mensual {
@@ -58,31 +57,23 @@ function InfoTip({ children }: { children: string }) {
 }
 
 export default function CostosPage() {
-  const currentYear = new Date().getFullYear();
-  const [year, setYear] = useState(currentYear);
+  const { year: selectedFinanceYear } = useFinancePeriod();
+  const year = Number(selectedFinanceYear);
   const { data, isLoading, error } = useQuery<Data>({
     queryKey: [`/api/v2/executive/costs?year=${year}`],
   });
 
-  const years = [currentYear + 1, currentYear, currentYear - 1, currentYear - 2];
   const topConceptos = (data?.conceptos ?? []).slice(0, 12);
   const esBoard = (c: string) => data?.boardYHolding.conceptos.includes(c) ?? false;
 
   return (
     <PageShell>
       <CompactPageHeader
-        title="Costos"
+        title="Desglose de costos"
         description="Desglose por concepto, tipo y equipo desde los registros nativos de Mind"
       />
 
-      <ToolbarPanel>
-        <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </ToolbarPanel>
+      <p className="text-sm text-muted-foreground">Ejercicio {year} · desglose anual en USD</p>
 
       {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
       {error && <p className="text-sm text-red-600">No se pudo cargar el desglose de costos.</p>}
@@ -99,7 +90,7 @@ export default function CostosPage() {
                 detail={`${data.conceptos.length} conceptos`}
               />
               <MetricCard
-                label={<span className="flex items-center justify-between gap-2"><span>Board + holding</span>
+                label={<span className="flex items-center justify-between gap-2"><span>Socios y holding</span>
                   <InfoTip>Compensación de socios y honorarios de la holding. Se muestra aparte porque es la línea más grande de la empresa y queda diluida dentro del ranking general.</InfoTip></span>}
                 value={fmt(data.boardYHolding.montoUsd)}
                 icon={<Users className="h-5 w-5" />}
@@ -110,8 +101,8 @@ export default function CostosPage() {
                 const ult = data.mensual[data.mensual.length - 1];
                 return (
                   <MetricCard
-                    label={<span className="flex items-center justify-between gap-2"><span>Overhead</span>
-                      <InfoTip>Costos indirectos sobre el costo operativo del último mes cerrado. Alto significa estructura pesada respecto del equipo asignado a clientes.</InfoTip></span>}
+                    label={<span className="flex items-center justify-between gap-2"><span>Peso de la estructura</span>
+                      <InfoTip>Costos indirectos sobre el costo operativo del último mes con costos registrados. Alto significa estructura pesada respecto del equipo asignado a clientes.</InfoTip></span>}
                     value={`${ult.overheadPct.toFixed(1)}%`}
                     icon={<Layers className="h-5 w-5" />}
                     detail={`${ult.periodKey} · ${fmt(ult.indirecto)} de ${fmt(ult.directo + ult.indirecto)}`}
@@ -125,7 +116,7 @@ export default function CostosPage() {
                   <MetricCard
                     label={<span className="flex items-center justify-between gap-2"><span>Valor hora</span>
                       <InfoTip>Costo del equipo dividido por las horas efectivamente cargadas en Asana del último mes con datos.</InfoTip></span>}
-                    value={ult.valorHora != null ? `$${ult.valorHora.toFixed(2)}` : "—"}
+                    value={ult.valorHora != null ? `USD ${ult.valorHora.toFixed(2)}` : "—"}
                     icon={<Users className="h-5 w-5" />}
                     detail={`${ult.periodKey} · ${ult.horasAsana.toFixed(0)}h cargadas`}
                   />
@@ -136,7 +127,7 @@ export default function CostosPage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  Conceptos más caros del año
+                  Principales costos del año
                   <span className="text-xs font-normal text-muted-foreground">ámbar = board y holding</span>
                 </CardTitle>
               </CardHeader>

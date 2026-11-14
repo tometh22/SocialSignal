@@ -72,9 +72,9 @@ const MISSING_FIELD_LABELS: Record<string, string> = {
   deliveryPeriod: "período de devengamiento válido",
 };
 const LOAD_GUIDE = [
-  { title: "Clientes", detail: "Facturas, fees y comprobantes de cobro", destinations: "Activo · Ingresos · Cashflow", icon: WalletCards },
-  { title: "Proveedores e impuestos", detail: "Facturas, pagos y liquidaciones", destinations: "Pasivo · Costos · Impuestos", icon: Building2 },
-  { title: "Bancos", detail: "Extractos, movimientos y transferencias propias", destinations: "Cashflow · Conciliación", icon: Landmark },
+  { title: "Clientes", detail: "Facturas, fees y comprobantes de cobro", destinations: "Cuentas por cobrar · Ingresos · Caja", icon: WalletCards },
+  { title: "Proveedores e impuestos", detail: "Facturas, pagos y liquidaciones", destinations: "Cuentas por pagar · Costos · Impuestos", icon: Building2 },
+  { title: "Bancos", detail: "Extractos, movimientos y transferencias propias", destinations: "Caja y bancos · Conciliación", icon: Landmark },
   { title: "Provisiones", detail: "Altas, recuperos y documentación de respaldo", destinations: "Provisiones", icon: ShieldAlert },
   { title: "Economía", detail: "Tipo de cambio real, REM e IPC", destinations: "Variables económicas", icon: TrendingUp },
 ];
@@ -194,10 +194,11 @@ export default function FinancialIntakePage() {
   return (
     <div className="space-y-6" onPaste={onPaste}>
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-        <div><p className="text-sm font-medium text-rose-600">Módulo operativo · separado de Reportes</p><h1 className="text-3xl font-semibold tracking-tight">Carga financiera</h1><p className="text-sm text-muted-foreground">Este es el único lugar para ingresar información financiera y económica en Mind.</p></div>
+        <div><p className="text-sm font-medium text-rose-600">Finanzas · carga y revisión</p><h1 className="text-3xl font-semibold tracking-tight">Carga financiera</h1><p className="text-sm text-muted-foreground">Ingresá un documento o mensaje, revisá el borrador y confirmá su registro. Las facturas del equipo se revisan en su propia vista.</p></div>
         <div className="flex gap-2"><Badge variant="outline">{openCount} abiertas</Badge><Badge variant={needsCount ? "destructive" : "outline"}>{needsCount} requieren atención</Badge></div>
       </div>
 
+      <details className="rounded-xl border bg-card p-3"><summary className="cursor-pointer text-sm font-medium">Qué podés cargar y dónde se registra</summary><div className="mt-3">
       <Card className="border-slate-200 bg-slate-50/70">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">¿Qué se carga acá?</CardTitle>
@@ -215,6 +216,7 @@ export default function FinancialIntakePage() {
         </CardContent>
       </Card>
 
+      </div></details>
       <div className="grid gap-3 sm:grid-cols-3">
         {[{ n: 1, title: "Cargá", text: "Texto, archivos o capturas." }, { n: 2, title: "Revisá", text: "Mind completa un borrador editable." }, { n: 3, title: "Confirmá", text: "Recién ahí impacta en Finanzas." }].map((step) => <div key={step.n} className="flex gap-3 rounded-xl border bg-white p-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-50 text-xs font-semibold text-rose-700">{step.n}</span><div><p className="text-sm font-semibold">{step.title}</p><p className="text-xs text-muted-foreground">{step.text}</p></div></div>)}
       </div>

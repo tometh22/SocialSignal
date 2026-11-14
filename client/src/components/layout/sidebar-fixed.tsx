@@ -1,3 +1,4 @@
+import { financePaths } from "@/components/finance/workspace";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -188,31 +189,8 @@ export default function SidebarFixed({ mobileMode = false, onNavigate }: Sidebar
       ]
     },
     {
-      title: "Carga financiera",
-      items: [
-        { href: "/finance/cargar", title: "Cargar datos", icon: UploadCloud, description: "Texto, archivos y capturas", permission: 'finance' as AppSection },
-        { href: "/finance/facturas-equipo", title: "Facturas equipo", icon: Receipt, description: "Comparar facturas y registrar Pasivo", permission: 'finance' as AppSection },
-      ]
-    },
-    {
-      title: "Gestión financiera",
-      items: [
-        { href: "/finance/cierre", title: "Cierre financiero", icon: LockKeyhole, description: "Checklist y cierre mensual", permission: 'finance' as AppSection },
-        { href: "/finance/cashflow", title: "Cashflow", icon: Wallet, description: "Movimientos y saldos bancarios", permission: 'finance' as AppSection },
-        { href: "/finance/activo", title: "Activo", icon: CircleArrowUp, description: "Cuentas a cobrar y activos líquidos", permission: 'finance' as AppSection },
-        { href: "/finance/pasivo", title: "Pasivo", icon: CircleArrowDown, description: "Cuentas a pagar y deudas", permission: 'finance' as AppSection },
-        { href: "/finance/provisions", title: "Provisiones", icon: ShieldAlert, description: "Provisiones y contingencias", permission: 'finance' as AppSection },
-      ]
-    },
-    {
-      title: "Reportes financieros",
-      items: [
-        { href: "/dashboard", title: "Resumen financiero", icon: LayoutDashboard, description: "KPIs económicos y operativos", anyPermissions: FINANCE_SUMMARY_ACCESS_SECTIONS },
-        { href: "/finance/proyeccion", title: "Proyección", icon: Target, description: "Ejecutado vs proyectado del ejercicio", anyPermissions: FINANCE_SUMMARY_ACCESS_SECTIONS },
-        { href: "/finance/arr", title: "ARR", icon: Repeat, description: "Ingreso recurrente anualizado", anyPermissions: FINANCE_SUMMARY_ACCESS_SECTIONS },
-        { href: "/finance/rendimiento", title: "Rendimiento", icon: Gauge, description: "Markup y margen por cliente y proyecto", anyPermissions: FINANCE_SUMMARY_ACCESS_SECTIONS },
-        { href: "/finance/costos", title: "Costos", icon: Coins, description: "Desglose por concepto, tipo y equipo", anyPermissions: FINANCE_SUMMARY_ACCESS_SECTIONS },
-      ]
+      title: "Finanzas",
+      items: [{ href: "/dashboard", title: "Finanzas", icon: Wallet, description: "Resumen, caja, cobros, pagos y proyección", anyPermissions: FINANCE_SUMMARY_ACCESS_SECTIONS }]
     },
     {
       title: "Administración",
@@ -239,7 +217,7 @@ export default function SidebarFixed({ mobileMode = false, onNavigate }: Sidebar
   const renderNavLink = (item: NavItem) => {
     const Icon = item.icon || LayoutDashboard;
     const matchesPath = (href: string) =>
-      currentPath === href || (href !== "/" && currentPath.startsWith(`${href}/`));
+      (href === "/dashboard" && financePaths.includes(currentPath)) || currentPath === href || (href !== "/" && currentPath.startsWith(`${href}/`));
     const isActive = matchesPath(item.href)
       && !visibleNavItems.some(candidate =>
         candidate.href !== item.href

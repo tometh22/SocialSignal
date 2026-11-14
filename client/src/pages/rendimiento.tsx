@@ -1,3 +1,4 @@
+import { useFinancePeriod } from "@/hooks/use-finance-period";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { MonthlyReconciliationReport } from "@shared/monthly-reconciliation";
@@ -16,7 +17,7 @@ const money = (value: number | null | undefined) => value == null ? "Sin datos"
 interface Response { periodos: string[]; periodo: string | null; report?: MonthlyReconciliationReport }
 
 export default function RendimientoPage() {
-  const [period, setPeriod] = useState<string | null>(null);
+  const { period } = useFinancePeriod();
   const [client, setClient] = useState("__all");
   const [basis, setBasis] = useState<"monthly" | "project">("monthly");
   const { data, isLoading, error, refetch } = useQuery<Response>({
@@ -32,12 +33,8 @@ export default function RendimientoPage() {
   const direct = rows.every(row => row.directCostUsd != null) ? rows.reduce((sum, row) => sum + row.directCostUsd!, 0) : null;
   const profit = direct == null ? null : sales - direct;
   return <PageShell>
-    <CompactPageHeader title="Rendimiento" description="Ventas y costos mensuales conciliados. Seguimiento acumulado de proyectos por separado." />
+    <CompactPageHeader title="Contribución por proyecto" description="Cuánto aporta cada proyecto después de sus costos directos. Los presupuestos acumulados se consultan por separado." />
     <ToolbarPanel>
-      <Select value={period ?? data?.periodo ?? ""} onValueChange={setPeriod}>
-        <SelectTrigger className="w-40" aria-label="Período"><SelectValue placeholder="Período" /></SelectTrigger>
-        <SelectContent>{(data?.periodos ?? []).map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
-      </Select>
       <Select value={client} onValueChange={setClient}>
         <SelectTrigger className="w-52 ml-2" aria-label="Cliente"><SelectValue /></SelectTrigger>
         <SelectContent><SelectItem value="__all">Todos los clientes</SelectItem>{clients.map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
@@ -69,9 +66,9 @@ export default function RendimientoPage() {
       {basis === "monthly" ? <>
         <MetricGrid>
           <MetricCard label="Ventas del mes" value={money(sales)} icon={<DollarSign />} detail="Selección de clientes" />
-          <MetricCard label="Costos directos del mes" value={money(direct)} icon={<TrendingUp />} detail="Sin overhead ni costos de otros meses" />
+          <MetricCard label="Costos directos del mes" value={money(direct)} icon={<TrendingUp />} detail="Sin estructura ni costos de otros meses" />
           <MetricCard label="Contribución del mes" value={money(profit)} icon={<Target />} detail="Ventas menos costos directos" />
-          <MetricCard label="EBIT de la empresa" value={money(report.totals.ebitUsd)} icon={<TrendingUp />} detail="Todos los clientes, con overhead" />
+          <MetricCard label="EBIT de la empresa" value={money(report.totals.ebitUsd)} icon={<TrendingUp />} detail="Todos los clientes, con costos de estructura" />
         </MetricGrid>
         <Card><CardHeader><CardTitle className="text-base">Detalle mensual por proyecto</CardTitle></CardHeader>
           <CardContent className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b text-left">
@@ -81,7 +78,7 @@ export default function RendimientoPage() {
             <td className="p-2 tabular-nums">{money(row.revenueUsd)}</td><td className="p-2 tabular-nums">{money(row.directCostUsd)}</td>
             <td className="p-2 tabular-nums">{money(row.directCostUsd == null ? null : row.revenueUsd - row.directCostUsd)}</td>
           </tr>)}</tbody></table>{!rows.length && <p className="py-4 text-muted-foreground">Sin movimientos del período.</p>}
-          <p className="mt-3 text-muted-foreground">Overhead de la empresa: {money(report.totals.overheadUsd)}. Costos operativos totales: {money(report.totals.operatingCostUsd)}.</p>
+          <p className="mt-3 text-muted-foreground">Costos de estructura de la empresa: {money(report.totals.overheadUsd)}. Costos operativos totales: {money(report.totals.operatingCostUsd)}.</p>
         </CardContent></Card>
       </> : <Card><CardHeader><CardTitle className="text-base">Seguimiento acumulado de proyectos</CardTitle></CardHeader><CardContent className="space-y-4 overflow-x-auto">
         <p className="text-sm text-muted-foreground">El mes es el del análisis. El valor del proyecto puede incluir cuotas futuras y los costos pueden abarcar varios meses. Los proyectos abiertos no se presentan como utilidad realizada.</p>

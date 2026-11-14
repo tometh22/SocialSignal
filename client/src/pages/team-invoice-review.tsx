@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useFinancePeriod } from "@/hooks/use-finance-period";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { InvoiceDocument } from "@/components/invoice-document";
 import { Link } from "wouter";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -67,7 +68,9 @@ export default function TeamInvoiceReview() {
   const { hasPermission } = usePermissions();
   const [focusedInvoiceId, setFocusedInvoiceId] = useState<number | null>(() => selectedId("invoiceId"));
   const [focusedPersonnelId, setFocusedPersonnelId] = useState<number | null>(() => selectedId("personnelId"));
-  const [period, setPeriod] = useState(() => { const saved = new URLSearchParams(window.location.search).get("period"); return saved && /^\d{4}-(0[1-9]|1[0-2])$/.test(saved) ? saved : currentPeriod(); });
+  const { period, setPeriod } = useFinancePeriod();
+  const previousPeriod = useRef(period);
+  useEffect(() => { if (previousPeriod.current !== period) { previousPeriod.current = period; setFocusedInvoiceId(null); setFocusedPersonnelId(null); } }, [period]);
   useEffect(() => { const url = new URL(window.location.href); url.searchParams.set("period",period); for (const [key, value] of [["invoiceId", focusedInvoiceId], ["personnelId", focusedPersonnelId]] as const) { if (value) url.searchParams.set(key, String(value)); else url.searchParams.delete(key); } window.history.replaceState(window.history.state,"",url); }, [period, focusedInvoiceId, focusedPersonnelId]);
   const [search, setSearch] = useState("");
   const [correction, setCorrection] = useState<ReviewInvoice | null>(null);

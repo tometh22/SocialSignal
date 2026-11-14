@@ -15,7 +15,7 @@ test('separates monthly results from open project budgets and fits mobile', asyn
   const writes: string[] = [];
   page.on('request', request => { if (request.url().includes('/rendimiento') && request.method() !== 'GET') writes.push(request.method()); });
   await page.route('**/api/v2/executive/rendimiento*', route => route.fulfill({ json: { periodos: ['2026-10'], periodo: '2026-10', report } }));
-  await page.goto('/finance/rendimiento');
+  await page.goto('/finance/rendimiento?period=2026-10');
   await expect(page.getByTestId('reconciliation-status')).toContainText('coincide');
   await expect(page.getByTestId('monthly-reconciliation')).toContainText('1.000,00');
   await expect(page.getByRole('cell', { name: 'Contrato futuro', exact: true })).toHaveCount(0);
@@ -33,7 +33,7 @@ test('separates monthly results from open project budgets and fits mobile', asyn
 test('unavailable sources show a retry instead of a reconciled zero', async ({ page }) => {
   await page.request.post('/api/login', { data: { email: 'e2e-0@example.test', password: 'mind-local-test-only' } });
   await page.route('**/api/v2/executive/rendimiento*', route => route.fulfill({ status: 503, json: { message: 'Source unavailable' } }));
-  await page.goto('/finance/rendimiento');
+  await page.goto('/finance/rendimiento?period=2026-10');
   await expect(page.getByRole('button', { name: 'Reintentar', exact: true })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('monthly-reconciliation')).toHaveCount(0);
 });

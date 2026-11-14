@@ -915,8 +915,8 @@ const authoredTrainingLessons: AuthoredLesson[] = [
       },
     ],
     instructions: [
-      "Entrá a Cierre financiero y elegí el período.",
-      "Ejecutá el pre-cierre y revisá los controles críticos y advertencias del checklist.",
+      "En Finanzas elegí el mes de referencia y abrí Revisar cierre.",
+      "Elegí Revisar pendientes y comprobá los controles críticos y las advertencias antes de avanzar al cierre.",
       "Corregí los registros de origen y volvé a ejecutar los controles hasta resolver las diferencias.",
       "Enviá el período a revisión cuando corresponda. El cierre definitivo y la reapertura los realiza un administrador.",
     ],
@@ -927,7 +927,7 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     id: "cashflow",
     version: 3,
     module: "Finanzas",
-    title: "Cashflow",
+    title: "Caja y bancos",
     access: {
       audience: "internal",
       any: ["finance"],
@@ -935,7 +935,7 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     covers: ["/finance/cashflow"],
     description: "Revisá movimientos reales y saldos de cuentas.",
     explanation: [
-      "Abrí Cashflow y filtrá el período y cuenta que necesitás revisar. Diferenciá un movimiento de dinero de una factura pendiente.",
+      "Entrá a Finanzas → Caja y elegí el mes de referencia y la cuenta que necesitás revisar. Diferenciá un movimiento de dinero de una factura pendiente.",
       "Antes de registrar o conciliar, comprobá fecha, moneda, importe y cuenta contra la evidencia. Una transferencia entre cuentas no es una venta nueva.",
       "Si un cobro o pago ya está vinculado a su documento, revisá esa aplicación antes de cargar otro movimiento.",
     ],
@@ -944,12 +944,12 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     minutes: 1,
     links: [
       {
-        label: "Abrir Cashflow",
+        label: "Abrir Caja y bancos",
         href: "/finance/cashflow",
       },
     ],
     instructions: [
-      "Entrá a Cashflow y filtrá por período y cuenta.",
+      "Entrá a Finanzas → Caja. El mes de referencia se conserva al pasar a otras vistas.",
       "Contrastá los movimientos con la evidencia: fecha, moneda, importe y cuenta.",
       "Antes de registrar o conciliar, comprobá si el cobro o pago ya está vinculado a un documento.",
       "Revisá los saldos y las aplicaciones resultantes. Identificá las transferencias entre cuentas para no tratarlas como ventas.",
@@ -960,7 +960,7 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     id: "activo-pasivo",
     version: 3,
     module: "Finanzas",
-    title: "Activo y Pasivo",
+    title: "Cuentas por cobrar y por pagar",
     access: {
       audience: "internal",
       any: ["finance"],
@@ -968,7 +968,7 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     covers: ["/finance/activo", "/finance/pasivo"],
     description: "Distinguí cuentas a cobrar, obligaciones y aplicaciones.",
     explanation: [
-      "En Activo revisá cuentas a cobrar y activos líquidos. En Pasivo revisá cuentas a pagar y deudas, con sus fechas y saldos.",
+      "En Finanzas → Cobros y pagos revisá Por cobrar, Por pagar y Provisiones. Consultá las fechas y los saldos de cada documento.",
       "Un cobro o pago parcial reduce el saldo pendiente del documento al que se aplica; no cambia su importe original.",
       "Antes de aplicar un movimiento, verificá contraparte, documento, moneda e importe. Consultá los vínculos para evitar aplicar dos veces el mismo comprobante.",
     ],
@@ -977,16 +977,16 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     minutes: 1,
     links: [
       {
-        label: "Abrir Activo",
+        label: "Abrir Cuentas por cobrar",
         href: "/finance/activo",
       },
       {
-        label: "Abrir Pasivo",
+        label: "Abrir Cuentas por pagar",
         href: "/finance/pasivo",
       },
     ],
     instructions: [
-      "Entrá a Activo para consultar cuentas a cobrar y activos líquidos, o a Pasivo para cuentas a pagar y deudas.",
+      "Entrá a Finanzas → Cobros y pagos y elegí Por cobrar o Por pagar. El mes de referencia es compartido con las demás vistas.",
       "Ubicá el documento y revisá contraparte, moneda, vencimiento y saldo pendiente.",
       "Antes de aplicar un cobro o pago, verificá su importe y los vínculos existentes para evitar duplicados.",
       "Comprobá el saldo resultante. Una aplicación parcial reduce lo pendiente y conserva el importe original del documento.",
@@ -1046,12 +1046,12 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     ],
     description: "Interpretá indicadores usando períodos y bases comparables.",
     explanation: [
-      "En Resumen financiero elegí el período y revisá los indicadores junto a su contexto. Proyección compara ejecutado y proyectado; ARR muestra ingreso recurrente anualizado.",
-      "Rendimiento permite revisar markup y margen por cliente y proyecto. Son medidas distintas: el markup compara con costo y el margen con ingreso.",
+      "Entrá a Finanzas y elegí el mes de referencia. Resumen destaca ventas, costos operativos, ganancia neta y caja; debajo muestra los datos pendientes de completar.",
+      "En Clientes y proyectos, Contribución por proyecto separa las ventas y costos del mes del seguimiento acumulado. El markup de cierre solo se calcula para los proyectos cerrados.",
       "En Costos revisá el desglose por concepto, tipo y equipo. Antes de comparar reportes, alineá período, moneda y filtros. Un saldo bancario no equivale a rentabilidad.",
     ],
     example:
-      "Un proyecto tiene ingresos de 150 y costos de 100. El resultado es 50: markup 50% sobre costo y margen aproximado 33,3% sobre ingreso.",
+      "Un proyecto tiene ingresos de 150 y costos de 100. Su contribución es 50; la relación valor/costo es 1,5× y el margen es aproximadamente 33,3% de las ventas.",
     minutes: 1,
     links: [
       {
@@ -1063,11 +1063,11 @@ const authoredTrainingLessons: AuthoredLesson[] = [
         href: "/finance/proyeccion",
       },
       {
-        label: "Abrir ARR",
+        label: "Abrir Ingresos recurrentes",
         href: "/finance/arr",
       },
       {
-        label: "Abrir Rendimiento",
+        label: "Abrir Contribución por proyecto",
         href: "/finance/rendimiento",
       },
       {
@@ -1076,12 +1076,12 @@ const authoredTrainingLessons: AuthoredLesson[] = [
       },
     ],
     instructions: [
-      "Entrá a Resumen financiero y elegí el período.",
-      "Para comparar ejecutado y proyectado, consultá Proyección; para ingreso recurrente anualizado, ARR.",
-      "Para revisar markup y margen por cliente o proyecto, consultá Rendimiento. Para desglosar conceptos y equipo, consultá Costos.",
+      "Entrá a Finanzas → Resumen y elegí el mes de referencia compartido.",
+      "Para comparar meses cerrados y estimados, consultá Proyección; para ingresos mensuales Fee y su equivalente anual, abrí Clientes y proyectos → Ingresos recurrentes.",
+      "En Clientes y proyectos podés consultar la contribución mensual, el seguimiento acumulado y el desglose anual de costos. Los importes pendientes no deben interpretarse como cero.",
       "Antes de comparar resultados, alineá período, moneda y filtros. Abrí el detalle disponible para entender las diferencias.",
     ],
-    verification: "Markup usa costo como base; margen usa ingreso.",
+    verification: "La contribución resta costos directos; la relación valor/costo se expresa en veces y el margen usa las ventas como base.",
   },
   {
     id: "analisis-financiero",
@@ -1108,7 +1108,7 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     minutes: 1,
     links: [
       {
-        label: "Abrir Rendimiento",
+        label: "Abrir Contribución por proyecto",
         href: "/finance/rendimiento",
       },
     ],

@@ -21,12 +21,14 @@ test('dashboard identifies Master source, partial net/margin and the balance per
   });
   await page.request.post('/api/login', { data: { email:'e2e-0@example.test', password:'mind-local-test-only' } });
   await page.goto('/dashboard');
+  await page.getByText('Comparar trimestre, año o rango personalizado',{exact:true}).click();
   await page.getByRole('button',{name:'Año',exact:true}).click();
   await expect(page.getByText('Fuente: Máster',{exact:true})).toBeVisible();
-  await expect(page.getByText('Beneficio Neto (parcial)',{exact:true})).toBeVisible();
+  await expect(page.getByText('Ganancia neta (parcial)',{exact:true})).toBeVisible();
+  await page.getByText('Indicadores de rentabilidad: resultado operativo, márgenes y markup', {exact:true}).click();
   await expect(page.getByText('Margen Neto (parcial)',{exact:true})).toBeVisible();
-  await expect(page.getByText('$12.000,00',{exact:true}).first()).toBeVisible();
-  await expect(page.getByText('$2.000,00',{exact:true}).first()).toBeVisible();
+  await expect(page.getByText('USD 12.000,00',{exact:true}).first()).toBeVisible();
+  await expect(page.getByText('USD 2.000,00',{exact:true}).first()).toBeVisible();
   await expect(page.getByText('20.00%',{exact:true}).first()).toBeVisible();
   await expect(page.getByText('al cierre de 09 sep',{exact:false})).toBeVisible();
   const adjustments = page.getByText('– Ajustes al neto',{exact:true}).locator('../..');
@@ -39,6 +41,6 @@ test('losses retain their minus sign in the income statement', async ({ page }) 
   await page.route('**/api/v2/executive/dashboard?*',route=>route.fulfill({json:{filtered,data:[filtered],available:[filtered.periodKey]}}));
   await page.request.post('/api/login',{data:{email:'e2e-0@example.test',password:'mind-local-test-only'}});
   await page.goto('/dashboard');
-  await expect(page.getByText('= EBIT Operativo',{exact:true}).locator('../..')).toContainText('$-123,45');
-  await expect(page.getByText('= Beneficio Neto',{exact:true}).locator('../..')).toContainText('$-150,67');
+  await expect(page.getByText('= EBIT Operativo',{exact:true}).locator('../..')).toContainText('USD -123,45');
+  await expect(page.getByText('= Beneficio Neto',{exact:true}).locator('../..')).toContainText('USD -150,67');
 });
