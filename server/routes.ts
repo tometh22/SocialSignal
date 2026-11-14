@@ -9708,12 +9708,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/v2/executive/recurring", requireAuth, requirePermission("dashboard", "finance"), async (req, res) => {
     try {
-      const svc = await import('./services/recurring-revenue');
-      const disponibles = await svc.getPeriodosDisponibles();
-      const periodo = parsePeriodo(req.query.period) ?? disponibles[0];
+      const svc = await import('./services/monthly-reconciliation');
+      if (req.query.period !== undefined && !parsePeriodo(req.query.period)) return res.status(400).json({ message: 'Período inválido' });
+      const disponibles = await svc.getReconciliationPeriods();
+      const periodo = parsePeriodo(req.query.period) ?? svc.defaultReconciliationPeriod(disponibles);
       if (!periodo) return res.json({ periodos: [], data: null });
-      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
-      res.json({ periodos: disponibles, data: await svc.getRecurringRevenue(periodo) });
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json({ periodos: disponibles, data: await svc.getMonthlyRecurringRevenue(periodo) });
     } catch (error: any) {
       console.error('❌ Recurring revenue error:', error?.message || error);
       res.status(500).json({ message: 'Error obteniendo el ingreso recurrente', error: error?.message });
@@ -9722,12 +9723,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/v2/executive/rendimiento", requireAuth, requirePermission("dashboard", "finance"), async (req, res) => {
     try {
-      const svc = await import('./services/recurring-revenue');
-      const disponibles = await svc.getPeriodosDisponibles();
-      const periodo = parsePeriodo(req.query.period) ?? disponibles[0];
+      const svc = await import('./services/monthly-reconciliation');
+      if (req.query.period !== undefined && !parsePeriodo(req.query.period)) return res.status(400).json({ message: 'Período inválido' });
+      const disponibles = await svc.getReconciliationPeriods();
+      const periodo = parsePeriodo(req.query.period) ?? svc.defaultReconciliationPeriod(disponibles);
       if (!periodo) return res.json({ periodos: [], periodo: null, filas: [] });
-      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
-      res.json({ periodos: disponibles, periodo, filas: await svc.getRendimiento(periodo) });
+      res.setHeader('Cache-Control', 'private, no-store');
+      const report = await svc.getMonthlyReconciliation(periodo);
+      res.json({ periodos: disponibles, periodo, report });
     } catch (error: any) {
       console.error('❌ Rendimiento error:', error?.message || error);
       res.status(500).json({ message: 'Error obteniendo el rendimiento', error: error?.message });
@@ -22037,30 +22040,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== SYNC FINANCIAL SOT FROM RENDIMIENTO CLIENTE ====================
   // Sincronizar financial_sot desde "Rendimiento Cliente"
   app.get('/internal/sync/financial', requireAuth, requirePermission("admin"), async (req: Request, res: Response) => {
-    try {
-      const configuredCutover = await getCutoverDate();
-      if (configuredCutover) return res.status(409).json({ error: `La sincronización financiera desde Sheets está desactivada desde el corte ${configuredCutover}.` });
-      console.log('🔄 SYNC FINANCIAL: Starting sync from "Rendimiento Cliente"');
-      
-      const { importRendimientoCliente } = await import('./etl/rendimiento-cliente');
-      const result = await importRendimientoCliente();
-      
-      console.log(`✅ SYNC FINANCIAL: Completed - ${result.inserted} inserted/updated`);
-      
-      return res.json({
-        ok: true,
-        rows: result.inserted,
-        upserts: result.inserted,
-        errors: result.errors,
-        timestamp: new Date().toISOString()
-      });
-      
-    } catch (error) {
-      console.error('❌ SYNC FINANCIAL Error:', error);
-      return res.status(500).json({
-        error: error instanceof Error ? (error as Error).message : String(error)
-      });
-    }
+    return res.status(409).json({ error: 'Rendimiento Cliente contiene presupuestos y costos acumulados. Ya no se importa como facturación mensual. Consultá Rendimiento para ver ambas bases separadas.' });
   });
 
   // ==================== SYNC MONTHLY AGGREGATES (ETL 3 VISTAS) ====================

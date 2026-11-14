@@ -1,9 +1,18 @@
 # Changelog
 
-## 1.14.52 — 2026-11-13
+## 1.14.54 — 2026-11-14
 
 - Las tarjetas del Pipeline comercial (Resumen, Concentración y Alertas) tienen una ayuda que explica qué mide cada número y cómo se calcula; se abre al pasar el mouse o tocándola en el celular, también en el enlace compartido.
 - La probabilidad es más fácil de encontrar: sección propia "Probabilidad" en la ficha, acceso directo desde la probabilidad de cada oportunidad en la lista (también en celular) y, en la pestaña Probabilidad, la lista de oportunidades abiertas con su probabilidad, de dónde sale y un botón Ajustar.
+## 1.14.53 — 2026-11-13
+
+- El catálogo de consultas de Mind identifica el seguimiento heredado como presupuestos y costos acumulados, aclara que el mes de análisis puede moverse y dirige las consultas mensuales al resumen financiero. Los hechos nativos se distinguen por su procedencia para evitar volver a mezclar las dos bases al consultar desde asistentes.
+
+## 1.14.52 — 2026-11-13
+
+- Rendimiento concilia ventas y costos del mes con el resumen financiero usando una misma lectura del Máster, o las fuentes nativas cuando el período ya opera en Mind. Muestra diferencias, costos estimados y datos faltantes.
+- Los presupuestos y costos acumulados quedan en Proyectos acumulados, con el estado del proyecto y markup solo de los cerrados. ARR usa las ventas Fee mensuales. El seguimiento acumulado deja de generar ventas y hechos mensuales en las sincronizaciones automáticas o manuales.
+- Pruebas de bases mensuales y acumuladas, precisión, fuentes incompletas, cierres nativos, permisos y navegación móvil.
 
 ## 1.14.51 — 2026-11-13
 

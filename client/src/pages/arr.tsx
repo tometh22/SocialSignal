@@ -1,12 +1,8 @@
 /**
  * ARR — ingreso recurrente anualizado.
  *
- * Reemplaza la página "ARR" del Looker Studio. Sale de financial_sot, que es la
- * solapa "Rendimiento Cliente" del Excel MAESTRO.
- *
- * MRR = facturación de proyectos con Tipo = "Fee" del mes. ARR = MRR × 12.
- * Verificado contra el Looker (jul-2026): MRR 45.081,72 y Warner ARR 420.420,
- * exactos.
+ * Usa las ventas mensuales de la misma fuente del resumen financiero.
+ * MRR = ventas tipo Fee del mes. ARR = MRR × 12.
  */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -66,7 +62,7 @@ export default function ArrPage() {
     <PageShell>
       <CompactPageHeader
         title="ARR"
-        description="Ingreso recurrente anualizado, sobre facturación de proyectos tipo Fee"
+        description="Ventas tipo Fee del mes y su equivalente anualizado, en la misma base del resumen financiero"
       />
 
       <ToolbarPanel>
@@ -99,7 +95,7 @@ export default function ArrPage() {
                 {
                   label: "ARR", icon: Repeat, value: fmt(d.arr),
                   detail: "MRR × 12",
-                  tip: "MRR anualizado. Mide recurrencia ejecutada: la fuente sólo tiene meses cerrados, no proyecta hacia adelante.",
+                  tip: "Ventas tipo Fee del mes multiplicadas por 12. Es una anualización del mes seleccionado; puede incluir ventas programadas y no acredita facturas emitidas ni contratos de doce meses.",
                 },
                 {
                   label: "Ingreso recurrente", icon: Percent, value: `${d.feeSharePct.toFixed(1)}%`,
