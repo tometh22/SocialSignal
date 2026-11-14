@@ -84,7 +84,7 @@ export default function ProyeccionPage() {
     <PageShell>
       <CompactPageHeader
         title="Proyección del año"
-        description="Ejecutado contra proyectado del ejercicio, con la base anual del Máster"
+        description="Meses cerrados y estimados del ejercicio. Los gastos sin importe siguen pendientes y pueden cambiar el resultado proyectado."
       />
 
       <ToolbarPanel>

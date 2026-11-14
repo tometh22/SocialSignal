@@ -220,7 +220,7 @@ export default function ExecutiveDashboardV2() {
             {viewMode === "year" && (
               <Badge className="text-[10px] bg-indigo-100 text-indigo-700 border border-indigo-200">
                 Acumulado año · Ene → {(d as any)._ytdLastMonthLabel ?? d.monthLabel}
-                {(d as any)._ytdMonthCount != null ? ` · ${(d as any)._ytdMonthCount} meses cerrados` : ""}
+                {(d as any)._ytdMonthCount != null ? ` · ${(d as any)._ytdMonthCount} meses incluidos` : ""}
               </Badge>
             )}
             {viewMode === "custom" && (
@@ -233,7 +233,7 @@ export default function ExecutiveDashboardV2() {
           <MetricGrid>
             <MetricCard label="Ventas del período" value={fmt(d.ventasDelMes)} icon={<DollarSign />} detail="Sin IVA · pueden incluir ventas programadas" />
             <MetricCard label="Costos operativos" value={fmt(d.ventasDelMes != null && d.ebitOperativo != null ? d.ventasDelMes - d.ebitOperativo : null)} icon={<TrendingDown />} detail={incompleteCosts ? 'Pendientes de completar' : 'Base del resultado operativo'} />
-            <MetricCard label={d.beneficioNetoParcial ? 'Ganancia neta (parcial)' : 'Ganancia neta'} value={fmt(d.beneficioNeto)} icon={<TrendingUp />} detail="Después de ajustes e impuestos de la fuente" />
+            <MetricCard label={d.beneficioNetoParcial ? 'Ganancia neta (parcial)' : 'Ganancia neta'} value={fmt(d.beneficioNeto)} icon={<TrendingUp />} detail={d.beneficioNetoParcial ? "Solo meses con resultado neto disponible" : "Después de ajustes e impuestos de la fuente"} />
             <MetricCard label="Caja disponible" value={fmt(d.activoLiquido)} icon={<Wallet />} detail="Saldo informado · distinto del resultado del mes" />
           </MetricGrid>
           {viewMode === "month" && <Card data-testid="finance-data-status"><CardContent className="space-y-2 pt-4 text-sm">
