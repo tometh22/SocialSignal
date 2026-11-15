@@ -3,20 +3,16 @@ import { useFinancePeriod } from "@/hooks/use-finance-period";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
+import { PageShell } from "@/components/ui/page-shell";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { DollarSign, AlertCircle, Clock, CheckCircle, ChevronLeft, ChevronRight, UploadCloud, Ban } from "lucide-react";
+import { FinanceHeader, FinancePagination, FinanceTableCard, StatusPill, formatDate, formatUsd, periodLabel, useReasonDialog } from "@/components/finance/ui";
+import { DollarSign, AlertCircle, Clock, CheckCircle, UploadCloud, Ban } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-
-function fmtUSD(n: number | null | undefined) {
-  if (n == null) return "Sin datos";
-  return new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
-}
+import { cn } from "@/lib/utils";
 
 type LedgerPage<T> = {
   items: T[];
@@ -30,7 +26,7 @@ export default function PasivoPage() {
   const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-
+  const reason = useReasonDialog();
 
   useEffect(() => { setPage(1); }, [period]);
 
@@ -58,192 +54,89 @@ export default function PasivoPage() {
     },
     onError: (error: Error) => toast({ title: "No se pudo anular", description: error.message, variant: "destructive" }),
   });
-  const voidRow = (row: any) => {
-    const reason = window.prompt(`Motivo de anulación de ${row.documentNumber || row.detalle || "la factura"}:`);
-    if (reason?.trim() && reason.trim().length >= 5) voidMutation.mutate({ id: row.id, reason: reason.trim() });
-    else if (reason != null) toast({ title: "Ingresá un motivo de al menos 5 caracteres", variant: "destructive" });
+  const voidRow = async (row: any) => {
+    const text = await reason.ask({ title: `Anular ${row.documentNumber || row.detalle || "la factura"}`, description: "La obligación deja de contar como saldo por pagar. Indicá por qué se anula.", confirmLabel: "Anular factura", destructive: true });
+    if (text) voidMutation.mutate({ id: row.id, reason: text });
   };
 
-  const subtipoEntries = Object.entries(summary?.bySubtipo ?? {}) as [string, number][];
+  const subtipoEntries = (Object.entries(summary?.bySubtipo ?? {}) as [string, number][]).sort(([, a], [, b]) => b - a);
+  const subtipoTotal = subtipoEntries.reduce((sum, [, value]) => sum + Number(value || 0), 0);
+  const overdue = summary?.vencido == null ? null : Number(summary.vencido);
+  const chip = (selected: boolean) => cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+    selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground");
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div><h1 className="text-2xl font-bold">Cuentas por pagar</h1><p className="text-muted-foreground text-sm">Obligaciones y pagos registrados directamente en Mind</p></div>
-        <Button asChild><Link href="/finance/cargar"><UploadCloud className="mr-2 h-4 w-4" />Cargar información</Link></Button>
-      </div>
+    <PageShell width="wide" spacing="compact">
+      <FinanceHeader
+        title="Cuentas por pagar"
+        description={`Obligaciones, pagos y saldos de ${periodLabel(period)}.`}
+        actions={<Button asChild variant="outline"><Link href={`/finance/cargar?period=${period}`}><UploadCloud className="mr-2 h-4 w-4" />Cargar facturas</Link></Button>}
+      />
 
-      {/* Filtros */}
-      <div className="flex gap-3 flex-wrap">
-        <Select value={estado} onValueChange={(value) => { setEstado(value); setPage(1); }}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+      {(isError || summaryError) && <QueryError message="No se pudieron cargar todos los datos del período. Los importes no disponibles se muestran como Sin datos." retry={() => { void refetch(); void retrySummary(); }} />}
+      <MetricGrid>
+        <MetricCard label="Obligaciones del mes" value={formatUsd(summary?.total)} icon={<DollarSign />} tone="neutral" />
+        <MetricCard label="Pagado" value={formatUsd(summary?.pagado)} icon={<CheckCircle />} tone="success" />
+        <MetricCard label="Pendiente" value={formatUsd(summary?.pendiente)} icon={<Clock />} tone="warning" detail="Todavía dentro del plazo" />
+        <MetricCard label="Vencido" value={formatUsd(summary?.vencido)} icon={<AlertCircle />} tone={overdue ? "danger" : "neutral"} detail={overdue ? "Pagos atrasados" : undefined} />
+      </MetricGrid>
+
+      <FinanceTableCard
+        title="Facturas y obligaciones"
+        description={subtipoEntries.length > 0 ? "Filtrá por tipo de gasto con los botones de abajo." : "Saldo pendiente de cada obligación al cierre del mes."}
+        toolbar={<Select value={estado} onValueChange={(value) => { setEstado(value); setPage(1); }}>
+          <SelectTrigger className="h-9 w-44" aria-label="Filtrar por estado"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos los estados</SelectItem>
             <SelectItem value="pagado">Pagado</SelectItem>
             <SelectItem value="pendiente">Pendiente</SelectItem>
             <SelectItem value="vencido">Vencido</SelectItem>
           </SelectContent>
-        </Select>
-      </div>
-
-      {(isError || summaryError) && <QueryError message="No se pudieron cargar todos los datos del período. Los importes no disponibles se muestran como Sin datos." retry={() => { void refetch(); void retrySummary(); }} />}
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Obligaciones del mes</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent><div className="text-2xl font-bold">{fmtUSD(summary?.total)}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Pagado</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent><div className="text-2xl font-bold text-green-600">{fmtUSD(summary?.pagado)}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Pendiente</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent><div className="text-2xl font-bold text-yellow-600">{fmtUSD(summary?.pendiente)}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Vencido</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent><div className="text-2xl font-bold text-red-600">{fmtUSD(summary?.vencido)}</div></CardContent>
-        </Card>
-      </div>
-
-      {/* Desglose por subtipo */}
-      {subtipoEntries.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">Por subtipo de costo</CardTitle></CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {subtipoEntries.sort(([, a], [, b]) => b - a).map(([key, val]) => (
-                <button
-                  key={key}
-                  onClick={() => { setSubtipo(subtipo === key ? "todos" : key); setPage(1); }}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                    subtipo === key ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"
-                  }`}
-                >
-                  {key} · {fmtUSD(val)}
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Tabla */}
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="space-y-3 p-5" aria-label="Cargando cuentas a pagar">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <Skeleton key={index} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : isError ? (
-            <div className="flex min-h-40 flex-col items-center justify-center gap-3 px-6 text-center">
-              <p className="text-sm font-medium">No pudimos cargar las cuentas a pagar.</p>
-              <Button variant="outline" size="sm" onClick={() => refetch()}>Reintentar</Button>
-            </div>
-          ) : rows.length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-muted-foreground">
-              No hay registros para {period}
-            </div>
-          ) : (
-            <>
-              <div className={`overflow-x-auto transition-opacity ${isFetching ? "opacity-60" : "opacity-100"}`}>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Detalle</TableHead>
-                      <TableHead>Subtipo</TableHead>
-                      <TableHead>Emisión</TableHead>
-                      <TableHead>Vencimiento</TableHead>
-                      <TableHead className="text-right">Monto USD</TableHead>
-                      <TableHead className="text-right">Saldo</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Fuente</TableHead>
-                      <TableHead className="text-right">Acción</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map((row: any) => (
-                      <TableRow key={row.id}>
-                        <TableCell className="max-w-[240px] truncate font-medium">{row.detalle}</TableCell>
-                        <TableCell>
-                          {row.subtipoCosto ? (
-                            <Badge variant="outline" className="text-xs">{row.subtipoCosto}</Badge>
-                          ) : "-"}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {row.fechaEmision ? new Date(row.fechaEmision).toLocaleDateString("es-AR") : "-"}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {row.fechaVencimiento ? new Date(row.fechaVencimiento).toLocaleDateString("es-AR") : "-"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {fmtUSD(Number(row.montoTotalUSD ?? 0))}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">{fmtUSD(Number(row.outstandingUSD ?? row.montoTotalUSD ?? 0))}</TableCell>
-                        <TableCell>
-                          {row.pagadoAlCierre ? (
-                            <Badge className="bg-green-100 text-green-800">Pagado</Badge>
-                          ) : row.status === "PARTIAL" ? (
-                            <Badge variant="outline">Parcial</Badge>
-                          ) : row.vencido ? (
-                            <Badge variant="destructive">Vencido</Badge>
-                          ) : (
-                            <Badge variant="secondary">Pendiente</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {row.overrideManual ? "Mind" : "Histórico"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right"><Button size="sm" variant="ghost" disabled={voidMutation.isPending} onClick={() => voidRow(row)}><Ban className="mr-1 h-4 w-4" />Anular</Button></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <div className="flex flex-col gap-3 border-t px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-muted-foreground">
-                  {pagination?.total ?? 0} registros · Página {pagination?.page ?? 1} de {Math.max(1, pagination?.totalPages ?? 1)}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage((current) => Math.max(1, current - 1))}
-                    disabled={page <= 1 || isFetching}
-                  >
-                    <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage((current) => current + 1)}
-                    disabled={page >= (pagination?.totalPages ?? 1) || isFetching}
-                  >
-                    Siguiente <ChevronRight className="ml-1 h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+        </Select>}
+        loading={isLoading} error={isError} onRetry={refetch} empty={rows.length === 0} dimmed={isFetching}
+        emptyMessage={subtipo === "todos" ? `No hay obligaciones en ${periodLabel(period)}.` : `No hay obligaciones de ${subtipo} en ${periodLabel(period)}.`}
+        footer={<FinancePagination page={pagination?.page ?? page} total={pagination?.total ?? 0} totalPages={pagination?.totalPages ?? 1} busy={isFetching} onPage={setPage} />}
+        subheader={subtipoEntries.length > 0 && <div role="group" aria-label="Filtrar por tipo de gasto" className="flex flex-wrap gap-2 border-b bg-muted/30 px-4 py-3 sm:px-5">
+          <button type="button" aria-pressed={subtipo === "todos"} className={chip(subtipo === "todos")} onClick={() => { setSubtipo("todos"); setPage(1); }}>Todos · {formatUsd(subtipoTotal)}</button>
+          {subtipoEntries.map(([key, val]) => <button key={key} type="button" aria-pressed={subtipo === key} className={chip(subtipo === key)} onClick={() => { setSubtipo(subtipo === key ? "todos" : key); setPage(1); }}>{key} · {formatUsd(val)}</button>)}
+        </div>}
+      >
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Detalle</TableHead>
+              <TableHead>Tipo de gasto</TableHead>
+              <TableHead>Emisión</TableHead>
+              <TableHead>Vencimiento</TableHead>
+              <TableHead className="text-right">Monto</TableHead>
+              <TableHead className="text-right">Saldo</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead className="w-px text-right"><span className="sr-only">Acciones</span></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row: any) => {
+              const outstanding = Number(row.outstandingUSD ?? row.montoTotalUSD ?? 0);
+              return <TableRow key={row.id}>
+                <TableCell className="max-w-[280px]"><span className="block truncate font-medium" title={row.detalle || undefined}>{row.detalle || "—"}</span><span className="text-xs text-muted-foreground">{row.overrideManual ? "Registrado en Mind" : "Histórico"}</span></TableCell>
+                <TableCell className="text-sm text-muted-foreground">{row.subtipoCosto || "—"}</TableCell>
+                <TableCell className="whitespace-nowrap text-sm">{formatDate(row.fechaEmision)}</TableCell>
+                <TableCell className="whitespace-nowrap text-sm">{formatDate(row.fechaVencimiento)}</TableCell>
+                <TableCell className="whitespace-nowrap text-right tabular-nums">{formatUsd(Number(row.montoTotalUSD ?? 0))}</TableCell>
+                <TableCell className={`whitespace-nowrap text-right font-medium tabular-nums ${outstanding > 0 ? "" : "text-muted-foreground"}`}>{formatUsd(outstanding)}</TableCell>
+                <TableCell>
+                  {row.pagadoAlCierre ? <StatusPill tone="success">Pagado</StatusPill>
+                    : row.status === "PARTIAL" ? <StatusPill tone="info">Parcial</StatusPill>
+                    : row.vencido ? <StatusPill tone="danger">Vencido</StatusPill>
+                    : <StatusPill tone="warning">Pendiente</StatusPill>}
+                </TableCell>
+                <TableCell className="text-right"><Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-red-700" aria-label="Anular" title="Anular" disabled={voidMutation.isPending} onClick={() => void voidRow(row)}><Ban className="h-4 w-4" /></Button></TableCell>
+              </TableRow>;
+            })}
+          </TableBody>
+        </Table>
+      </FinanceTableCard>
+      {reason.dialog}
+    </PageShell>
   );
 }

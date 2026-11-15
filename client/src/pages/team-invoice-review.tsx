@@ -7,6 +7,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Check, FileText, Loader2, Receipt, Search, X } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { PageShell } from "@/components/ui/page-shell";
+import { FinanceHeader } from "@/components/finance/ui";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,7 +45,7 @@ function currentPeriod() {
 
 function money(value: number | null | undefined, currency: "ARS" | "USD") {
   if (value == null || !Number.isFinite(Number(value))) return "—";
-  return new Intl.NumberFormat(currency === "ARS" ? "es-AR" : "en-US", {
+  return new Intl.NumberFormat("es-AR", {
     style: "currency", currency, currencyDisplay: currency === "USD" ? "code" : "symbol", maximumFractionDigits: 2,
   }).format(Number(value));
 }
@@ -112,7 +114,7 @@ export default function TeamInvoiceReview() {
     return target.amount > 0 && Math.abs(Number(invoice.declared_invoice_amount ?? 0) - target.amount) > (target.currency === "ARS" ? 1 : 0.01);
   }).length;
 
-  return <div className="mx-auto max-w-6xl space-y-6">
+  return <PageShell width="wide" spacing="compact">
     <AlertDialog open={Boolean(correction)} onOpenChange={(open) => { if (!open) { setCorrection(null); setReason(""); } }}>
       <AlertDialogContent>
         <AlertDialogHeader><AlertDialogTitle>Pedir corrección</AlertDialogTitle><AlertDialogDescription>Indicá qué dato de la factura no coincide con la liquidación publicada por Operaciones.</AlertDialogDescription></AlertDialogHeader>
@@ -121,11 +123,7 @@ export default function TeamInvoiceReview() {
       </AlertDialogContent>
     </AlertDialog>
 
-    <div>
-      <p className="text-sm font-medium text-indigo-600">Carga financiera</p>
-      <h1 className="text-3xl font-semibold tracking-tight">Facturas del equipo</h1>
-      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Compará cada factura con el número final publicado por Operaciones. Aprobarla crea el Pasivo en el mes de emisión; nunca modifica Costos ni la rentabilidad.</p>
-    </div>
+    <FinanceHeader title="Facturas del equipo" description="Compará cada factura con el número final publicado por Operaciones. Aprobarla crea la cuenta por pagar en el mes de emisión; nunca modifica costos ni la rentabilidad." />
 
     {focusedInvoiceId && <div className="space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm">
       <p className="font-medium">Mostrando el comprobante seleccionado desde el cierre del equipo.</p>
@@ -165,7 +163,7 @@ export default function TeamInvoiceReview() {
         </CardContent>
       </Card>;
     })}</div>
-  </div>;
+  </PageShell>;
 }
 
 function Metric({ label, value, warning = false }: { label: string; value: number; warning?: boolean }) {

@@ -5,6 +5,8 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import { authFetch, authFetchJson } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { PageShell } from "@/components/ui/page-shell";
+import { useReasonDialog } from "@/components/finance/ui";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -112,6 +114,7 @@ export default function FinancialIntakePage() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const reasonDialog = useReasonDialog();
   const qc = useQueryClient();
 
   const debouncedSearch = useDebouncedValue(search);
@@ -183,7 +186,7 @@ export default function FinancialIntakePage() {
   }
   function setField<K extends keyof Extraction>(key: K, value: Extraction[K]) { setDraft((old) => old ? { ...old, [key]: value } : old); }
   function numberValue(value: string) { return value.trim() === "" ? null : Number(value); }
-  function reject() { const reason = window.prompt("Motivo del rechazo (queda en auditoría):"); if (reason) actionMutation.mutate({ action: "reject", body: { reason } }); }
+  async function reject() { const reason = await reasonDialog.ask({ title: "Rechazar entrada", description: "La entrada no se registra. El motivo queda en la auditoría.", confirmLabel: "Rechazar", destructive: true, minLength: 1 }); if (reason) actionMutation.mutate({ action: "reject", body: { reason } }); }
   async function publish() {
     try {
       await saveMutation.mutateAsync();
@@ -192,9 +195,9 @@ export default function FinancialIntakePage() {
   }
 
   return (
-    <div className="space-y-6" onPaste={onPaste}>
+    <PageShell width="wide" spacing="compact" onPaste={onPaste}>
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-        <div><p className="text-sm font-medium text-rose-600">Finanzas · carga y revisión</p><h1 className="text-3xl font-semibold tracking-tight">Carga financiera</h1><p className="text-sm text-muted-foreground">Ingresá un documento o mensaje, revisá el borrador y confirmá su registro. Las facturas del equipo se revisan en su propia vista.</p></div>
+        <div className="min-w-0"><h1 className="text-balance text-2xl font-bold leading-tight tracking-[-0.03em]">Carga financiera</h1><p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">Ingresá un documento o mensaje, revisá el borrador y confirmá su registro. Las facturas del equipo se revisan en su propia vista.</p></div>
         <div className="flex gap-2"><Badge variant="outline">{openCount} abiertas</Badge><Badge variant={needsCount ? "destructive" : "outline"}>{needsCount} requieren atención</Badge></div>
       </div>
 
@@ -306,7 +309,8 @@ export default function FinancialIntakePage() {
             })}</CardContent></Card>}
           </div>}
       </div>
-    </div>
+      {reasonDialog.dialog}
+    </PageShell>
   );
 }
 

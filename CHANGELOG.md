@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.56 — 2026-11-14
+
+- Todas las vistas de Finanzas comparten el mismo diseño: encabezado, tarjetas de indicadores, tablas con estados de carga, error y vacío, y montos en formato "USD 1.234". La barra común suma flechas de mes anterior y siguiente, pestañas con íconos y acciones compactas en el celular.
+- Anular facturas o movimientos, rechazar cargas, aceptar excepciones y reabrir el cierre piden el motivo en un diálogo propio de Mind en lugar del aviso del navegador.
+- El resumen compara ventas, costos, ganancia y caja con el mes anterior, elige mes, trimestre, año o rango desde el encabezado y muestra en rojo los meses con cashflow negativo, que antes no se dibujaban. La lectura de crecimiento compara contra el mes anterior y no contra el más antiguo de la serie.
+- El cierre muestra sus etapas y estados traducidos; Contribución por proyecto agrega margen y fila de totales. Sin cambios en importes, cálculos ni permisos.
+
 ## 1.14.55 — 2026-11-14
 
 - Finanzas reúne Resumen, Caja, Cobros y pagos, Clientes y proyectos y Proyección en una navegación común, con acciones de carga, facturas del equipo y cierre según permisos. Los enlaces existentes se conservan.

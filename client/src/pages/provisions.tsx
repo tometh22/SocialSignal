@@ -3,23 +3,19 @@ import { useFinancePeriod } from "@/hooks/use-finance-period";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
+import { PageShell } from "@/components/ui/page-shell";
+import { FinanceHeader, FinanceTableCard, StatusPill, formatUsd, periodLabel } from "@/components/finance/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldAlert, UploadCloud } from "lucide-react";
+import { Scale, ShieldAlert, Undo2, UploadCloud } from "lucide-react";
 import { Link } from "wouter";
 import { Label } from "@/components/ui/label";
 import { statusLabel } from "@/lib/status-labels";
 
-function fmtUSD(n: number | null | undefined) {
-  if (n == null) return "Sin datos";
-  return new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
-}
 
 export default function ProvisionsPage() {
   const { period } = useFinancePeriod();
@@ -57,101 +53,64 @@ export default function ProvisionsPage() {
   const totalActivo = rows.filter(r => r.tipo === "NUEVA_PROVISION" && ["APPROVED", "ACTIVE"].includes(r.status)).reduce((s, r) => s + parseFloat(r.remainingAmount ?? r.montoProvision ?? "0"), 0);
   const totalRecupero = rows.filter(r => r.tipo === "RECUPERO" && ["APPROVED", "ACTIVE"].includes(r.status)).reduce((s, r) => s + parseFloat(r.montoProvision ?? "0"), 0);
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Provisiones</h1>
-          <p className="text-muted-foreground text-sm">Provisiones de facturación adelantada y contingencias</p>
-        </div>
-        <Button asChild><Link href="/finance/cargar"><UploadCloud className="h-4 w-4 mr-2" />Cargar provisión</Link></Button>
-      </div>
+  const net = provisionData ? totalActivo - totalRecupero : null;
 
-      {/* Filtros */}
-      <div className="flex gap-3 flex-wrap">
-      </div>
+  return (
+    <PageShell width="wide" spacing="compact">
+      <FinanceHeader
+        title="Provisiones"
+        description={`Facturación adelantada y contingencias vigentes en ${periodLabel(period)}.`}
+        actions={<Button asChild variant="outline"><Link href={`/finance/cargar?period=${period}`}><UploadCloud className="mr-2 h-4 w-4" />Cargar provisión</Link></Button>}
+      />
 
       {isError && <QueryError message="No se pudieron cargar las provisiones del período." retry={refetch} />}
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Provisiones activas</CardTitle>
-            <ShieldAlert className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent><div className="text-2xl font-bold">{fmtUSD(provisionData ? totalActivo : null)}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Recuperos</CardTitle>
-            <ShieldAlert className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent><div className="text-2xl font-bold text-green-600">{fmtUSD(provisionData ? totalRecupero : null)}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Neto</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">{fmtUSD(provisionData ? totalActivo - totalRecupero : null)}</div></CardContent>
-        </Card>
-      </div>
+      <MetricGrid>
+        <MetricCard label="Provisiones activas" value={formatUsd(provisionData ? totalActivo : null)} icon={<ShieldAlert />} tone="warning" detail="Saldo aprobado sin liberar" />
+        <MetricCard label="Recuperos" value={formatUsd(provisionData ? totalRecupero : null)} icon={<Undo2 />} tone="success" />
+        <MetricCard label="Neto provisionado" value={formatUsd(net)} icon={<Scale />} tone="neutral" detail="Activas menos recuperos" />
+      </MetricGrid>
 
-      {/* Tabla */}
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-32 text-muted-foreground">Cargando...</div>
-          ) : isError ? <p className="p-6 text-sm text-muted-foreground">No se puede confirmar si hay registros hasta recuperar la conexión.</p> : rows.length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-muted-foreground">
-              No hay provisiones para {period}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Mes aplicación</TableHead>
-                  <TableHead className="text-right">Monto Provisión</TableHead>
-                  <TableHead className="text-right">Saldo</TableHead>
-                  <TableHead>Criterio</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Fuente</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row: any) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium">{row.clienteNombre || "-"}</TableCell>
-                    <TableCell>
-                      <Badge variant={row.tipo === "RECUPERO" ? "default" : "secondary"}>
-                        {row.tipo === "RECUPERO" ? "Recupero" : "Nueva Provisión"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{row.mesAplicacion || row.periodKey}</TableCell>
-                    <TableCell className="text-right font-mono">{fmtUSD(parseFloat(row.montoProvision ?? "0"))}</TableCell>
-                    <TableCell className="text-right font-mono">{fmtUSD(parseFloat(row.remainingAmount ?? row.montoProvision ?? "0"))}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{row.criterio || "-"}</TableCell>
-                    <TableCell><Badge variant="outline">{statusLabel(row.status, "Propuesta")}</Badge></TableCell>
-                    <TableCell>
-                      {row.importBatch ? (
-                        <Badge variant="outline" className="text-xs text-muted-foreground">Excel</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs">Mind</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {(row.status || "PROPOSED") === "PROPOSED" && <Button size="sm" variant="outline" disabled={approveMutation.isPending} onClick={() => approveMutation.mutate(row.id)}>Aprobar</Button>}
-                        {["APPROVED", "ACTIVE"].includes(row.status) && Number(row.remainingAmount ?? row.montoProvision ?? 0) > 0 && <Button size="sm" variant="outline" onClick={() => { setReleaseRow(row); setReleaseAmount(String(row.remainingAmount ?? row.montoProvision ?? "")); }}>Liberar</Button>}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <FinanceTableCard
+        title="Provisiones del período"
+        description="Las propuestas requieren aprobación antes de afectar el resultado."
+        loading={isLoading} error={isError} onRetry={refetch} empty={rows.length === 0}
+        emptyMessage={`No hay provisiones para ${periodLabel(period)}.`}
+      >
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Cliente</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Mes de aplicación</TableHead>
+              <TableHead className="text-right">Monto</TableHead>
+              <TableHead className="text-right">Saldo</TableHead>
+              <TableHead>Criterio</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead className="w-px text-right"><span className="sr-only">Acciones</span></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row: any) => {
+              const status = row.status || "PROPOSED";
+              return <TableRow key={row.id}>
+                <TableCell><span className="font-medium">{row.clienteNombre || "—"}</span><span className="block text-xs text-muted-foreground">{row.importBatch ? "Importado de Excel" : "Registrado en Mind"}</span></TableCell>
+                <TableCell>{row.tipo === "RECUPERO" ? <StatusPill tone="success">Recupero</StatusPill> : <StatusPill tone="info">Nueva provisión</StatusPill>}</TableCell>
+                <TableCell className="whitespace-nowrap text-sm">{row.mesAplicacion || row.periodKey}</TableCell>
+                <TableCell className="whitespace-nowrap text-right tabular-nums">{formatUsd(parseFloat(row.montoProvision ?? "0"))}</TableCell>
+                <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">{formatUsd(parseFloat(row.remainingAmount ?? row.montoProvision ?? "0"))}</TableCell>
+                <TableCell className="max-w-[220px]"><span className="block truncate text-sm text-muted-foreground" title={row.criterio || undefined}>{row.criterio || "—"}</span></TableCell>
+                <TableCell><StatusPill tone={status === "PROPOSED" ? "warning" : ["APPROVED", "ACTIVE"].includes(status) ? "success" : "neutral"}>{statusLabel(row.status, "Propuesta")}</StatusPill></TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2">
+                    {status === "PROPOSED" && <Button size="sm" variant="outline" disabled={approveMutation.isPending} onClick={() => approveMutation.mutate(row.id)}>Aprobar</Button>}
+                    {["APPROVED", "ACTIVE"].includes(row.status) && Number(row.remainingAmount ?? row.montoProvision ?? 0) > 0 && <Button size="sm" variant="outline" onClick={() => { setReleaseRow(row); setReleaseAmount(String(row.remainingAmount ?? row.montoProvision ?? "")); }}>Liberar</Button>}
+                  </div>
+                </TableCell>
+              </TableRow>;
+            })}
+          </TableBody>
+        </Table>
+      </FinanceTableCard>
       <Dialog open={Boolean(releaseRow)} onOpenChange={(open) => { if (!open) setReleaseRow(null); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Liberar provisión</DialogTitle></DialogHeader>
@@ -162,6 +121,6 @@ export default function ProvisionsPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 }

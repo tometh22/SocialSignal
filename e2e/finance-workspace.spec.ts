@@ -21,7 +21,7 @@ test('shares a reference month through views, reload, and browser back', async (
   await expect(picker).toHaveValue('2026-10');
   await expect(page.getByRole('heading',{name:'Resumen financiero',exact:true})).toBeVisible();
   await picker.fill('2026-09');
-  await expect(page.getByTestId('finance-data-status')).toContainText('2026-09');
+  await expect(page.getByTestId('finance-data-status')).toContainText('Septiembre 2026');
   await page.getByRole('navigation',{name:'Vistas de Finanzas'}).getByRole('link',{name:'Clientes y proyectos'}).click();
   await expect(page).toHaveURL(/rendimiento\?period=2026-09/);
   await expect(page.getByRole('heading',{name:'Contribución por proyecto'})).toBeVisible();
@@ -83,4 +83,25 @@ test('legacy finance links retain the requested month in the unified summary', a
   await page.goto('/executive/finanzas?period=2026-09');
   await expect(page).toHaveURL(/dashboard\?period=2026-09/);
   await expect(page.getByLabel('Mes de referencia de Finanzas')).toHaveValue('2026-09');
+});
+
+test('voiding a receivable asks for an audited reason in an in-app dialog', async ({ page }) => {
+  const posts: unknown[] = [];
+  await page.route('**/api/activo/summary**', route => route.fulfill({ json: { total: 1000, cobrado: 0, pendiente: 1000, vencido: 0 } }));
+  await page.route('**/api/activo?*', route => route.fulfill({ json: { items: [{ id: 7, concepto: 'Fee octubre', clienteNombre: 'Cliente', nroFactura: 'A-0001', montoTotalUSD: '1000', outstandingUSD: '1000' }], pagination: { page: 1, pageSize: 50, total: 1, totalPages: 1 } } }));
+  await page.route('**/api/activo/7/void', route => { posts.push(route.request().postDataJSON()); return route.fulfill({ json: { ok: true } }); });
+  await page.goto('/finance/activo?period=2026-10');
+  await page.getByRole('button', { name: 'Anular', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('Anular A-0001');
+  const confirm = dialog.getByRole('button', { name: 'Anular factura' });
+  await dialog.getByLabel('Motivo').fill('dup');
+  await expect(confirm).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(posts).toEqual([]);
+  await page.getByRole('button', { name: 'Anular', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('Motivo').fill('Factura duplicada');
+  await page.getByRole('dialog').getByRole('button', { name: 'Anular factura' }).click();
+  await expect.poll(() => posts).toEqual([{ reason: 'Factura duplicada' }]);
 });
