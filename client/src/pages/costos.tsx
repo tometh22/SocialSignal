@@ -11,7 +11,8 @@ import { useFinancePeriod } from "@/hooks/use-finance-period";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CompactPageHeader } from "@/components/ui/compact-page-header";
+import { FinanceHeader, FinanceLoading } from "@/components/finance/ui";
+import { QueryError } from "@/components/query-error";
 import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
 import { PageShell } from "@/components/ui/page-shell";
 import { ToolbarPanel } from "@/components/ui/toolbar-panel";
@@ -59,7 +60,7 @@ function InfoTip({ children }: { children: string }) {
 export default function CostosPage() {
   const { year: selectedFinanceYear } = useFinancePeriod();
   const year = Number(selectedFinanceYear);
-  const { data, isLoading, error } = useQuery<Data>({
+  const { data, isLoading, error, refetch } = useQuery<Data>({
     queryKey: [`/api/v2/executive/costs?year=${year}`],
   });
 
@@ -67,16 +68,14 @@ export default function CostosPage() {
   const esBoard = (c: string) => data?.boardYHolding.conceptos.includes(c) ?? false;
 
   return (
-    <PageShell>
-      <CompactPageHeader
+    <PageShell width="wide" spacing="compact">
+      <FinanceHeader
         title="Desglose de costos"
-        description="Desglose por concepto, tipo y equipo desde los registros nativos de Mind"
+        description={`Costos del ejercicio ${year} en USD, por concepto, tipo y equipo, desde los registros de Mind.`}
       />
 
-      <p className="text-sm text-muted-foreground">Ejercicio {year} · desglose anual en USD</p>
-
-      {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
-      {error && <p className="text-sm text-red-600">No se pudo cargar el desglose de costos.</p>}
+      {isLoading && <FinanceLoading label="Cargando desglose de costos" />}
+      {error && <QueryError message="No se pudo cargar el desglose de costos." retry={refetch} />}
 
       {data && (
         <TooltipProvider delayDuration={200}>
@@ -137,7 +136,7 @@ export default function CostosPage() {
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                     <XAxis type="number" tickLine={false} axisLine={false} fontSize={12}
                       tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
-                    <YAxis type="category" dataKey="concepto" width={120} tickLine={false} axisLine={false} fontSize={11} />
+                    <YAxis type="category" dataKey="concepto" width={170} tickLine={false} axisLine={false} fontSize={11} />
                     <RTooltip formatter={(v: any) => fmt(v)} />
                     <Bar dataKey="montoUsd" radius={[0, 3, 3, 0]}>
                       {topConceptos.map((c, i) => (

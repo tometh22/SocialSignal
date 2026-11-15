@@ -3,9 +3,10 @@ import { useFinancePeriod } from "@/hooks/use-finance-period";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
+import { PageShell } from "@/components/ui/page-shell";
+import { FinanceHeader, FinanceTableCard, StatusPill, amountTone, formatDate, formatUsd, periodLabel, useReasonDialog } from "@/components/finance/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -15,10 +16,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { DollarSign, ArrowUp, ArrowDown, Wallet, Settings2, UploadCloud, Ban } from "lucide-react";
 
-function fmtUSD(n: number | null | undefined) {
-  if (n == null) return "Sin datos";
-  return new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
-}
 
 interface CashflowRow {
   id: number;
@@ -49,6 +46,7 @@ export default function CashflowPage() {
   const [openingBalanceDate, setOpeningBalanceDate] = useState(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`);
   const qc = useQueryClient();
   const { toast } = useToast();
+  const reason = useReasonDialog();
 
 
   // Last day of selected month
@@ -93,139 +91,95 @@ export default function CashflowPage() {
     },
     onError: (error: Error) => toast({ title: "No se pudo anular", description: error.message, variant: "destructive" }),
   });
-  const voidRow = (row: CashflowRow) => {
-    const reason = window.prompt(`Motivo de anulación de ${row.detalleOperacion || row.concepto || "este movimiento"}:`);
-    if (reason?.trim() && reason.trim().length >= 5) voidMutation.mutate({ id: row.id, reason: reason.trim() });
-    else if (reason != null) toast({ title: "Ingresá un motivo de al menos 5 caracteres", variant: "destructive" });
+  const voidRow = async (row: CashflowRow) => {
+    const text = await reason.ask({ title: `Anular ${row.detalleOperacion || row.concepto || "el movimiento"}`, description: "Si tenía una factura aplicada, su saldo se restaura. Indicá por qué se anula.", confirmLabel: "Anular movimiento", destructive: true });
+    if (text) voidMutation.mutate({ id: row.id, reason: text });
   };
 
   const rows = movementData ?? [];
   const operatingRows = rows.filter((row) => !row.transferGroupId);
   const ingresos = operatingRows.filter(r => r.tipoMovimiento === "Ingreso").reduce((s, r) => s + parseFloat(r.montoUSD ?? "0"), 0);
   const egresos = operatingRows.filter(r => r.tipoMovimiento === "Egreso").reduce((s, r) => s + parseFloat(r.montoUSD ?? "0"), 0);
+  const net = movementData ? ingresos - egresos : null;
+  const pendingCount = rows.filter(row => row.reconciliationStatus !== "matched" && row.reconciliationStatus !== "ignored").length;
+  const bankBalances = Object.entries(balance?.balances ?? {}) as [string, number][];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div><h1 className="text-2xl font-semibold">Caja y bancos</h1><p className="text-muted-foreground text-sm">Movimientos y saldos registrados directamente en Mind</p></div>
-        <div className="flex gap-2"><Button variant="outline" asChild><Link href="/finance/cargar"><UploadCloud className="mr-2 h-4 w-4" />Cargar movimientos</Link></Button><Dialog open={accountOpen} onOpenChange={setAccountOpen}><DialogTrigger asChild><Button variant="outline"><Settings2 className="mr-2 h-4 w-4" />Cuentas</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Cuentas financieras</DialogTitle></DialogHeader><div className="space-y-2">{accounts.map((account) => <div key={account.id} className="flex items-center justify-between rounded-lg border p-3 text-sm"><span>{account.name}</span><Badge variant="outline">{account.currency} · inicial {account.openingBalance}</Badge></div>)}</div><div className="grid gap-3 border-t pt-4"><div><Label>Nombre / banco</Label><Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Ej. Santander USD" /></div><div className="grid grid-cols-2 gap-3"><div><Label>Moneda</Label><Select value={accountCurrency} onValueChange={setAccountCurrency}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="USD">USD</SelectItem><SelectItem value="ARS">ARS</SelectItem><SelectItem value="EUR">EUR</SelectItem></SelectContent></Select></div><div><Label>Saldo inicial</Label><Input type="number" value={openingBalance} onChange={(e) => setOpeningBalance(e.target.value)} /></div></div><div><Label>Fecha del saldo inicial</Label><Input type="date" value={openingBalanceDate} onChange={(e) => setOpeningBalanceDate(e.target.value)} /></div><Button disabled={!accountName.trim() || !openingBalanceDate || accountMutation.isPending} onClick={() => accountMutation.mutate()}>Agregar cuenta</Button></div></DialogContent></Dialog></div>
-      </div>
-
-      {/* Filtros */}
-      <div className="flex gap-3 flex-wrap">
-        <Select value={banco} onValueChange={setBanco}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos los bancos</SelectItem>
-            {accounts.map((account) => <SelectItem key={account.id} value={account.name}>{account.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={tipo} onValueChange={setTipo}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="Ingreso">Ingresos</SelectItem>
-            <SelectItem value="Egreso">Egresos</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+    <PageShell width="wide" spacing="compact">
+      <FinanceHeader
+        title="Caja y bancos"
+        description={`Saldos y movimientos bancarios de ${periodLabel(period)}.`}
+        actions={<><Button variant="outline" asChild><Link href={`/finance/cargar?period=${period}`}><UploadCloud className="mr-2 h-4 w-4" />Cargar movimientos</Link></Button><Dialog open={accountOpen} onOpenChange={setAccountOpen}><DialogTrigger asChild><Button variant="outline"><Settings2 className="mr-2 h-4 w-4" />Cuentas</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Cuentas financieras</DialogTitle></DialogHeader><div className="space-y-2">{accounts.map((account) => <div key={account.id} className="flex items-center justify-between rounded-lg border p-3 text-sm"><span>{account.name}</span><span className="text-xs text-muted-foreground">{account.currency} · saldo inicial {account.openingBalance}</span></div>)}</div><div className="grid gap-3 border-t pt-4"><div><Label>Nombre / banco</Label><Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Ej. Santander USD" /></div><div className="grid grid-cols-2 gap-3"><div><Label>Moneda</Label><Select value={accountCurrency} onValueChange={setAccountCurrency}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="USD">USD</SelectItem><SelectItem value="ARS">ARS</SelectItem><SelectItem value="EUR">EUR</SelectItem></SelectContent></Select></div><div><Label>Saldo inicial</Label><Input type="number" value={openingBalance} onChange={(e) => setOpeningBalance(e.target.value)} /></div></div><div><Label>Fecha del saldo inicial</Label><Input type="date" value={openingBalanceDate} onChange={(e) => setOpeningBalanceDate(e.target.value)} /></div><Button disabled={!accountName.trim() || !openingBalanceDate || accountMutation.isPending} onClick={() => accountMutation.mutate()}>Agregar cuenta</Button></div></DialogContent></Dialog></>}
+      />
 
       {(isError || balanceError) && <QueryError message="No se pudieron cargar los movimientos o los saldos bancarios." retry={() => { void refetch(); void retryBalance(); }} />}
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Ingresos</CardTitle>
-            <ArrowUp className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent><div className="text-2xl font-bold text-green-600">{fmtUSD(movementData ? ingresos : null)}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Egresos</CardTitle>
-            <ArrowDown className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent><div className="text-2xl font-bold text-red-600">{fmtUSD(movementData ? egresos : null)}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Movimiento neto del mes</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${ingresos - egresos >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {fmtUSD(movementData ? ingresos - egresos : null)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium">Saldo de todas las cuentas</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent><div className="text-2xl font-bold">{fmtUSD(balance?.totalUSD)}</div><p className="mt-1 text-xs text-muted-foreground">Al cierre de {period}, sin filtrar por banco.</p></CardContent>
-        </Card>
-      </div>
+      <MetricGrid>
+        <MetricCard label="Saldo de todas las cuentas" value={formatUsd(balance?.totalUSD)} icon={<Wallet />} tone="neutral" detail={`Al cierre de ${periodLabel(period)}`} />
+        <MetricCard label="Ingresos" value={formatUsd(movementData ? ingresos : null)} icon={<ArrowUp />} tone="success" detail="Sin transferencias entre cuentas" />
+        <MetricCard label="Egresos" value={formatUsd(movementData ? egresos : null)} icon={<ArrowDown />} tone="danger" detail="Sin transferencias entre cuentas" />
+        <MetricCard label="Movimiento neto del mes" value={formatUsd(net)} icon={<DollarSign />} tone={net == null ? "neutral" : net >= 0 ? "success" : "danger"} detail={net == null ? undefined : net >= 0 ? "Entró más de lo que salió" : "Salió más de lo que entró"} />
+      </MetricGrid>
 
-      {/* Saldos por banco */}
-      {balance?.balances && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {Object.entries(balance.balances as Record<string, number>).map(([bank, saldo]) => (
-            <Card key={bank}>
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{bank}</CardTitle></CardHeader>
-              <CardContent><div className="text-xl font-semibold">{fmtUSD(saldo)}</div></CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      {bankBalances.length > 0 && <section aria-label="Saldo por cuenta" className="rounded-2xl border border-border/75 bg-card p-4 sm:p-5">
+        <h2 className="text-sm font-semibold">Saldo por cuenta</h2>
+        <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {bankBalances.map(([bank, saldo]) => <div key={bank} className="flex items-baseline justify-between gap-3 border-b border-dashed pb-2 last:border-0 sm:last:border-b">
+            <dt className="truncate text-sm text-muted-foreground">{bank}</dt><dd className={`whitespace-nowrap text-sm font-semibold tabular-nums ${amountTone(saldo)}`}>{formatUsd(saldo)}</dd>
+          </div>)}
+        </dl>
+      </section>}
 
-      {/* Tabla */}
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-32 text-muted-foreground">Cargando...</div>
-          ) : isError ? <p className="p-6 text-sm text-muted-foreground">No se puede confirmar si hay registros hasta recuperar la conexión.</p> : rows.length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-muted-foreground">
-              No hay movimientos para {period}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Banco</TableHead>
-                  <TableHead>Detalle</TableHead>
-                  <TableHead>Conciliación</TableHead>
-                  <TableHead className="text-right">Monto USD</TableHead>
-                  <TableHead className="text-right">Acción</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="text-sm">
-                      {row.fecha ? new Date(row.fecha).toLocaleDateString("es-AR") : "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={row.tipoMovimiento === "Ingreso" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                        {row.tipoMovimiento}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{row.banco || "-"}</TableCell>
-                    <TableCell className="max-w-[250px] truncate text-sm">{row.detalleOperacion || row.concepto || "-"}</TableCell>
-                    <TableCell><Badge variant={row.reconciliationStatus === "matched" ? "default" : "outline"}>{row.reconciliationStatus === "matched" ? "Conciliado" : row.reconciliationStatus === "ignored" ? "Ignorado" : "Pendiente"}</Badge></TableCell>
-                    <TableCell className={`text-right font-mono ${row.tipoMovimiento === "Ingreso" ? "text-green-600" : "text-red-600"}`}>
-                      {fmtUSD(parseFloat(row.montoUSD ?? "0"))}
-                    </TableCell>
-                    <TableCell className="text-right"><div className="flex justify-end gap-1">{row.reconciliationStatus !== "matched" && <Button size="sm" variant="outline" disabled={reconcileMutation.isPending} onClick={() => reconcileMutation.mutate(row.id)}>Conciliar</Button>}<Button size="sm" variant="ghost" disabled={voidMutation.isPending} onClick={() => voidRow(row)}><Ban className="mr-1 h-4 w-4" />Anular</Button></div></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+      <FinanceTableCard
+        title="Movimientos"
+        description={movementData && rows.length > 0 ? (pendingCount > 0 ? `${pendingCount} de ${rows.length} movimientos sin conciliar.` : `Los ${rows.length} movimientos están conciliados.`) : undefined}
+        toolbar={<>
+          <Select value={banco} onValueChange={setBanco}>
+            <SelectTrigger className="h-9 w-44" aria-label="Filtrar por cuenta"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas las cuentas</SelectItem>
+              {accounts.map((account) => <SelectItem key={account.id} value={account.name}>{account.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={tipo} onValueChange={setTipo}>
+            <SelectTrigger className="h-9 w-48" aria-label="Filtrar por tipo de movimiento"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Ingresos y egresos</SelectItem>
+              <SelectItem value="Ingreso">Solo ingresos</SelectItem>
+              <SelectItem value="Egreso">Solo egresos</SelectItem>
+            </SelectContent>
+          </Select>
+        </>}
+        loading={isLoading} error={isError} onRetry={refetch} empty={rows.length === 0}
+        emptyMessage={`No hay movimientos para ${periodLabel(period)}.`}
+      >
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Fecha</TableHead>
+              <TableHead>Detalle</TableHead>
+              <TableHead>Cuenta</TableHead>
+              <TableHead>Conciliación</TableHead>
+              <TableHead className="text-right">Monto</TableHead>
+              <TableHead className="w-px text-right"><span className="sr-only">Acciones</span></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => {
+              const income = row.tipoMovimiento === "Ingreso";
+              const amount = parseFloat(row.montoUSD ?? "0");
+              return <TableRow key={row.id}>
+                <TableCell className="whitespace-nowrap text-sm">{formatDate(row.fecha)}</TableCell>
+                <TableCell className="max-w-[320px]"><span className="block truncate" title={row.detalleOperacion || row.concepto || undefined}>{row.detalleOperacion || row.concepto || "—"}</span>{row.transferGroupId && <span className="text-xs text-muted-foreground">Transferencia entre cuentas</span>}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{row.banco || "—"}</TableCell>
+                <TableCell>{row.reconciliationStatus === "matched" ? <StatusPill tone="success">Conciliado</StatusPill> : row.reconciliationStatus === "ignored" ? <StatusPill tone="neutral">Ignorado</StatusPill> : <StatusPill tone="warning">Pendiente</StatusPill>}</TableCell>
+                <TableCell className={`whitespace-nowrap text-right font-medium tabular-nums ${income ? "text-emerald-700" : "text-red-600"}`}>{income ? "+" : "−"}{formatUsd(Math.abs(amount))}</TableCell>
+                <TableCell className="text-right"><div className="flex justify-end gap-1">{row.reconciliationStatus !== "matched" && <Button size="sm" variant="outline" disabled={reconcileMutation.isPending} onClick={() => reconcileMutation.mutate(row.id)}>Conciliar</Button>}<Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-red-700" aria-label="Anular" title="Anular" disabled={voidMutation.isPending} onClick={() => void voidRow(row)}><Ban className="h-4 w-4" /></Button></div></TableCell>
+              </TableRow>;
+            })}
+          </TableBody>
+        </Table>
+      </FinanceTableCard>
+      {reason.dialog}
+    </PageShell>
   );
 }

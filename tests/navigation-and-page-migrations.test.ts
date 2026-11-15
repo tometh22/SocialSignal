@@ -43,8 +43,8 @@ describe("navigation and high-traffic page migrations", () => {
     const dashboard = source("client/src/pages/executive-dashboard-v2.tsx");
 
     expect(dashboard).toContain("<PageShell");
-    expect(dashboard).toContain("<CompactPageHeader");
-    expect(dashboard).toContain("<ToolbarPanel");
+    expect(dashboard).toContain("<FinanceHeader");
+    expect(dashboard).toContain('aria-label="Selector de período financiero"');
     expect(dashboard).toContain("<MetricGrid");
     expect(dashboard).toContain('aria-label="Actualizar resumen financiero"');
     expect(dashboard).toContain("aria-pressed={viewMode === mode}");

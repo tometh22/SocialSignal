@@ -8,7 +8,8 @@ import { useFinancePeriod } from "@/hooks/use-finance-period";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CompactPageHeader } from "@/components/ui/compact-page-header";
+import { FinanceHeader, FinanceLoading } from "@/components/finance/ui";
+import { QueryError } from "@/components/query-error";
 import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
 import { PageShell } from "@/components/ui/page-shell";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -48,7 +49,7 @@ const CONCENTRACION_CRITICA = 65;
 
 export default function ArrPage() {
   const { period: periodo } = useFinancePeriod();
-  const { data: resp, isLoading, error } = useQuery<Resp>({
+  const { data: resp, isLoading, error, refetch } = useQuery<Resp>({
     queryKey: [periodo ? `/api/v2/executive/recurring?period=${periodo}` : `/api/v2/executive/recurring`],
   });
 
@@ -57,15 +58,15 @@ export default function ArrPage() {
   const concentrado = (top?.sharePct ?? 0) >= CONCENTRACION_ALERTA;
 
   return (
-    <PageShell>
-      <CompactPageHeader
+    <PageShell width="wide" spacing="compact">
+      <FinanceHeader
         title="Ingresos recurrentes"
-        description="Ventas tipo Fee del mes y su equivalente anualizado, en la misma base del resumen financiero"
+        description="Ventas tipo fee del mes y su equivalente anualizado, en la misma base del resumen financiero."
       />
 
 
-      {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
-      {error && <p className="text-sm text-red-600">No se pudo cargar el ingreso recurrente.</p>}
+      {isLoading && <FinanceLoading label="Cargando ingresos recurrentes" />}
+      {error && <QueryError message="No se pudo cargar el ingreso recurrente." retry={refetch} />}
       {resp && !d && (
         <p className="text-sm text-muted-foreground">
           No hay datos de rendimiento por proyecto cargados todavía.
@@ -106,7 +107,7 @@ export default function ArrPage() {
                   key={i}
                   label={(
                     <span className="flex min-w-0 items-center justify-between gap-2">
-                      <span className="truncate">{kpi.label}</span>
+                      <span className="min-w-0">{kpi.label}</span>
                       <InfoTip>{kpi.tip}</InfoTip>
                     </span>
                   )}

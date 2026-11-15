@@ -8,10 +8,9 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CompactPageHeader } from "@/components/ui/compact-page-header";
+import { FinanceHeader, StatusPill, periodLabel } from "@/components/finance/ui";
 import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
 import { PageShell } from "@/components/ui/page-shell";
-import { ToolbarPanel } from "@/components/ui/toolbar-panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -102,60 +101,59 @@ export default function ExecutiveDashboardV2() {
     return val >= good ? "text-emerald-700" : val >= 0 ? "text-amber-600" : "text-red-600";
   };
 
+  const previousKey = (() => { const [y, m] = period.split("-").map(Number); return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7); })();
+  const previous = viewMode === "month" ? allData.find((row: any) => row.periodKey === previousKey) : null;
+  const delta = (current: number | null | undefined, before: number | null | undefined, higherIsBetter = true) => {
+    if (current == null || before == null || before === 0) return undefined;
+    const change = ((current - before) / Math.abs(before)) * 100;
+    const good = higherIsBetter ? change >= 0 : change <= 0;
+    return <span className="flex items-center justify-between gap-2"><span>vs. {periodLabel(previousKey).split(" ")[0].toLowerCase()}</span><span className={`font-semibold tabular-nums ${Math.abs(change) < 0.5 ? "text-muted-foreground" : good ? "text-emerald-700" : "text-red-600"}`}>{change >= 0 ? "+" : "−"}{Math.abs(change).toFixed(1)}%</span></span>;
+  };
+  const costOf = (row: any) => row?.ventasDelMes != null && row?.ebitOperativo != null ? row.ventasDelMes - row.ebitOperativo : null;
+
   const runwayMonths = d?.activoLiquido != null && d?.ebitOperativo != null && d.ebitOperativo < 0
     ? Math.abs(d.activoLiquido / d.ebitOperativo)
     : null;
 
   return (
     <PageShell width="wide" spacing="compact">
-      <CompactPageHeader
+      <FinanceHeader
         title="Resumen financiero"
-        description="Ventas, costos, ganancia y dinero disponible del período."
-        className="!border-0 !bg-transparent !p-0 !shadow-none"
-        actions={<Button variant="outline" size="sm" onClick={() => { void refetch(); if (viewMode === 'month') void control.refetch(); }} disabled={isFetching}>Actualizar datos</Button>}
-      />
-
-      <details className="rounded-xl border bg-card p-3"><summary className="cursor-pointer text-sm font-medium">Comparar trimestre, año o rango personalizado</summary>
-      <ToolbarPanel
-        className="mt-3 !border-0 !p-0 !shadow-none"
-        title="Vista del resumen"
-        description="Compará un mes, trimestre, año o rango personalizado."
-        ariaLabel="Selector de período financiero"
-      >
-        <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center">
-          {/* Mode toggle */}
-          <div className="grid grid-cols-2 overflow-hidden rounded-xl border text-sm sm:flex">
+        description={viewMode === "month" ? `Ventas, costos, ganancia y dinero disponible de ${periodLabel(period)}.` : "Ventas, costos, ganancia y dinero disponible del período seleccionado."}
+        actions={<>
+          <div role="group" aria-label="Selector de período financiero" className="inline-flex gap-0.5 rounded-lg bg-muted p-0.5">
             {(["month", "quarter", "year", "custom"] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                aria-pressed={viewMode === mode}
-                className={`min-h-11 px-3 py-2 font-medium transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${viewMode === mode ? "bg-primary text-primary-foreground" : "bg-white text-slate-600 hover:bg-slate-50"}`}
-                onClick={() => setViewMode(mode)}
-              >
+              <button key={mode} type="button" aria-pressed={viewMode === mode}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${viewMode === mode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => setViewMode(mode)}>
                 {mode === "month" ? "Mes" : mode === "quarter" ? "Trimestre" : mode === "year" ? "Año" : "Personalizado"}
               </button>
             ))}
           </div>
-
+          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => { void refetch(); if (viewMode === 'month') void control.refetch(); }} disabled={isFetching} aria-label="Actualizar resumen financiero" title="Actualizar datos">
+            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+          </Button>
+        </>}
+      />
+      {(viewMode === "quarter" || viewMode === "custom") && <div className="flex min-w-0 flex-wrap items-center gap-2">
           {/* Selectors — change based on mode */}
           {viewMode === "custom" ? (
             <div className="grid min-w-0 grid-cols-2 gap-2 text-sm sm:flex sm:flex-wrap sm:items-center">
               <Select value={String(customStartMonth)} onValueChange={(v) => setCustomStartMonth(parseInt(v))}>
-                <SelectTrigger className="h-11 w-full sm:w-24" aria-label="Mes inicial"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 w-full sm:w-24" aria-label="Mes inicial"><SelectValue /></SelectTrigger>
                 <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={String(customStartYear)} onValueChange={(v) => setCustomStartYear(parseInt(v))}>
-                <SelectTrigger className="h-11 w-full sm:w-24" aria-label="Año inicial"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 w-full sm:w-24" aria-label="Año inicial"><SelectValue /></SelectTrigger>
                 <SelectContent>{Array.from({ length: 6 }, (_, index) => now.getFullYear() + 1 - index).map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
               </Select>
               <span className="hidden px-1 text-slate-400 sm:inline" aria-hidden="true">→</span>
               <Select value={String(customEndMonth)} onValueChange={(v) => setCustomEndMonth(parseInt(v))}>
-                <SelectTrigger className="h-11 w-full sm:w-24" aria-label="Mes final"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 w-full sm:w-24" aria-label="Mes final"><SelectValue /></SelectTrigger>
                 <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={String(customEndYear)} onValueChange={(v) => setCustomEndYear(parseInt(v))}>
-                <SelectTrigger className="h-11 w-full sm:w-24" aria-label="Año final"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 w-full sm:w-24" aria-label="Año final"><SelectValue /></SelectTrigger>
                 <SelectContent>{Array.from({ length: 6 }, (_, index) => now.getFullYear() + 1 - index).map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
               </Select>
             </div>
@@ -163,7 +161,7 @@ export default function ExecutiveDashboardV2() {
             <>
               {viewMode === "quarter" && (
                 <Select value={String(selectedQuarter)} onValueChange={(v) => setSelectedQuarter(parseInt(v))}>
-                  <SelectTrigger className="h-11 w-48" aria-label="Trimestre"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-9 w-48" aria-label="Trimestre"><SelectValue /></SelectTrigger>
                   <SelectContent>{QUARTERS.map(q => <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>)}</SelectContent>
                 </Select>
               )}
@@ -171,12 +169,7 @@ export default function ExecutiveDashboardV2() {
             </>
           )}
 
-          <Button variant="outline" size="icon" className="h-11 w-11" onClick={() => refetch()} disabled={isFetching} aria-label="Actualizar resumen financiero">
-            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          </Button>
-        </div>
-      </ToolbarPanel>
-      </details>
+      </div>}
       {viewMode !== "month" && d?.fuenteDatos && <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <Badge variant="outline">Fuente: {d.fuenteDatos === 'master' ? 'Máster' : d.fuenteDatos === 'cierre' ? 'Cierre Mind' : d.fuenteDatos === 'mixta' ? 'Máster y Mind, según el mes' : 'Mind'}</Badge>
         {data.sourceReadAt && (d.fuenteDatos === 'master' || d.fuenteDatos === 'mixta') && <span>Consultado: {new Date(data.sourceReadAt).toLocaleString('es-AR')}</span>}
@@ -231,23 +224,25 @@ export default function ExecutiveDashboardV2() {
           </div>
 
           <MetricGrid>
-            <MetricCard label="Ventas del período" value={fmt(d.ventasDelMes)} icon={<DollarSign />} detail="Sin IVA · pueden incluir ventas programadas" />
-            <MetricCard label="Costos operativos" value={fmt(d.ventasDelMes != null && d.ebitOperativo != null ? d.ventasDelMes - d.ebitOperativo : null)} icon={<TrendingDown />} detail={incompleteCosts ? 'Pendientes de completar' : 'Base del resultado operativo'} />
-            <MetricCard label={d.beneficioNetoParcial ? 'Ganancia neta (parcial)' : 'Ganancia neta'} value={fmt(d.beneficioNeto)} icon={<TrendingUp />} detail={d.beneficioNetoParcial ? "Solo meses con resultado neto disponible" : "Después de ajustes e impuestos de la fuente"} />
-            <MetricCard label="Caja disponible" value={fmt(d.activoLiquido)} icon={<Wallet />} detail="Saldo informado · distinto del resultado del mes" />
+            <MetricCard label={viewMode === "month" ? "Ventas del mes" : "Ventas del período"} value={fmt(d.ventasDelMes)} icon={<DollarSign />} tone="neutral" detail="Sin IVA · pueden incluir ventas programadas" footer={delta(d.ventasDelMes, previous?.ventasDelMes)} />
+            <MetricCard label="Costos operativos" value={fmt(d.ventasDelMes != null && d.ebitOperativo != null ? d.ventasDelMes - d.ebitOperativo : null)} icon={<TrendingDown />} detail={incompleteCosts ? 'Pendientes de completar' : 'Base del resultado operativo'} footer={incompleteCosts ? undefined : delta(costOf(d), costOf(previous), false)} />
+            <MetricCard label={d.beneficioNetoParcial ? 'Ganancia neta (parcial)' : 'Ganancia neta'} value={fmt(d.beneficioNeto)} icon={<TrendingUp />} detail={d.beneficioNetoParcial ? "Solo meses con resultado neto disponible" : "Después de ajustes e impuestos de la fuente"} tone={d.beneficioNeto == null ? "neutral" : d.beneficioNeto >= 0 ? "success" : "danger"} footer={delta(d.beneficioNeto, previous?.beneficioNeto)} />
+            <MetricCard label="Caja disponible" value={fmt(d.activoLiquido)} icon={<Wallet />} detail="Saldo informado · distinto del resultado del mes" footer={delta(d.activoLiquido, previous?.activoLiquido)} />
           </MetricGrid>
-          {viewMode === "month" && <Card data-testid="finance-data-status"><CardContent className="space-y-2 pt-4 text-sm">
-            <p className="font-semibold">Estado de los datos · {period}</p>
-            {control.isLoading ? <p className="text-muted-foreground">Comprobando ventas y costos…</p>
-              : control.error ? <QueryError message="No se pudo comprobar la conciliación de este mes." retry={control.refetch} />
-              : control.data && <>
-                <div className="flex flex-wrap gap-2"><Badge variant="outline">{control.data.report.source === 'master' ? 'Fuente: Máster' : control.data.report.source === 'cierre' ? 'Fuente: cierre Mind' : 'Fuente: Mind'}</Badge>
-                <Badge variant="outline">{control.data.report.costBasis === 'estimated' ? 'Costos estimados' : control.data.report.costBasis === 'actual' ? 'Costos cargados' : 'Costos incompletos'}</Badge>
-                <Badge variant={control.data.report.status === 'matched' ? 'secondary' : 'destructive'}>{control.data.report.status === 'matched' ? 'Ventas y costos conciliados' : control.data.report.status === 'difference' ? 'Diferencias por revisar' : 'Faltan datos para conciliar'}</Badge></div>
-                <p className="text-xs text-muted-foreground">La conciliación comprueba totales. La aprobación del cierre es un paso separado.</p>
-                {control.data.report.status !== 'matched' && control.data.report.warnings.length > 0 && <div className="text-amber-800"><p>Hay gastos o importes pendientes. Completalos antes de usar el resultado de este mes.</p><details className="mt-1"><summary className="cursor-pointer text-xs">Ver registros pendientes</summary>{control.data.report.warnings.map((warning, index) => <p key={index} className="mt-2 text-xs">{warning}</p>)}</details></div>}
-              </>}
-          </CardContent></Card>}
+          {viewMode === "month" && <Card data-testid="finance-data-status" className="p-4 text-sm sm:px-5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <p className="font-semibold">Estado de los datos · {periodLabel(period)}</p>
+              {control.isLoading ? <p className="text-muted-foreground">Comprobando ventas y costos…</p>
+                : control.data && !control.error && <div className="flex flex-wrap gap-1.5">
+                  <StatusPill tone={control.data.report.status === 'matched' ? 'success' : control.data.report.status === 'difference' ? 'danger' : 'warning'}>{control.data.report.status === 'matched' ? 'Ventas y costos conciliados' : control.data.report.status === 'difference' ? 'Diferencias por revisar' : 'Faltan datos para conciliar'}</StatusPill>
+                  <StatusPill tone={control.data.report.costBasis === 'actual' ? 'neutral' : 'warning'}>{control.data.report.costBasis === 'estimated' ? 'Costos estimados' : control.data.report.costBasis === 'actual' ? 'Costos cargados' : 'Costos incompletos'}</StatusPill>
+                  <StatusPill tone="neutral">{control.data.report.source === 'master' ? 'Fuente: Máster' : control.data.report.source === 'cierre' ? 'Fuente: cierre Mind' : 'Fuente: Mind'}</StatusPill>
+                </div>}
+              <p className="text-xs text-muted-foreground sm:ml-auto">La conciliación comprueba totales; la aprobación del cierre es un paso separado.</p>
+            </div>
+            {control.error && <QueryError message="No se pudo comprobar la conciliación de este mes." retry={control.refetch} />}
+            {control.data && !control.error && control.data.report.status !== 'matched' && control.data.report.warnings.length > 0 && <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900"><p>Hay gastos o importes pendientes. Completalos antes de usar el resultado de este mes.</p><details className="mt-1"><summary className="cursor-pointer text-xs font-medium">Ver registros pendientes</summary><ul className="mt-2 space-y-1 text-xs">{control.data.report.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></details></div>}
+          </Card>}
           <details className="rounded-xl border bg-card p-4"><summary className="cursor-pointer text-sm font-semibold">Indicadores de rentabilidad: resultado operativo, márgenes y markup</summary><div className="mt-4">
           {/* KPI Cards */}
           <TooltipProvider delayDuration={200}>
@@ -330,43 +325,90 @@ export default function ExecutiveDashboardV2() {
 
           {/* P&L + Balance */}
           <div className="grid lg:grid-cols-2 gap-6">
-            {/* Estado de Resultados */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" /> Estado de Resultados
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <TooltipProvider delayDuration={200}>
-                {[
-                  { label: viewMode === "quarter" ? "Ventas del trimestre" : viewMode === "year" ? "Ventas del año" : viewMode === "custom" ? "Ventas del período" : "Ventas del mes", value: d.ventasDelMes, bold: false, pct: 100, tooltip: "Total facturado sin IVA en el período." },
-                  { label: "– Costos operativos", value: d.ventasDelMes != null && d.ebitOperativo != null ? -(d.ventasDelMes - d.ebitOperativo) : null, bold: false, pct: d.ventasDelMes ? ((d.ventasDelMes - (d.ebitOperativo || 0)) / d.ventasDelMes * 100) : null, negative: true, tooltip: "Ventas − EBIT. Incluye costos directos del equipo + costos indirectos de operación." },
-                  { label: "= EBIT Operativo", value: d.ebitOperativo, bold: true, pct: d.margenOperativo, tooltip: "Resultado operativo antes de los ajustes al neto e impuestos de la fuente." },
-                  { label: !d.beneficioNetoParcial && d.beneficioNeto != null && d.ebitOperativo != null && d.beneficioNeto > d.ebitOperativo ? "+ Recuperos y ajustes al neto" : "– Ajustes al neto", value: !d.beneficioNetoParcial && d.ebitOperativo != null && d.beneficioNeto != null ? -(d.ebitOperativo - d.beneficioNeto) : null, bold: false, negative: true, tooltip: d.beneficioNetoParcial ? "No se calcula la diferencia: EBIT y neto cubren distintos meses." : "Diferencia entre EBIT y neto según la fuente: incluye impuestos, provisiones y el tratamiento de bonos." },
-                  { label: d.beneficioNetoParcial ? "= Beneficio Neto (parcial)" : "= Beneficio Neto", value: d.beneficioNeto, bold: true, pct: d.margenNeto, tooltip: "Ganancia final después de todos los costos e impuestos." },
-                ].map((row, i) => (
-                  <div key={i} className={`flex items-center justify-between py-2 px-3 rounded ${row.bold ? "bg-slate-50 border font-semibold" : ""}`}>
-                    <div className="flex items-center gap-1.5">
-                      <span className={`text-sm ${row.bold ? "" : "text-muted-foreground"}`}>{row.label}</span>
-                      <InfoTip label={`Más información sobre ${row.label}`} side="right">{row.tooltip}</InfoTip>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-sm tabular-nums ${row.negative ? "text-red-500" : kpiColor(row.value, 0)}`}>
-                        {row.value != null ? fmt(row.negative ? Math.abs(row.value) : row.value) : "—"}
-                      </span>
-                      {row.pct != null && (
-                        <span className="text-xs text-muted-foreground w-16 text-right">{typeof row.pct === 'number' ? fmtPct(row.pct) : row.pct}</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                </TooltipProvider>
-              </CardContent>
-            </Card>
-
-            {/* Balance + Caja */}
+            {/* Estado de resultados + caja */}
             <div className="space-y-6">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" /> Estado de resultados
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <TooltipProvider delayDuration={200}>
+                  {[
+                    { label: viewMode === "quarter" ? "Ventas del trimestre" : viewMode === "year" ? "Ventas del año" : viewMode === "custom" ? "Ventas del período" : "Ventas del mes", value: d.ventasDelMes, bold: false, pct: 100, tooltip: "Total facturado sin IVA en el período." },
+                    { label: "– Costos operativos", value: d.ventasDelMes != null && d.ebitOperativo != null ? -(d.ventasDelMes - d.ebitOperativo) : null, bold: false, pct: d.ventasDelMes ? ((d.ventasDelMes - (d.ebitOperativo || 0)) / d.ventasDelMes * 100) : null, negative: true, tooltip: "Ventas − EBIT. Incluye costos directos del equipo + costos indirectos de operación." },
+                    { label: "= EBIT Operativo", value: d.ebitOperativo, bold: true, pct: d.margenOperativo, tooltip: "Resultado operativo antes de los ajustes al neto e impuestos de la fuente." },
+                    { label: !d.beneficioNetoParcial && d.beneficioNeto != null && d.ebitOperativo != null && d.beneficioNeto > d.ebitOperativo ? "+ Recuperos y ajustes al neto" : "– Ajustes al neto", value: !d.beneficioNetoParcial && d.ebitOperativo != null && d.beneficioNeto != null ? -(d.ebitOperativo - d.beneficioNeto) : null, bold: false, negative: true, tooltip: d.beneficioNetoParcial ? "No se calcula la diferencia: EBIT y neto cubren distintos meses." : "Diferencia entre EBIT y neto según la fuente: incluye impuestos, provisiones y el tratamiento de bonos." },
+                    { label: d.beneficioNetoParcial ? "= Beneficio Neto (parcial)" : "= Beneficio Neto", value: d.beneficioNeto, bold: true, pct: d.margenNeto, tooltip: "Ganancia final después de todos los costos e impuestos." },
+                  ].map((row, i) => (
+                    <div key={i} className={`flex items-center justify-between py-2 px-3 rounded ${row.bold ? "bg-slate-50 border font-semibold" : ""}`}>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-sm ${row.bold ? "" : "text-muted-foreground"}`}>{row.label}</span>
+                        <InfoTip label={`Más información sobre ${row.label}`} side="right">{row.tooltip}</InfoTip>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`whitespace-nowrap text-sm tabular-nums ${row.negative ? "text-red-500" : kpiColor(row.value, 0)}`}>
+                          {row.value != null ? fmt(row.negative ? Math.abs(row.value) : row.value) : "—"}
+                        </span>
+                        {row.pct != null && (
+                          <span className="text-xs text-muted-foreground w-16 text-right">{typeof row.pct === 'number' ? fmtPct(row.pct) : row.pct}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  </TooltipProvider>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" /> Caja y runway
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between py-1.5 px-3 text-sm">
+                    <span className="text-muted-foreground">Cashflow Neto</span>
+                    <span className={`whitespace-nowrap tabular-nums font-medium ${kpiColor(d.cashflow, 0)}`}>{fmt(d.cashflow)}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 px-3 text-sm">
+                    <span className="text-muted-foreground">Caja Total</span>
+                    <span className={`whitespace-nowrap tabular-nums font-medium ${kpiColor(d.activoLiquido, 0)}`}>{fmt(d.activoLiquido)}</span>
+                  </div>
+                  {runwayMonths != null && (
+                    <div className="flex justify-between py-2 px-3 rounded bg-red-50 border border-red-200 text-sm">
+                      <span className="font-semibold text-red-800">Runway</span>
+                      <Badge className="bg-red-100 text-red-800">{runwayMonths.toFixed(1)} meses</Badge>
+                    </div>
+                  )}
+                  {d.proyeccionResultado != null && (
+                    <TooltipProvider delayDuration={200}>
+                      <div className="border-t pt-2 mt-2 space-y-1.5">
+                        <div className="flex justify-between py-1 px-3 text-sm">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-muted-foreground">Proyección resultado</span>
+                            <InfoTip label="Más información sobre la proyección de resultado" side="right">
+                              Resultado proyectado del período desde ingresos y costos registrados en Mind.
+                            </InfoTip>
+                          </div>
+                          <span className={`whitespace-nowrap tabular-nums font-medium ${kpiColor(d.proyeccionResultado, 0)}`}>{fmt(d.proyeccionResultado)}</span>
+                        </div>
+                        {d.beneficioNeto != null && (
+                          <div className="flex justify-between py-1.5 px-3 rounded bg-slate-50 border text-sm font-semibold">
+                            <span>Real vs Proyección</span>
+                            <span className={`whitespace-nowrap tabular-nums ${kpiColor(d.beneficioNeto - d.proyeccionResultado, 0)}`}>
+                              {d.beneficioNeto - d.proyeccionResultado >= 0 ? "+" : ""}{fmt(d.beneficioNeto - d.proyeccionResultado)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </TooltipProvider>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            {/* Balance */}
+            <div>
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
@@ -396,7 +438,7 @@ export default function ExecutiveDashboardV2() {
                         <span className={row.bold ? "" : "text-muted-foreground"}>{row.label}</span>
                         <InfoTip label={`Más información sobre ${row.label}`} side="right">{row.tooltip}</InfoTip>
                       </div>
-                      <span className={`tabular-nums ${row.negative ? "text-red-500" : kpiColor(row.value, 0)}`}>
+                      <span className={`whitespace-nowrap tabular-nums ${row.negative ? "text-red-500" : kpiColor(row.value, 0)}`}>
                         {fmt(row.value)}
                       </span>
                     </div>
@@ -405,52 +447,6 @@ export default function ExecutiveDashboardV2() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" /> Caja & Runway
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between py-1.5 px-3 text-sm">
-                    <span className="text-muted-foreground">Cashflow Neto</span>
-                    <span className={`tabular-nums font-medium ${kpiColor(d.cashflow, 0)}`}>{fmt(d.cashflow)}</span>
-                  </div>
-                  <div className="flex justify-between py-1.5 px-3 text-sm">
-                    <span className="text-muted-foreground">Caja Total</span>
-                    <span className={`tabular-nums font-medium ${kpiColor(d.activoLiquido, 0)}`}>{fmt(d.activoLiquido)}</span>
-                  </div>
-                  {runwayMonths != null && (
-                    <div className="flex justify-between py-2 px-3 rounded bg-red-50 border border-red-200 text-sm">
-                      <span className="font-semibold text-red-800">Runway</span>
-                      <Badge className="bg-red-100 text-red-800">{runwayMonths.toFixed(1)} meses</Badge>
-                    </div>
-                  )}
-                  {d.proyeccionResultado != null && (
-                    <TooltipProvider delayDuration={200}>
-                      <div className="border-t pt-2 mt-2 space-y-1.5">
-                        <div className="flex justify-between py-1 px-3 text-sm">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-muted-foreground">Proyección resultado</span>
-                            <InfoTip label="Más información sobre la proyección de resultado" side="right">
-                              Resultado proyectado del período desde ingresos y costos registrados en Mind.
-                            </InfoTip>
-                          </div>
-                          <span className={`tabular-nums font-medium ${kpiColor(d.proyeccionResultado, 0)}`}>{fmt(d.proyeccionResultado)}</span>
-                        </div>
-                        {d.beneficioNeto != null && (
-                          <div className="flex justify-between py-1.5 px-3 rounded bg-slate-50 border text-sm font-semibold">
-                            <span>Real vs Proyección</span>
-                            <span className={`tabular-nums ${kpiColor(d.beneficioNeto - d.proyeccionResultado, 0)}`}>
-                              {d.beneficioNeto - d.proyeccionResultado >= 0 ? "+" : ""}{fmt(d.beneficioNeto - d.proyeccionResultado)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </TooltipProvider>
-                  )}
-                </CardContent>
-              </Card>
             </div>
           </div>
 
@@ -471,7 +467,7 @@ export default function ExecutiveDashboardV2() {
                 {/* Ventas & EBIT Chart */}
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Ventas & EBIT (USD)</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Ventas y EBIT (USD)</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={220}>
@@ -492,7 +488,7 @@ export default function ExecutiveDashboardV2() {
                 {/* Cashflow Chart */}
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Cashflow Mensual (USD)</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Cashflow mensual (USD)</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={220}>
@@ -507,7 +503,7 @@ export default function ExecutiveDashboardV2() {
                           // Color bars based on positive/negative
                           shape={(props: any) => {
                             const { x, y, width, height, value } = props;
-                            return <rect x={x} y={y} width={width} height={height} rx={4} fill={value >= 0 ? '#10b981' : '#ef4444'} fillOpacity={0.75} />;
+                            return <rect x={x} y={height < 0 ? y + height : y} width={width} height={Math.abs(height)} rx={4} fill={value >= 0 ? '#10b981' : '#ef4444'} fillOpacity={0.75} />;
                           }}
                         />
                       </BarChart>
@@ -524,15 +520,15 @@ export default function ExecutiveDashboardV2() {
             const recommendations: Array<{ priority: 'high' | 'medium' | 'low'; text: string }> = [];
 
             // Trend analysis
-            const prev = trend.length > 1 ? trend.find((m: any) => m.periodKey !== d.periodKey && m.ventasDelMes != null) : null;
+            const prev = previous;
             const ventasChange = prev?.ventasDelMes && d.ventasDelMes ? ((d.ventasDelMes - prev.ventasDelMes) / prev.ventasDelMes * 100) : null;
 
             // Revenue insight
             if (d.ventasDelMes != null) {
               if (ventasChange != null && ventasChange > 10) {
-                insights.push({ icon: TrendingUp, color: "text-emerald-600", title: "Revenue en crecimiento", text: `Ventas crecieron ${ventasChange.toFixed(0)}% vs mes anterior. Tendencia positiva.` });
+                insights.push({ icon: TrendingUp, color: "text-emerald-600", title: "Ventas en crecimiento", text: `Ventas crecieron ${ventasChange.toFixed(0)}% vs mes anterior. Tendencia positiva.` });
               } else if (ventasChange != null && ventasChange < -10) {
-                insights.push({ icon: TrendingDown, color: "text-red-600", title: "Caída de revenue", text: `Ventas bajaron ${Math.abs(ventasChange).toFixed(0)}% vs mes anterior.` });
+                insights.push({ icon: TrendingDown, color: "text-red-600", title: "Caída de ventas", text: `Ventas bajaron ${Math.abs(ventasChange).toFixed(0)}% vs mes anterior.` });
                 recommendations.push({ priority: 'high', text: 'Revisar pipeline de ventas y acelerar cierre de propuestas pendientes.' });
               }
             }
@@ -592,7 +588,7 @@ export default function ExecutiveDashboardV2() {
                 <Card className="border-indigo-100">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Lightbulb className="h-4 w-4 text-indigo-500" /> Insights para el Board
+                      <Lightbulb className="h-4 w-4 text-indigo-500" /> Lecturas del período
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -612,7 +608,7 @@ export default function ExecutiveDashboardV2() {
                 <Card className={recommendations.some(r => r.priority === 'high') ? "border-red-100" : "border-amber-100"}>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Target className="h-4 w-4 text-amber-500" /> Recomendaciones Accionables
+                      <Target className="h-4 w-4 text-amber-500" /> Qué revisar
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -642,31 +638,31 @@ export default function ExecutiveDashboardV2() {
           {trend.length > 1 && (
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Evolución Mensual (últimos {trend.length} meses)</CardTitle>
+                <CardTitle className="text-base">Evolución mensual · últimos {trend.length} meses</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
-                <table className="w-full text-xs">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left py-2 px-2 font-medium text-muted-foreground">Período</th>
-                      <th className="text-right py-2 px-2 font-medium text-muted-foreground">Ventas</th>
-                      <th className="text-right py-2 px-2 font-medium text-muted-foreground">EBIT</th>
-                      <th className="text-right py-2 px-2 font-medium text-muted-foreground">Benef. Neto</th>
-                      <th className="text-right py-2 px-2 font-medium text-muted-foreground">Markup</th>
-                      <th className="text-right py-2 px-2 font-medium text-muted-foreground">Margen Op.</th>
-                      <th className="text-right py-2 px-2 font-medium text-muted-foreground">Cashflow</th>
+                      <th className="text-left py-2.5 px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Período</th>
+                      <th className="text-right py-2.5 px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Ventas</th>
+                      <th className="text-right py-2.5 px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">EBIT</th>
+                      <th className="text-right py-2.5 px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Benef. Neto</th>
+                      <th className="text-right py-2.5 px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Markup</th>
+                      <th className="text-right py-2.5 px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Margen Op.</th>
+                      <th className="text-right py-2.5 px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Cashflow</th>
                     </tr>
                   </thead>
                   <tbody>
                     {trend.map((m: any) => (
-                      <tr key={m.periodKey} className={`border-b hover:bg-slate-50 ${m.periodKey === d.periodKey ? "bg-indigo-50" : ""}`}>
-                        <td className="py-1.5 px-2 font-medium">{m.monthLabel} {m.year}</td>
-                        <td className="text-right py-1.5 px-2 tabular-nums">{fmtShort(m.ventasDelMes)}</td>
-                        <td className={`text-right py-1.5 px-2 tabular-nums ${kpiColor(m.ebitOperativo, 0)}`}>{fmtShort(m.ebitOperativo)}</td>
-                        <td className={`text-right py-1.5 px-2 tabular-nums ${kpiColor(m.beneficioNeto, 0)}`}>{fmtShort(m.beneficioNeto)}</td>
-                        <td className={`text-right py-1.5 px-2 tabular-nums ${kpiColor(m.markup, 2.5)}`}>{m.markup?.toFixed(2) || "—"}</td>
-                        <td className={`text-right py-1.5 px-2 tabular-nums ${kpiColor(m.margenOperativo, 15)}`}>{fmtPct(m.margenOperativo)}</td>
-                        <td className={`text-right py-1.5 px-2 tabular-nums ${kpiColor(m.cashflow, 0)}`}>{fmtShort(m.cashflow)}</td>
+                      <tr key={m.periodKey} aria-current={m.periodKey === d.periodKey ? "date" : undefined} className={`border-b last:border-0 hover:bg-muted/40 ${m.periodKey === d.periodKey ? "bg-primary/[0.06] font-medium" : ""}`}>
+                        <td className="whitespace-nowrap py-2 px-3 font-medium">{m.monthLabel} {m.year}</td>
+                        <td className="whitespace-nowrap text-right py-2 px-3 tabular-nums">{fmtShort(m.ventasDelMes)}</td>
+                        <td className={`whitespace-nowrap text-right py-2 px-3 tabular-nums ${kpiColor(m.ebitOperativo, 0)}`}>{fmtShort(m.ebitOperativo)}</td>
+                        <td className={`whitespace-nowrap text-right py-2 px-3 tabular-nums ${kpiColor(m.beneficioNeto, 0)}`}>{fmtShort(m.beneficioNeto)}</td>
+                        <td className={`whitespace-nowrap text-right py-2 px-3 tabular-nums ${kpiColor(m.markup, 2.5)}`}>{m.markup?.toFixed(2) || "—"}</td>
+                        <td className={`whitespace-nowrap text-right py-2 px-3 tabular-nums ${kpiColor(m.margenOperativo, 15)}`}>{fmtPct(m.margenOperativo)}</td>
+                        <td className={`whitespace-nowrap text-right py-2 px-3 tabular-nums ${kpiColor(m.cashflow, 0)}`}>{fmtShort(m.cashflow)}</td>
                       </tr>
                     ))}
                   </tbody>

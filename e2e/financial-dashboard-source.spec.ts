@@ -21,7 +21,6 @@ test('dashboard identifies Master source, partial net/margin and the balance per
   });
   await page.request.post('/api/login', { data: { email:'e2e-0@example.test', password:'mind-local-test-only' } });
   await page.goto('/dashboard');
-  await page.getByText('Comparar trimestre, año o rango personalizado',{exact:true}).click();
   await page.getByRole('button',{name:'Año',exact:true}).click();
   await expect(page.getByText('Fuente: Máster',{exact:true})).toBeVisible();
   await expect(page.getByText('Ganancia neta (parcial)',{exact:true})).toBeVisible();

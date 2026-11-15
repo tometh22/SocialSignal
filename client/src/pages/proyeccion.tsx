@@ -13,10 +13,10 @@ import { useFinancePeriod } from "@/hooks/use-finance-period";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CompactPageHeader } from "@/components/ui/compact-page-header";
+import { FinanceHeader, FinanceLoading, StatusPill } from "@/components/finance/ui";
+import { QueryError } from "@/components/query-error";
 import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
 import { PageShell } from "@/components/ui/page-shell";
-import { ToolbarPanel } from "@/components/ui/toolbar-panel";
 import { CostScenario } from "@/components/finance/cost-scenario";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Target, TrendingUp, DollarSign, Info } from "lucide-react";
@@ -66,7 +66,7 @@ export default function ProyeccionPage() {
   const { year: selectedFinanceYear } = useFinancePeriod();
   const year = Number(selectedFinanceYear);
 
-  const { data, isLoading, error } = useQuery<Proyeccion>({
+  const { data, isLoading, error, refetch } = useQuery<Proyeccion>({
     queryKey: [`/api/v2/executive/proyeccion?year=${year}`],
   });
 
@@ -81,22 +81,15 @@ export default function ProyeccionPage() {
   }));
 
   return (
-    <PageShell>
-      <CompactPageHeader
+    <PageShell width="wide" spacing="compact">
+      <FinanceHeader
         title="Proyección del año"
         description="Meses cerrados y estimados del ejercicio. Los gastos sin importe siguen pendientes y pueden cambiar el resultado proyectado."
+        actions={data && <StatusPill tone="neutral">{data.mesesCerrados} meses cerrados · {data.mesesProyectados} proyectados</StatusPill>}
       />
 
-      <ToolbarPanel>
-        {data && (
-          <Badge variant="outline" className="ml-2">
-            {data.mesesCerrados} cerrados · {data.mesesProyectados} proyectados
-          </Badge>
-        )}
-      </ToolbarPanel>
-
-      {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
-      {error && <p className="text-sm text-red-600">No se pudo cargar la proyección.</p>}
+      {isLoading && <FinanceLoading label="Cargando proyección" />}
+      {error && <QueryError message="No se pudo cargar la proyección." retry={refetch} />}
 
       {data && (
         <TooltipProvider delayDuration={200}>
