@@ -118,7 +118,10 @@ export class AutoSyncService {
       const now = new Date();
       const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       if (cutoverDate && currentPeriod >= cutoverDate) {
-        console.log(`📊 Auto-sync financiero desde Excel desactivado por cutover ${cutoverDate}; la fuente operativa es Mind.`);
+        console.log(`📊 Auto-sync de ventas y costos desde Excel desactivado por cutover ${cutoverDate}.`);
+        // The ledger (Activo, Pasivo, CashFlow, Provisión pasivo) follows the
+        // one-source-per-month rule, not the cutover: Master months keep syncing.
+        await this.syncLedger();
         return {
           salesImported: 0,
           salesUpdated: 0,
@@ -500,6 +503,14 @@ export class AutoSyncService {
       const changed = Object.entries(report.results).filter(([, result]) => Object.values(result).some(value => !/sin cambios|sin provisiones|sin datos|sin movimientos/.test(value)));
       console.log(`📒 Ledger del Máster: ${report.periods.length} meses revisados, ${changed.length} con cambios${changed.length ? ` (${changed.map(([period]) => period).join(', ')})` : ''}`);
       for (const warning of report.warnings) console.warn(`⚠️ ${warning}`);
+      // Monthly control: Mind must equal the Master detail for the latest Master months.
+      const { getMasterControl } = await import('./master-control');
+      for (const period of report.periods.slice(-2)) {
+        const control = await getMasterControl(period);
+        const failed = control.checks.filter(check => check.kind === 'sync' && !check.ok);
+        if (failed.length) console.warn(`⚠️ Control Máster–Mind ${period}: ${failed.map(check => `${check.label} (diferencia USD ${check.differenceUsd ?? 'sin dato'})`).join('; ')}`);
+        else console.log(`✅ Control Máster–Mind ${period}: Mind coincide con el Máster.`);
+      }
     } catch (err: any) {
       console.error('⚠️ syncLedger error (non-critical):', err?.message);
     }
