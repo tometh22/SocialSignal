@@ -40,7 +40,7 @@ describe.skipIf(!setup.url)("financial projection sources", () => {
         beneficio_neto numeric, margen_neto numeric
       );
       CREATE TABLE fact_cost_month (period_key text PRIMARY KEY, direct_usd numeric, indirect_usd numeric, provisions_usd numeric);
-      CREATE TABLE fact_estimated_cost_month (month_key text, monto_total_usd numeric, id serial, detalle text, subtipo_costo text, puesto text);
+      CREATE TABLE fact_estimated_cost_month (month_key text, monto_total_usd numeric, id serial, detalle text, subtipo_costo text, puesto text, source_run_id text);
       CREATE TABLE pasivo_entries (
         id serial PRIMARY KEY, period_key text, detalle text, concepto text, descripcion text, vendor_name text,
         subtipo_costo text, fecha_emision timestamp, source text DEFAULT 'excel', cost_treatment text DEFAULT 'unclassified',
@@ -67,6 +67,18 @@ describe.skipIf(!setup.url)("financial projection sources", () => {
       CREATE TABLE fact_labor_month (period_key text, cost_usd numeric);
       CREATE TABLE financial_accounts (currency text, opening_balance numeric, is_active boolean, opening_balance_date date);
       CREATE TABLE exchange_rates (year integer, month integer, is_active boolean, rate_type text, rate numeric, updated_at timestamp, id serial);
+      -- Tables read by the Mind-month calculation (native-month.ts).
+      ALTER TABLE activo_entries ADD COLUMN id serial, ADD COLUMN source text, ADD COLUMN tipo_activo text, ADD COLUMN concepto text, ADD COLUMN gross_amount numeric,
+        ADD COLUMN monto_total_usd numeric, ADD COLUMN monto_ars numeric, ADD COLUMN fecha_vencimiento timestamp;
+      ALTER TABLE pasivo_entries ADD COLUMN gross_amount numeric, ADD COLUMN fecha_vencimiento timestamp;
+      ALTER TABLE cashflow_transactions ADD COLUMN fecha timestamp, ADD COLUMN account_id integer, ADD COLUMN banco text, ADD COLUMN moneda text, ADD COLUMN original_amount numeric;
+      ALTER TABLE financial_accounts ADD COLUMN id serial, ADD COLUMN name text, ADD COLUMN bank_name text;
+      CREATE TABLE pl_adjustments (period_key text, type text, concept text, amount_usd numeric);
+      CREATE TABLE provision_movements (provision_id integer, period_key text, movement_type text, amount numeric, currency text);
+      ALTER TABLE provision_entries ADD COLUMN id serial, ADD COLUMN tipo text;
+      CREATE TABLE financial_document_applications (activo_entry_id integer, pasivo_entry_id integer, amount_usd numeric, applied_at timestamp, voided_at timestamp);
+      CREATE TABLE active_projects (id serial PRIMARY KEY, closed_at timestamp, completed_date timestamp, actual_end_date timestamp);
+      CREATE TABLE fact_rc_month (project_id integer, period_key text, revenue_usd numeric, cost_usd numeric);
     `);
   });
   beforeEach(async () => {
@@ -147,6 +159,28 @@ describe.skipIf(!setup.url)("financial projection sources", () => {
     expect(result.mesesProyectados).toBe(11);
     expect(result.meses).toHaveLength(12);
     expect(result.meses[0]).toMatchObject({ month: 1, monthLabel: '01 ene', cierre: true });
+  });
+
+  it("uses the Mind budget only in Mind months and never adds it to Master months", async () => {
+    await pool.query(`
+      INSERT INTO monthly_financial_summary (period_key, facturacion_total) VALUES ('2027-01', 5000);
+      INSERT INTO fact_estimated_cost_month (month_key, monto_total_usd, source_run_id) VALUES
+        ('2027-01', 4000, NULL), ('2027-01', 999999, 'mind_budget'),
+        ('2027-02', 999999, NULL), ('2027-02', 3000, 'mind_budget'), ('2027-02', 500, 'mind_budget'),
+        ('2027-03', 2500, NULL);
+      INSERT INTO revenue_events (invoice_period, amount_usd, confirmed, probability, status, is_estimate, source_tab) VALUES
+        ('2027-01', 999999, false, 100, 'pipeline', true, 'mind_budget'),
+        ('2027-02', 10000, false, 40, 'pipeline', true, 'mind_budget'),
+        ('2027-02', 2000, true, 100, 'confirmed', true, 'mind_budget'),
+        ('2027-02', 999999, false, 50, 'cancelled', true, 'mind_budget');
+    `);
+    const result = await getNativeProjectionSummary(2027);
+    // Mes del Máster: sólo las filas importadas; el presupuesto de Mind no suma.
+    expect(result.meses[0]).toMatchObject({ fuenteFacturacion: 'master', facturacion: 5000, costos: 4000, resultado: 1000 });
+    // Mes de Mind con presupuesto: reemplaza a las filas del Máster y pondera las ventas no confirmadas.
+    expect(result.meses[1]).toMatchObject({ fuenteFacturacion: 'mind', facturacion: 6000, costos: 3500, resultado: 2500 });
+    // Mes de Mind sin presupuesto: conserva la referencia del Máster.
+    expect(result.meses[2]).toMatchObject({ fuenteFacturacion: 'mind', facturacion: 0, costos: 2500 });
   });
 
   it("keeps the full imported annual base even when an operational cutover is configured", async () => {

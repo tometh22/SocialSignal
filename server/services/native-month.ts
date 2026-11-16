@@ -1,5 +1,6 @@
 import { pool } from "../db";
 import { addMonths } from "../../shared/finance-native";
+import { EFFECTIVE_ESTIMATED_COSTS_SQL } from "./finance-period-source";
 
 /**
  * A month that belongs to Mind (see finance-period-source), computed only from
@@ -94,7 +95,7 @@ async function monthResult(runner: Runner, periodKey: string) {
 async function monthBudget(runner: Runner, periodKey: string, excludeUsaTax = false) {
   const { rows: [row] } = await runner.query(`SELECT
       (SELECT COALESCE(sum(amount_usd),0) FROM revenue_events WHERE invoice_period=$1 AND status <> 'cancelled')::float8 ventas,
-      (SELECT COALESCE(sum(monto_total_usd),0) FROM fact_estimated_cost_month WHERE month_key=$1
+      (SELECT COALESCE(sum(monto_total_usd),0) FROM (${EFFECTIVE_ESTIMATED_COSTS_SQL}) budget WHERE month_key=$1
          AND lower(translate(COALESCE(detalle,'')||' '||COALESCE(subtipo_costo,''),'ÁÉÍÓÚáéíóú','AEIOUaeiou')) !~ ${excludeUsaTax ? `'(^| )(iva|impuestos usa)( |$)'` : `'(^| )(iva|iibb|impuestos usa|intereses oxean)( |$)'`})::float8 costos`, [periodKey]);
   return { ventas: n(row.ventas), costos: n(row.costos) };
 }

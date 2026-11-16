@@ -54,6 +54,7 @@ const ReviewHubPage = lazy(() => import("@/pages/review/hub"));
 const ReviewRoomPage = lazy(() => import("@/pages/review/room"));
 const StatusObjectivesPage = lazy(() => import("@/pages/status-objectives"));
 const ProyeccionPage = lazy(() => import("@/pages/proyeccion"));
+const PresupuestoPage = lazy(() => import("@/pages/presupuesto"));
 const ArrPage = lazy(() => import("@/pages/arr"));
 const RendimientoPage = lazy(() => import("@/pages/rendimiento"));
 const CostosPage = lazy(() => import("@/pages/costos"));
@@ -360,6 +361,8 @@ function AppRoutes() {
                   <ProtectedRoute path="/finance/cierre" component={FinancialClosePage} requiredPermission="finance" />
                   <ProtectedRoute path="/finance/saldos-iniciales" component={FinanceOpeningPage} requiredPermission="finance" />
                   <ProtectedRoute path="/finance/proyeccion" component={ProyeccionPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
+                  {/* Lectura con el permiso del Resumen; cargar o editar el presupuesto exige "finance" (API y botones). */}
+                  <ProtectedRoute path="/finance/presupuesto" component={PresupuestoPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/finance/arr" component={ArrPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/finance/rendimiento" component={RendimientoPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/finance/costos" component={CostosPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />

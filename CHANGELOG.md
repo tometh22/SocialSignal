@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.14.59 — 2026-11-16
+
+Preparación para registrar Finanzas sólo en Mind desde enero de 2027.
+
+- Mes de cambio: desde el mes elegido en Saldos iniciales, todos los meses se informan con lo cargado en Mind aunque la planilla Máster tenga datos.
+- Saldos iniciales: página nueva para cargar bancos, facturas sin cobrar, deudas, provisiones e inversiones con las que arranca Mind, con importación desde el Máster y comparación con su Resumen Ejecutivo. No generan ventas ni gastos.
+- Meses de Mind: un único cálculo para el Resumen, el cierre y los indicadores. Los saldos de cobrar, pagar, caja y provisiones son los del último día del mes según los cobros y pagos aplicados; nunca suman filas importadas del Máster. Las ventas estimadas nunca cuentan como ventas reales.
+- Impuestos como en el Máster: IVA fuera del resultado; IIBB, Impuestos de EE. UU. e intereses debajo del EBIT; deuda de impuestos de EE. UU. separada en el balance. La carga financiera permite elegir el impuesto, separar IVA e IIBB en ventas, registrar intereses y deudas sin costo.
+- Inversiones (cripto y otras) con valuación mensual en Caja; markup, proyección de resultado, balance y cashflow a 60 días con las fórmulas del Máster.
+- Presupuesto: costos y ventas estimadas por mes para la proyección de los meses de Mind, sin mezclarse con lo importado del Máster.
+- Otros: campos de ajuste de venta y costo de marketing, horas objetivo desde la planificación de capacidad y cuentas en euros.
+
 ## 1.14.58 — 2026-11-16
 
 - La sincronización automática del ledger del Máster (Activo, Pasivo, CashFlow y Provisión pasivo) corre cada 30 minutos aunque esté activo el corte de agosto: antes el corte la salteaba y sólo funcionaba al dispararla a mano.
