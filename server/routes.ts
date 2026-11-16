@@ -10478,10 +10478,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const marginContableUsd = ebitContableUsd;
       
       // ===== PROVISIONES Y AJUSTES PnL =====
+      // El IVA liquidado desde Carga financiera no es resultado: se excluye.
       const { rows: [adjustmentsData] } = await pool.query(`
         SELECT COALESCE(SUM(amount_usd), 0) as total_adjustments
         FROM pl_adjustments
-        WHERE period_key = ANY($1)
+        WHERE period_key = ANY($1) AND COALESCE(concept, '') <> 'IVA'
       `, [periodKeys]);
       const totalAdjustmentsUsd = parseFloat(adjustmentsData?.total_adjustments || '0');
       

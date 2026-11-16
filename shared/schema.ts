@@ -5321,7 +5321,10 @@ export const pasivoEntries = pgTable("pasivo_entries", {
   grossAmount: numeric("gross_amount", { precision: 18, scale: 2 }),
   status: varchar("status", { length: 20 }).notNull().default("PENDING"),
   outstandingAmount: numeric("outstanding_amount", { precision: 18, scale: 2 }),
+  // direct | indirect | provision | unclassified | balance_only (deuda sin costo) | tax (impuesto debajo del EBIT)
   costTreatment: varchar("cost_treatment", { length: 20 }).notNull().default("unclassified"),
+  // Columna "Costo Marketing" del Máster.
+  isMarketing: boolean("is_marketing").notNull().default(false),
   source: varchar("source", { length: 40 }).notNull().default("excel"),
   externalId: text("external_id"),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
@@ -5543,6 +5546,10 @@ export const revenueEvents = pgTable("revenue_events", {
   sourceRowId: text("source_row_id"),
   isEstimate: boolean("is_estimate").notNull().default(false),
   periodClosed: boolean("period_closed").notNull().default(false),
+
+  // Columna "Ajuste" del Máster: ya incluida en amount_usd; se guarda aparte para auditar la venta base.
+  adjustmentAmountUsd: numeric("adjustment_amount_usd", { precision: 14, scale: 2 }),
+  adjustmentNote: text("adjustment_note"),
 
   note: text("note"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

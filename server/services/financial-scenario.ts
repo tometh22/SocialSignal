@@ -24,8 +24,9 @@ function toCost(row: ScenarioCostRow, source: 'ledger'): ScenarioCost {
   let amount = row.amount_usd == null ? null : Number(row.amount_usd);
   if (amount != null && !Number.isFinite(amount)) amount = null;
   // Native rollups treat unclassified liabilities as indirect costs; only an
-  // explicit provision belongs below EBIT. Do not apply imported VAT/category rules.
-  const fiscal = row.cost_treatment === 'provision';
+  // explicit provision or tax (IIBB, Impuestos USA) belongs below EBIT.
+  // Do not apply imported VAT/category rules.
+  const fiscal = row.cost_treatment === 'provision' || row.cost_treatment === 'tax';
   return {
     id: `${source}:${row.id}`, periodKey: row.period_key, concept,
     description: [...new Set([row.concepto, row.descripcion, row.vendor_name].filter(Boolean))].join(' · '),
