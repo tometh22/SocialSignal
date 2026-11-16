@@ -66,6 +66,7 @@ const FinancialIntakePage = lazy(() => import("@/pages/financial-intake"));
 const TeamSettlementsPage = lazy(() => import("@/pages/team-monthly-close"));
 const TeamInvoiceReviewPage = lazy(() => import("@/pages/team-invoice-review"));
 const FinancialClosePage = lazy(() => import("@/pages/financial-close"));
+const FinanceOpeningPage = lazy(() => import("@/pages/finance-opening"));
 
 // Task Management Module
 const MyTasksPage = lazy(() => import("@/pages/my-tasks"));
@@ -357,6 +358,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/finance/facturas-equipo" component={TeamInvoiceReviewPage} requiredPermission="finance" />
                   <Route path="/finance/liquidaciones-equipo">{() => <Redirect to="/operations/liquidaciones-equipo" />}</Route>
                   <ProtectedRoute path="/finance/cierre" component={FinancialClosePage} requiredPermission="finance" />
+                  <ProtectedRoute path="/finance/saldos-iniciales" component={FinanceOpeningPage} requiredPermission="finance" />
                   <ProtectedRoute path="/finance/proyeccion" component={ProyeccionPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/finance/arr" component={ArrPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/finance/rendimiento" component={RendimientoPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />

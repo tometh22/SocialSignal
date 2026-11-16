@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'wouter';
-import { BarChart3, ChevronLeft, ChevronRight, ClipboardCheck, FolderKanban, Landmark, LineChart, Receipt, Scale, UploadCloud } from 'lucide-react';
+import { BarChart3, ChevronLeft, ChevronRight, ClipboardCheck, Flag, FolderKanban, Landmark, LineChart, Receipt, Scale, UploadCloud } from 'lucide-react';
 import { useFinancePeriod } from '@/hooks/use-finance-period';
 import { FINANCE_SUMMARY_ACCESS_SECTIONS, usePermissions } from '@/hooks/use-permissions';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ const actions = [
   { href: '/finance/cargar', label: 'Cargar información', icon: UploadCloud, note: 'La bandeja reúne todos los períodos. Revisá la fecha y el mes de aplicación de cada documento antes de confirmar.' },
   { href: '/finance/facturas-equipo', label: 'Facturas del equipo', icon: Receipt },
   { href: '/finance/cierre', label: 'Revisar cierre', icon: ClipboardCheck },
+  { href: '/finance/saldos-iniciales', label: 'Saldos iniciales', icon: Flag, note: 'Saldos con los que Finanzas arranca en Mind en el mes de cambio.' },
 ];
 export const financePaths = [...groups.flatMap(group => group.paths), ...actions.map(action => action.href)];
 const secondary: Record<string, string> = { '/finance/activo': 'Por cobrar', '/finance/pasivo': 'Por pagar', '/finance/provisions': 'Provisiones', '/finance/rendimiento': 'Contribución por proyecto', '/finance/costos': 'Desglose de costos', '/finance/arr': 'Ingresos recurrentes' };

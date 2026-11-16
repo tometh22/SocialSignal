@@ -72,7 +72,7 @@ export default function ActivoPage() {
       <MetricGrid>
         <MetricCard label="Facturas del mes" value={formatUsd(summary?.total)} icon={<DollarSign />} tone="neutral" />
         <MetricCard label="Cobrado" value={formatUsd(summary?.cobrado)} icon={<CheckCircle />} tone="success" />
-        <MetricCard label="Pendiente" value={formatUsd(summary?.pendiente)} icon={<Clock />} tone="warning" detail="Todavía dentro del plazo" />
+        <MetricCard label="Pendiente" value={formatUsd(summary?.pendiente)} icon={<Clock />} tone="warning" detail={summary?.basis === "as_of" ? "Al cierre del mes, incluye meses anteriores" : "Todavía dentro del plazo"} />
         <MetricCard label="Vencido" value={formatUsd(summary?.vencido)} icon={<AlertCircle />} tone={overdue ? "danger" : "neutral"} detail={overdue ? "Requiere seguimiento de cobro" : undefined} />
       </MetricGrid>
 
@@ -110,7 +110,7 @@ export default function ActivoPage() {
               const outstanding = Number(row.outstandingUSD ?? row.montoTotalUSD ?? 0);
               return <TableRow key={row.id}>
                 <TableCell className="font-medium">{row.clienteNombre || "—"}</TableCell>
-                <TableCell className="max-w-[260px]"><span className="block truncate" title={row.concepto || undefined}>{row.concepto || "—"}</span><span className="text-xs text-muted-foreground">{row.source === "excel" ? "Máster" : "Registrado en Mind"}</span></TableCell>
+                <TableCell className="max-w-[260px]"><span className="block truncate" title={row.concepto || undefined}>{row.concepto || "—"}</span><span className="text-xs text-muted-foreground">{row.source === "excel" ? "Máster" : row.openingBalance ? "Saldo inicial" : row.issuedBefore ? `Pendiente desde ${row.periodKey}` : "Registrado en Mind"}</span></TableCell>
                 <TableCell className="whitespace-nowrap font-mono text-xs">{row.nroFactura || "—"}</TableCell>
                 <TableCell className="whitespace-nowrap text-sm">{formatDate(row.fechaVencimiento)}</TableCell>
                 <TableCell className="whitespace-nowrap text-right tabular-nums">{formatUsd(Number(row.montoTotalUSD ?? 0))}</TableCell>

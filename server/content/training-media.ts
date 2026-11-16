@@ -304,6 +304,18 @@ export const trainingScreenshots: Record<string, AuthoredTrainingScreenshot[]> =
         height: 600,
       },
     ],
+    "saldos-iniciales": [
+      {
+        id: "referencia",
+        fileName: "saldos-iniciales.jpg",
+        alt: "Mes de cambio e importación de saldos del Máster",
+        caption:
+          "Un administrador define el primer mes en Mind. Después, Importar del Máster trae los saldos pendientes al cierre del mes anterior para revisarlos.",
+        step: 3,
+        width: 1176,
+        height: 600,
+      },
+    ],
     cashflow: [
       {
         id: "referencia",

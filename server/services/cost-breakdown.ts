@@ -157,7 +157,8 @@ export async function getCostBreakdown(year: number): Promise<CostBreakdown> {
                   COALESCE(CASE WHEN currency='ARS' THEN net_amount/NULLIF(cotizacion,0) ELSE net_amount END,monto_total_usd,monto_usd,monto_ars/NULLIF(cotizacion,0),0)::numeric AS monto
              FROM pasivo_entries
             WHERE period_key LIKE $1 AND period_key <> ALL($2::text[]) AND voided_at IS NULL AND source <> 'excel'
-              AND COALESCE(cost_treatment,'direct') <> 'balance_only'
+              AND COALESCE(cost_treatment,'direct') NOT IN ('balance_only','tax')
+              AND lower(translate(COALESCE(subtipo_costo,''),'ÁÉÍÓÚáéíóú','AEIOUaeiou')) NOT IN ('iva','iibb','impuestos usa','intereses oxean')
            UNION ALL
            SELECT modeled.concepto,modeled.modeled_usd::numeric AS monto
              FROM modeled_team modeled

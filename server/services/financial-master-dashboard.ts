@@ -39,7 +39,7 @@ export function buildMasterDashboard(snapshot: MasterScenarioSnapshot, periods: 
       margenNeto: brokenNet ? null : margin, markup: amount(18), proyeccionResultado: amount(19),
       activoLiquido: amount(3), activoMedPlazo: amount(4), clientesACobrar: amount(5), activoTotal: amount(6),
       pasivoImpuestosUSA: amount(7), pasivoFacturacionAdelantada: amount(8), pasivoProveedores: amount(9),
-      pasivoTotal: amount(10), balanceNeto: amount(11), cashflow: amount(20), cashflow60Dias: amount(21) });
+      pasivoTotal: amount(10), balanceNeto: amount(11), cashflow: amount(20), cashflow60Dias: amount(21), balance60Dias: amount(12) });
   }
   for (const key of periods) if (!found.has(key)) throw new Error(`Falta el resumen del Máster: ${key}`);
   return result;

@@ -1,7 +1,8 @@
 // Preaggregate each ledger once, then compute historical balances with window functions.
 export const NATIVE_DASHBOARD_SQL = `
     WITH periods AS (
-      SELECT invoice_period period_key FROM revenue_events WHERE status <> 'cancelled'
+      -- Budget and estimated sales never make a month appear as executed.
+      SELECT invoice_period period_key FROM revenue_events WHERE status <> 'cancelled' AND COALESCE(confirmed, true) AND NOT COALESCE(is_estimate, false) AND COALESCE(source_tab,'') <> 'mind_budget'
       UNION SELECT period_key FROM activo_entries WHERE voided_at IS NULL
       UNION SELECT period_key FROM pasivo_entries WHERE voided_at IS NULL
       UNION SELECT period_key FROM cashflow_transactions WHERE voided_at IS NULL
@@ -11,7 +12,7 @@ export const NATIVE_DASHBOARD_SQL = `
       UNION SELECT period_key FROM provision_entries WHERE status IN ('APPROVED','ACTIVE')
     ), revenue AS (
       SELECT invoice_period period_key, sum(amount_usd) amount FROM revenue_events
-      WHERE status <> 'cancelled' GROUP BY invoice_period
+      WHERE status <> 'cancelled' AND COALESCE(confirmed, true) AND NOT COALESCE(is_estimate, false) AND COALESCE(source_tab,'') <> 'mind_budget' GROUP BY invoice_period
     ), labor AS (
       SELECT period_key, sum(cost_usd) amount FROM fact_labor_month GROUP BY period_key
     ), receivables AS (

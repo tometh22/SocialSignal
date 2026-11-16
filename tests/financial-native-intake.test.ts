@@ -82,7 +82,9 @@ describe("financial native integration contracts", () => {
     expect(read("server/services/financial-intake-posting.ts")).toContain("pg_advisory_xact_lock");
     const close = read("server/services/financial-close.ts");
     expect(close).toContain("internal_transfers_balanced");
-    expect(close).toContain("transfer_group_id IS NULL");
+    // The close freezes the same month calculation the Resumen shows, which excludes own transfers.
+    expect(close).toContain("computeNativeMonth");
+    expect(read("server/services/native-month.ts")).toContain("transfer_group_id IS NULL");
   });
 
   it("revierte aplicaciones al anular caja y obliga a rehacer un pre-cierre sucio", () => {
