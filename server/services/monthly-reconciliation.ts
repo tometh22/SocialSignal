@@ -23,7 +23,7 @@ export async function getMonthlyReconciliation(periodKey: string): Promise<Month
     WITH entries AS (
       SELECT project_id,client_name,project_name,amount_usd::numeric revenue,0::numeric cost,
              'Ingreso #'||id::text ref
-      FROM revenue_events WHERE invoice_period=$1 AND status<>'cancelled'
+      FROM revenue_events WHERE invoice_period=$1 AND status<>'cancelled' AND is_estimate=false
       UNION ALL
       SELECT project_id,NULL,NULL,0,COALESCE(cost_usd,0),'Costo del equipo #'||id::text
       FROM fact_labor_month WHERE period_key=$1
@@ -68,7 +68,7 @@ export async function getMonthlyReconciliation(periodKey: string): Promise<Month
 
 export async function getReconciliationPeriods() {
   const { rows } = await pool.query(`SELECT period_key FROM monthly_financial_summary
-    UNION SELECT invoice_period FROM revenue_events WHERE status<>'cancelled'
+    UNION SELECT invoice_period FROM revenue_events WHERE status<>'cancelled' AND is_estimate=false
     UNION SELECT period_key FROM financial_close_periods ORDER BY 1 DESC`);
   return rows.map(row => row.period_key as string);
 }

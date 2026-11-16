@@ -1039,6 +1039,7 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     covers: [
       "/dashboard",
       "/finance/proyeccion",
+      "/finance/presupuesto",
       "/finance/arr",
       "/finance/rendimiento",
       "/finance/costos",
@@ -1063,6 +1064,10 @@ const authoredTrainingLessons: AuthoredLesson[] = [
         href: "/finance/proyeccion",
       },
       {
+        label: "Abrir Presupuesto",
+        href: "/finance/presupuesto",
+      },
+      {
         label: "Abrir Ingresos recurrentes",
         href: "/finance/arr",
       },
@@ -1078,6 +1083,7 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     instructions: [
       "Entrá a Finanzas → Resumen y elegí el mes de referencia compartido.",
       "Para comparar meses cerrados y estimados, consultá Proyección; para ingresos mensuales Fee y su equivalente anual, abrí Clientes y proyectos → Ingresos recurrentes.",
+      "En Proyección → Presupuesto cargá los costos estimados y las ventas estimadas de los meses que ya se registran en Mind; los meses que informa el Máster se corrigen en la planilla.",
       "En Clientes y proyectos podés consultar la contribución mensual, el seguimiento acumulado y el desglose anual de costos. Los importes pendientes no deben interpretarse como cero.",
       "Antes de comparar resultados, alineá período, moneda y filtros. Abrí el detalle disponible para entender las diferencias.",
     ],

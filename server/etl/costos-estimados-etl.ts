@@ -143,7 +143,8 @@ export function parseEstimatedCosts(rawRows: any[][]): EstimatedCostRow[] {
 
 import { db } from '../db.js';
 import { factEstimatedCostMonth } from '../../shared/schema.js';
-import { inArray } from 'drizzle-orm';
+import { and, inArray, sql } from 'drizzle-orm';
+import { BUDGET_SOURCE } from '../../shared/finance-budget.js';
 
 export interface EstimatedCostsETLResult {
   parsed: number;
@@ -154,6 +155,10 @@ export interface EstimatedCostsETLResult {
 /**
  * Writes parsed EstimatedCostRow[] to fact_estimated_cost_month.
  * Delete-then-insert per distinct monthKey for idempotency.
+ *
+ * Only rows imported from the Master are replaced. Budget rows created in Mind
+ * (source_run_id = 'mind_budget', page Finanzas → Presupuesto) are never deleted
+ * here; which rows count for each month is decided by EFFECTIVE_ESTIMATED_COSTS_SQL.
  */
 export async function runEstimatedCostsETL(
   rows: EstimatedCostRow[]
@@ -166,7 +171,10 @@ export async function runEstimatedCostsETL(
 
   try {
     await db.delete(factEstimatedCostMonth)
-      .where(inArray(factEstimatedCostMonth.monthKey, monthKeys));
+      .where(and(
+        inArray(factEstimatedCostMonth.monthKey, monthKeys),
+        sql`${factEstimatedCostMonth.sourceRunId} IS DISTINCT FROM ${BUDGET_SOURCE}`,
+      ));
 
     await db.insert(factEstimatedCostMonth).values(
       rows.map(r => ({

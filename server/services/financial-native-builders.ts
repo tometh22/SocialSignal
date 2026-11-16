@@ -97,7 +97,8 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
           WHEN currency='ARS' AND COALESCE(delivery_start,invoice_period)=${periodKey} THEN amount_native
           ELSE 0 END) revenue_ars
       FROM revenue_events
-      WHERE project_id IS NOT NULL AND status <> 'cancelled'
+      -- Las ventas estimadas del Presupuesto (is_estimate) no son ingresos del proyecto.
+      WHERE project_id IS NOT NULL AND status <> 'cancelled' AND is_estimate = false
         AND (invoice_period=${periodKey} OR ${periodKey} BETWEEN COALESCE(delivery_start,invoice_period) AND COALESCE(delivery_end,delivery_start,invoice_period))
       GROUP BY project_id
     ), modeled_labor AS (

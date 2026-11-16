@@ -6,7 +6,7 @@ import { aggregateMonths, type MonthData } from "./direct-sheets-dashboard";
 import { getMasterScenarioSnapshot } from './financial-master-scenario';
 import { buildMasterDashboard } from './financial-master-dashboard';
 import { getRevenueByBasis } from "./revenue-basis";
-import { getMasterSourcedPeriods } from "./finance-period-source";
+import { EFFECTIVE_ESTIMATED_COSTS_SQL, getMasterSourcedPeriods } from "./finance-period-source";
 
 const num = (value: unknown): number | null => value == null ? null : Number(value);
 
@@ -118,7 +118,8 @@ export async function getNativeProjectionSummary(year: number) {
         COALESCE(NULLIF(f.direct_usd+f.indirect_usd,0), e.estimated, 0)::float total
       FROM unnest($1::text[]) p(period_key)
       LEFT JOIN fact_cost_month f ON f.period_key=p.period_key
-      LEFT JOIN LATERAL (SELECT sum(monto_total_usd)::numeric estimated FROM fact_estimated_cost_month WHERE month_key=p.period_key) e ON true
+      -- Presupuesto del mes: filas del Máster o del Presupuesto de Mind, nunca ambas.
+      LEFT JOIN LATERAL (SELECT sum(monto_total_usd)::numeric estimated FROM (${EFFECTIVE_ESTIMATED_COSTS_SQL}) budget WHERE budget.month_key=p.period_key) e ON true
     `, [periods]),
     // El corte operativo no recorta el presupuesto anual ya importado del
     // Máster. Se conserva como base hasta que el mes tenga ingresos o cierre

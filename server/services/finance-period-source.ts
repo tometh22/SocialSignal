@@ -40,3 +40,21 @@ export async function getPeriodSource(periodKey: string, runner: Runner = pool):
 /** SQL predicate selecting the rows that belong to the period's source. */
 export const ledgerSourcePredicate = (source: FinancePeriodSource, column = "source") =>
   source === "master" ? `${column} = 'excel'` : `${column} <> 'excel'`;
+
+/**
+ * Rows of fact_estimated_cost_month that count for each month (one source per month).
+ * Budget rows created in Mind carry source_run_id = 'mind_budget'; every other row
+ * comes from the Master "Costos estimados" tab.
+ *   · Master month                 → only Master rows (Mind budget rows never add up there)
+ *   · Mind month with budget rows  → only the Mind budget rows
+ *   · Mind month without them      → the Master rows, kept as the pre-migration reference
+ * Mirrors budgetCostBasis in shared/finance-budget.ts. Use it as a derived table:
+ * `FROM (${EFFECTIVE_ESTIMATED_COSTS_SQL}) e`.
+ */
+export const EFFECTIVE_ESTIMATED_COSTS_SQL = `
+  SELECT e.* FROM fact_estimated_cost_month e
+   WHERE CASE
+     WHEN e.month_key IN (${MASTER_PERIODS_SQL}) THEN e.source_run_id IS DISTINCT FROM 'mind_budget'
+     WHEN EXISTS (SELECT 1 FROM fact_estimated_cost_month n WHERE n.month_key = e.month_key AND n.source_run_id = 'mind_budget')
+       THEN e.source_run_id = 'mind_budget'
+     ELSE true END`;

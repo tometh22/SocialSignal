@@ -11,7 +11,7 @@ const groups = [
   { label: 'Caja', icon: Landmark, question: 'Dinero disponible y movimientos bancarios.', paths: ['/finance/cashflow'], finance: true },
   { label: 'Cobros y pagos', icon: Scale, question: 'Saldos por cobrar, por pagar y provisiones.', paths: ['/finance/activo', '/finance/pasivo', '/finance/provisions'], finance: true },
   { label: 'Clientes y proyectos', icon: FolderKanban, question: 'Contribución mensual, costos e ingresos recurrentes.', paths: ['/finance/rendimiento', '/finance/costos', '/finance/arr'] },
-  { label: 'Proyección', icon: LineChart, question: 'Estimación del resultado al terminar el ejercicio.', paths: ['/finance/proyeccion'] },
+  { label: 'Proyección', icon: LineChart, question: 'Estimación del resultado al terminar el ejercicio.', paths: ['/finance/proyeccion', '/finance/presupuesto'] },
 ];
 const actions = [
   { href: '/finance/cargar', label: 'Cargar información', icon: UploadCloud, note: 'La bandeja reúne todos los períodos. Revisá la fecha y el mes de aplicación de cada documento antes de confirmar.' },
@@ -19,7 +19,7 @@ const actions = [
   { href: '/finance/cierre', label: 'Revisar cierre', icon: ClipboardCheck },
 ];
 export const financePaths = [...groups.flatMap(group => group.paths), ...actions.map(action => action.href)];
-const secondary: Record<string, string> = { '/finance/activo': 'Por cobrar', '/finance/pasivo': 'Por pagar', '/finance/provisions': 'Provisiones', '/finance/rendimiento': 'Contribución por proyecto', '/finance/costos': 'Desglose de costos', '/finance/arr': 'Ingresos recurrentes' };
+const secondary: Record<string, string> = { '/finance/activo': 'Por cobrar', '/finance/pasivo': 'Por pagar', '/finance/provisions': 'Provisiones', '/finance/rendimiento': 'Contribución por proyecto', '/finance/costos': 'Desglose de costos', '/finance/arr': 'Ingresos recurrentes', '/finance/proyeccion': 'Ejecutado y proyectado', '/finance/presupuesto': 'Presupuesto' };
 const shiftMonth = (period: string, delta: number) => { const [year, month] = period.split('-').map(Number); return new Date(Date.UTC(year, month - 1 + delta, 1)).toISOString().slice(0, 7); };
 
 export function FinanceWorkspace() {
@@ -30,7 +30,7 @@ export function FinanceWorkspace() {
   const canManage = hasPermission('finance');
   const active = groups.find(group => group.paths.includes(path));
   const activeAction = actions.find(action => action.href === path);
-  const yearOnly = ['/finance/costos', '/finance/proyeccion'].includes(path);
+  const yearOnly = ['/finance/costos', '/finance/proyeccion', '/finance/presupuesto'].includes(path);
   const focus = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
   return <section aria-label="Área de Finanzas" className="mx-auto mb-6 max-w-[1680px] rounded-2xl border border-border/75 bg-card shadow-[0_14px_34px_-32px_rgba(15,23,42,0.5)]">
     <div className="flex flex-wrap items-center justify-between gap-3 px-3 pt-3 sm:px-5 sm:pt-4">

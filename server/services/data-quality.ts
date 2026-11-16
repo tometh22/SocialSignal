@@ -371,18 +371,20 @@ export async function runAllDetectors(opts: RunDetectorsOptions = {}): Promise<F
 
   // 4. Líneas en cero en la proyección de costos.
   const hasEstimatedCosts = await tableExists('fact_estimated_cost_month');
+  // Una sola fuente por mes: filas del Máster o del Presupuesto de Mind, nunca ambas.
+  const { EFFECTIVE_ESTIMATED_COSTS_SQL } = await import('./finance-period-source');
   if (hasEstimatedCosts) {
   const { rows: conceptRows } = await pool.query(
     `WITH reales AS (
         SELECT detalle AS concept, AVG(monto_total_usd)::float AS avg_usd
-          FROM fact_estimated_cost_month
+          FROM (${EFFECTIVE_ESTIMATED_COSTS_SQL}) fact_estimated_cost_month
          WHERE month_key < $1 AND month_key >= $2 AND detalle IS NOT NULL
          GROUP BY detalle
      ), proyectados AS (
         SELECT detalle AS concept,
                COALESCE(SUM(monto_total_usd), 0)::float AS total_usd,
                COUNT(DISTINCT month_key)::int AS months
-          FROM fact_estimated_cost_month
+          FROM (${EFFECTIVE_ESTIMATED_COSTS_SQL}) fact_estimated_cost_month
          WHERE month_key >= $1 AND detalle IS NOT NULL
          GROUP BY detalle
      )
@@ -451,7 +453,7 @@ export async function runAllDetectors(opts: RunDetectorsOptions = {}): Promise<F
   if (hasEstimatedCosts && hasRevenueData) {
     const { rows: costRows } = await pool.query(
       `SELECT detalle AS concept, SUM(monto_total_usd)::float AS amount
-         FROM fact_estimated_cost_month
+         FROM (${EFFECTIVE_ESTIMATED_COSTS_SQL}) fact_estimated_cost_month
         WHERE month_key = ANY($1::text[]) AND detalle IS NOT NULL
         GROUP BY detalle`,
       [yearPeriods],

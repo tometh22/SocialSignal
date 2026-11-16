@@ -40,7 +40,7 @@ describe.skipIf(!setup.url)("financial projection sources", () => {
         beneficio_neto numeric, margen_neto numeric
       );
       CREATE TABLE fact_cost_month (period_key text PRIMARY KEY, direct_usd numeric, indirect_usd numeric, provisions_usd numeric);
-      CREATE TABLE fact_estimated_cost_month (month_key text, monto_total_usd numeric, id serial, detalle text, subtipo_costo text, puesto text);
+      CREATE TABLE fact_estimated_cost_month (month_key text, monto_total_usd numeric, id serial, detalle text, subtipo_costo text, puesto text, source_run_id text);
       CREATE TABLE pasivo_entries (
         id serial PRIMARY KEY, period_key text, detalle text, concepto text, descripcion text, vendor_name text,
         subtipo_costo text, fecha_emision timestamp, source text DEFAULT 'excel', cost_treatment text DEFAULT 'unclassified',
@@ -147,6 +147,28 @@ describe.skipIf(!setup.url)("financial projection sources", () => {
     expect(result.mesesProyectados).toBe(11);
     expect(result.meses).toHaveLength(12);
     expect(result.meses[0]).toMatchObject({ month: 1, monthLabel: '01 ene', cierre: true });
+  });
+
+  it("uses the Mind budget only in Mind months and never adds it to Master months", async () => {
+    await pool.query(`
+      INSERT INTO monthly_financial_summary (period_key, facturacion_total) VALUES ('2027-01', 5000);
+      INSERT INTO fact_estimated_cost_month (month_key, monto_total_usd, source_run_id) VALUES
+        ('2027-01', 4000, NULL), ('2027-01', 999999, 'mind_budget'),
+        ('2027-02', 999999, NULL), ('2027-02', 3000, 'mind_budget'), ('2027-02', 500, 'mind_budget'),
+        ('2027-03', 2500, NULL);
+      INSERT INTO revenue_events (invoice_period, amount_usd, confirmed, probability, status, is_estimate, source_tab) VALUES
+        ('2027-01', 999999, false, 100, 'pipeline', true, 'mind_budget'),
+        ('2027-02', 10000, false, 40, 'pipeline', true, 'mind_budget'),
+        ('2027-02', 2000, true, 100, 'confirmed', true, 'mind_budget'),
+        ('2027-02', 999999, false, 50, 'cancelled', true, 'mind_budget');
+    `);
+    const result = await getNativeProjectionSummary(2027);
+    // Mes del Máster: sólo las filas importadas; el presupuesto de Mind no suma.
+    expect(result.meses[0]).toMatchObject({ fuenteFacturacion: 'master', facturacion: 5000, costos: 4000, resultado: 1000 });
+    // Mes de Mind con presupuesto: reemplaza a las filas del Máster y pondera las ventas no confirmadas.
+    expect(result.meses[1]).toMatchObject({ fuenteFacturacion: 'mind', facturacion: 6000, costos: 3500, resultado: 2500 });
+    // Mes de Mind sin presupuesto: conserva la referencia del Máster.
+    expect(result.meses[2]).toMatchObject({ fuenteFacturacion: 'mind', facturacion: 0, costos: 2500 });
   });
 
   it("keeps the full imported annual base even when an operational cutover is configured", async () => {
