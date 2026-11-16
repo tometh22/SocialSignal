@@ -163,6 +163,8 @@ export interface MonthData {
   // Cashflow
   cashflow: number | null;
   cashflow60Dias: number | null;
+  /** Balance neto + ventas de los dos meses siguientes − sus costos (Máster: "Balance 60 días"). */
+  balance60Dias?: number | null;
 }
 
 export function createSheetsClient() {

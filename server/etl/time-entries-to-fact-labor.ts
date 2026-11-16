@@ -60,6 +60,50 @@ export async function getCutoverDate(runner: LaborRunner = db): Promise<string |
   return row?.description ?? null;
 }
 
+type WeeklyPlanRow = { projectId: number; personnelId: number | null; weekStart: string; estimatedHours: number };
+
+/**
+ * Horas objetivo del mes desde la planificación de capacidad (vista
+ * capacity_effective_weekly_estimates). Una semana que cruza meses se reparte
+ * según cuántos días hábiles (lunes a viernes) caen dentro del período.
+ */
+export function monthlyTargetHoursFromWeeklyPlan(rows: WeeklyPlanRow[], periodKey: string): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    if (row.personnelId == null || !(Number(row.estimatedHours) > 0)) continue;
+    const match = String(row.weekStart).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) continue;
+    const start = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    let weekdays = 0;
+    let inPeriod = 0;
+    for (let offset = 0; offset < 7; offset++) {
+      const day = new Date(start + offset * 86_400_000);
+      const weekday = day.getUTCDay();
+      if (weekday === 0 || weekday === 6) continue;
+      weekdays++;
+      if (day.toISOString().slice(0, 7) === periodKey) inPeriod++;
+    }
+    if (!weekdays || !inPeriod) continue;
+    const key = `${row.projectId}::${row.personnelId}`;
+    totals.set(key, (totals.get(key) ?? 0) + Number(row.estimatedHours) * inPeriod / weekdays);
+  }
+  return totals;
+}
+
+async function loadMonthlyTargetHours(runner: LaborRunner, periodKey: string, startDate: Date, endDate: Date): Promise<Map<string, number>> {
+  // La vista la crea la migración de capacidad; si faltara, no se frena el
+  // armado de costos (una consulta fallida abortaría la transacción).
+  const exists = await runner.execute(sql`SELECT to_regclass('capacity_effective_weekly_estimates') IS NOT NULL AS ok`);
+  if (!((exists as any).rows ?? exists)[0]?.ok) return new Map();
+  const result = await runner.execute(sql`
+    SELECT project_id AS "projectId", personnel_id AS "personnelId", week_start AS "weekStart", estimated_hours::float8 AS "estimatedHours"
+    FROM capacity_effective_weekly_estimates
+    WHERE personnel_id IS NOT NULL
+      AND week_start::date + 6 >= ${startDate.toISOString().slice(0, 10)}::date
+      AND week_start::date <= ${endDate.toISOString().slice(0, 10)}::date`);
+  return monthlyTargetHoursFromWeeklyPlan(((result as any).rows ?? result) as WeeklyPlanRow[], periodKey);
+}
+
 export async function buildFactLaborFromTimeEntries(periodKey: string, force?: boolean): Promise<BuildFactLaborResult> {
   return db.transaction(async tx => buildFactLaborInTransaction(periodKey, tx, force));
 }
@@ -320,6 +364,7 @@ export async function buildFactLaborInTransaction(periodKey: string, runner: Lab
   let inserted = 0;
   let updated = 0;
   let deleted = 0;
+  const targetHoursByKey = await loadMonthlyTargetHours(runner, periodKey, startDate, endDate);
 
   // Remove app-owned facts that no longer have any source entries. Without
   // this, deleting the final entry for a project/person left a stale monthly
@@ -361,7 +406,8 @@ export async function buildFactLaborInTransaction(periodKey: string, runner: Lab
       if (agg.fromTask) flags.push('source_task');
       if (agg.pendingFx) flags.push('missing_fx', 'partial_cost');
       if (agg.pendingRate) flags.push('missing_rate', 'partial_cost');
-      flags.push('no_target_hours');
+      const targetHours = targetHoursByKey.get(`${agg.projectId}::${agg.personnelId}`) ?? 0;
+      if (!(targetHours > 0)) flags.push('no_target_hours');
 
       const values = {
         projectId: agg.projectId,
@@ -370,7 +416,7 @@ export async function buildFactLaborInTransaction(periodKey: string, runner: Lab
         clientKey,
         projectKey,
         personKey,
-        targetHours: '0',
+        targetHours: targetHours.toFixed(2),
         asanaHours: agg.totalHours.toFixed(2),
         billingHours: agg.billableHours.toFixed(2),
         hourlyRateARS: avgRate > 0 ? avgRate.toFixed(2) : null,
@@ -404,6 +450,7 @@ export async function buildFactLaborInTransaction(periodKey: string, runner: Lab
           target: [factLaborMonth.projectId, factLaborMonth.personKey, factLaborMonth.periodKey],
           set: {
             personId: values.personId,
+            targetHours: values.targetHours,
             asanaHours: values.asanaHours,
             billingHours: values.billingHours,
             hourlyRateARS: values.hourlyRateARS,

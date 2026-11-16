@@ -80,7 +80,7 @@ export default function PasivoPage() {
       <MetricGrid>
         <MetricCard label="Obligaciones del mes" value={formatUsd(summary?.total)} icon={<DollarSign />} tone="neutral" />
         <MetricCard label="Pagado" value={formatUsd(summary?.pagado)} icon={<CheckCircle />} tone="success" />
-        <MetricCard label="Pendiente" value={formatUsd(summary?.pendiente)} icon={<Clock />} tone="warning" detail="Todavía dentro del plazo" />
+        <MetricCard label="Pendiente" value={formatUsd(summary?.pendiente)} icon={<Clock />} tone="warning" detail={summary?.basis === "as_of" ? "Al cierre del mes, incluye meses anteriores" : "Todavía dentro del plazo"} />
         <MetricCard label="Vencido" value={formatUsd(summary?.vencido)} icon={<AlertCircle />} tone={overdue ? "danger" : "neutral"} detail={overdue ? "Pagos atrasados" : undefined} />
       </MetricGrid>
 
@@ -121,7 +121,7 @@ export default function PasivoPage() {
             {rows.map((row: any) => {
               const outstanding = Number(row.outstandingUSD ?? row.montoTotalUSD ?? 0);
               return <TableRow key={row.id}>
-                <TableCell className="max-w-[280px]"><span className="block truncate font-medium" title={row.detalle || undefined}>{row.detalle || "—"}</span><span className="text-xs text-muted-foreground">{row.source === "excel" ? "Máster" : "Registrado en Mind"}</span></TableCell>
+                <TableCell className="max-w-[280px]"><span className="block truncate font-medium" title={row.detalle || undefined}>{row.detalle || "—"}</span><span className="text-xs text-muted-foreground">{row.source === "excel" ? "Máster" : row.openingBalance ? "Saldo inicial" : row.issuedBefore ? `Pendiente desde ${row.periodKey}` : "Registrado en Mind"}</span></TableCell>
                 <TableCell className="text-sm text-muted-foreground">{row.subtipoCosto || "—"}</TableCell>
                 <TableCell className="whitespace-nowrap text-sm">{formatDate(row.fechaEmision)}</TableCell>
                 <TableCell className="whitespace-nowrap text-sm">{formatDate(row.fechaVencimiento)}</TableCell>

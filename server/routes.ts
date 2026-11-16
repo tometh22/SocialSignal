@@ -241,6 +241,8 @@ import { registerMindMcp } from "./mcp/routes";
 import { notifyMcpStatusNote } from "./services/mcp-status-notifications";
 import { readMcpConfig } from "./mcp/config";
 import { createLedgerRouter } from "./routes-ledger";
+import { createFinanceOpeningRouter } from "./routes-finance-opening";
+import { createBudgetRouter } from "./routes-budget";
 import { createFinancialIntelligenceRouter } from "./routes-financial-intelligence";
 import { createFinancialNativeRouter } from "./routes-financial-native";
 import { createObjectivesRouter } from "./routes-objectives";
@@ -1160,6 +1162,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ═══ Review Rooms (multi-sala) ═══════════════════════════════════════════
   app.use('/api/reviews', createReviewRoomsRouter(requireAuth));
   app.use('/api', createLedgerRouter(requireAuth));
+  app.use('/api', createFinanceOpeningRouter(requireAuth));
+  app.use('/api', createBudgetRouter(requireAuth));
   app.use('/api/financial-intelligence', createFinancialIntelligenceRouter(requireAuth));
   app.use('/api/financial-native', createFinancialNativeRouter(requireAuth));
   app.use('/api', createObjectivesRouter(requireAuth));
@@ -10478,10 +10482,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const marginContableUsd = ebitContableUsd;
       
       // ===== PROVISIONES Y AJUSTES PnL =====
+      // El IVA liquidado desde Carga financiera no es resultado: se excluye.
       const { rows: [adjustmentsData] } = await pool.query(`
         SELECT COALESCE(SUM(amount_usd), 0) as total_adjustments
         FROM pl_adjustments
-        WHERE period_key = ANY($1)
+        WHERE period_key = ANY($1) AND COALESCE(concept, '') <> 'IVA'
       `, [periodKeys]);
       const totalAdjustmentsUsd = parseFloat(adjustmentsData?.total_adjustments || '0');
       

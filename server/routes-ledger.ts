@@ -190,6 +190,10 @@ export function createLedgerRouter(requireAuth: any) {
       const { period, estado, cliente } = req.query as Record<string, string>;
       const { page, pageSize } = pagination;
       const periodSource = await getPeriodSource(pagination.period);
+      if (periodSource === "mind") {
+        const { nativeLedgerList } = await import("./services/native-ledger-view");
+        return res.json(await nativeLedgerList("activo", pagination.period, { page, pageSize, estado }));
+      }
       const conditions: any[] = [eq(activoEntries.periodKey, pagination.period), isNull(activoEntries.voidedAt), receivableOnly, sourceCondition(activoEntries.source, periodSource)];
       if (estado === "cobrado") conditions.push(eq(activoEntries.cobradoAlCierre, true));
       if (estado === "pendiente") conditions.push(eq(activoEntries.cobradoAlCierre, false));
@@ -241,6 +245,11 @@ export function createLedgerRouter(requireAuth: any) {
       const parsed = parseLedgerQuery(req.query);
       if ("error" in parsed) return res.status(400).json({ message: parsed.error });
       const periodSource = await getPeriodSource(parsed.period);
+      if (periodSource === "mind") {
+        const { nativeLedgerSummary } = await import("./services/native-ledger-view");
+        const row = await nativeLedgerSummary("activo", parsed.period);
+        return res.json({ total: row.total, cobrado: row.settled, pendiente: row.pending, vencido: row.overdue, count: row.count, basis: "as_of" });
+      }
       const [summary] = await db.select({
         total: sql<number>`COALESCE(SUM(${activoUSD}), 0)::double precision`,
         cobrado: sql<number>`COALESCE(SUM(${activoUSD} - ${activoOutstandingUSD}), 0)::double precision`,
@@ -332,6 +341,10 @@ export function createLedgerRouter(requireAuth: any) {
       const { period, subtipo, estado } = req.query as Record<string, string>;
       const { page, pageSize } = pagination;
       const periodSource = await getPeriodSource(pagination.period);
+      if (periodSource === "mind") {
+        const { nativeLedgerList } = await import("./services/native-ledger-view");
+        return res.json(await nativeLedgerList("pasivo", pagination.period, { page, pageSize, estado, subtipo }));
+      }
       const conditions: any[] = [eq(pasivoEntries.periodKey, pagination.period), isNull(pasivoEntries.voidedAt), sourceCondition(pasivoEntries.source, periodSource)];
       if (subtipo) conditions.push(eq(pasivoEntries.subtipoCosto, subtipo));
       if (estado === "pagado") conditions.push(eq(pasivoEntries.pagadoAlCierre, true));
@@ -383,6 +396,12 @@ export function createLedgerRouter(requireAuth: any) {
       const parsed = parseLedgerQuery(req.query);
       if ("error" in parsed) return res.status(400).json({ message: parsed.error });
       const periodSource = await getPeriodSource(parsed.period);
+      if (periodSource === "mind") {
+        const { nativeLedgerSummary } = await import("./services/native-ledger-view");
+        const row = await nativeLedgerSummary("pasivo", parsed.period);
+        const { rows: subtipos } = await db.execute(sql`SELECT COALESCE(subtipo_costo,'Sin subtipo') subtipo, sum(COALESCE(monto_total_usd,0))::float8 total FROM pasivo_entries WHERE period_key=${parsed.period} AND voided_at IS NULL AND COALESCE(source,'') NOT IN ('excel','opening') GROUP BY 1`);
+        return res.json({ total: row.total, pagado: row.settled, pendiente: row.pending, vencido: row.overdue, count: row.count, basis: "as_of", bySubtipo: Object.fromEntries((subtipos as any[]).map((item: any) => [item.subtipo, Number(item.total)])) });
+      }
       const periodCondition = and(eq(pasivoEntries.periodKey, parsed.period), isNull(pasivoEntries.voidedAt), sourceCondition(pasivoEntries.source, periodSource));
       const [summaryRows, subtipoRows] = await Promise.all([
         db.select({
@@ -671,35 +690,10 @@ export function createLedgerRouter(requireAuth: any) {
           return res.json({ date, balances, totalUSD: Object.values(balances).reduce((sum, value) => sum + value, 0), source: "master" });
         }
       }
-      const cutoff = new Date(date + "T23:59:59Z");
-      const cutover = await getCutoverDate();
-      const useNativeLedger = Boolean(cutover && date.slice(0, 7) >= cutover);
-      const [rows, accounts, rates] = await Promise.all([
-        db.select().from(cashflowTransactions).where(and(sql`${cashflowTransactions.fecha} <= ${cutoff}`, isNull(cashflowTransactions.voidedAt), useNativeLedger ? sql`${cashflowTransactions.source} <> 'excel'` : sql`true`)).orderBy(asc(cashflowTransactions.fecha)),
-        db.select().from(financialAccounts).where(and(eq(financialAccounts.isActive, true), sql`(${financialAccounts.openingBalanceDate} IS NULL OR ${financialAccounts.openingBalanceDate} <= ${cutoff})`)),
-        db.select().from(exchangeRates).where(and(eq(exchangeRates.year, cutoff.getUTCFullYear()), eq(exchangeRates.month, cutoff.getUTCMonth() + 1), eq(exchangeRates.isActive, true))).orderBy(desc(exchangeRates.updatedAt)).limit(1),
-      ]);
-
-      // Saldos acumulados por banco, calculados sumando ingresos/egresos hasta la fecha
-      // (las columnas saldo* nunca se populan en la importación, así que se computa acá).
-      const fx = Number(rates[0]?.rate ?? 0);
-      const balances: Record<string, number> = {};
-      const accountNames = new Map(accounts.map((account) => [account.id, account.name]));
-      const accountByLabel = new Map(accounts.flatMap((account) => [account.name, account.bankName].filter(Boolean).map((label) => [String(label).toLocaleLowerCase(), account] as const)));
-      for (const account of accounts) {
-        const opening = Number(account.openingBalance ?? 0);
-        balances[account.name] = account.currency === "ARS" && fx > 0 ? opening / fx : opening;
-      }
-      for (const r of rows) {
-        const account = r.accountId ? accounts.find((candidate) => candidate.id === r.accountId) : accountByLabel.get(String(r.banco ?? "").toLocaleLowerCase());
-        if (account?.openingBalanceDate && r.fecha < account.openingBalanceDate) continue;
-        const amt = parseFloat(r.montoUSD ?? "") || ((parseFloat(r.montoARS ?? "") || 0) / (parseFloat(r.cotizacion ?? "") || fx || 1));
-        const signed = r.tipoMovimiento === "Egreso" ? -amt : amt;
-        const banco = (r.accountId ? accountNames.get(r.accountId) : null) || r.banco || "Otros";
-        balances[banco] = (balances[banco] ?? 0) + signed;
-      }
-      const totalUSD = Object.values(balances).reduce((sum, value) => sum + value, 0);
-      res.json({ date, balances, totalUSD });
+      // Mind months: the same month-end balance per account as the Resumen (native-month.ts).
+      const { computeNativeMonth } = await import("./services/native-month");
+      const month = await computeNativeMonth(date.slice(0, 7));
+      res.json({ date, balances: month.cajaPorCuenta, totalUSD: month.caja, source: "mind", warnings: month.warnings });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

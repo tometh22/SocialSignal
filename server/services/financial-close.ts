@@ -9,6 +9,7 @@ import {
   revenueEvents,
 } from "@shared/schema";
 import { rebuildNativeFinancialFacts } from "./financial-native-builders";
+import { computeNativeMonth } from "./native-month";
 import { buildFactLaborFromTimeEntries, getCutoverDate } from "../etl/time-entries-to-fact-labor";
 
 export type CloseCheckDefinition = {
@@ -256,60 +257,6 @@ export async function runFinancialPreClose(periodKey: string, actorUserId: numbe
   });
 }
 
-type Snapshot = {
-  totalActivo: number;
-  totalPasivo: number;
-  cajaTotal: number;
-  cashflowIngresos: number;
-  cashflowEgresos: number;
-  cuentasCobrarUsd: number;
-  cuentasPagarUsd: number;
-  facturacionTotal: number;
-  costosDirectos: number;
-  costosDirectosOperativos: number;
-  costosIndirectos: number;
-  ivaCompras: number;
-  impuestosUsa: number;
-  provisiones: number;
-  provisionExpense: number;
-};
-
-async function calculateSnapshot(tx: any, periodKey: string, officialRate: number): Promise<Snapshot> {
-  const result = await tx.execute(sql`
-    SELECT
-      COALESCE((SELECT sum(CASE WHEN tipo_movimiento='Ingreso' THEN COALESCE(monto_usd, monto_ars/NULLIF(cotizacion,0)) ELSE 0 END) FROM cashflow_transactions WHERE period_key=${periodKey} AND voided_at IS NULL AND transfer_group_id IS NULL),0) AS ingresos,
-      COALESCE((SELECT sum(CASE WHEN tipo_movimiento='Egreso' THEN COALESCE(monto_usd, monto_ars/NULLIF(cotizacion,0)) ELSE 0 END) FROM cashflow_transactions WHERE period_key=${periodKey} AND voided_at IS NULL AND transfer_group_id IS NULL),0) AS egresos,
-      COALESCE((SELECT sum(CASE WHEN currency='ARS' THEN opening_balance/${officialRate} ELSE opening_balance END) FROM financial_accounts WHERE is_active=true AND (opening_balance_date IS NULL OR opening_balance_date < (${periodKey} || '-01')::date + interval '1 month')),0) AS opening_cash,
-      COALESCE((SELECT sum(CASE WHEN tipo_movimiento='Ingreso' AND transfer_group_id IS NULL THEN COALESCE(monto_usd,monto_ars/NULLIF(cotizacion,0),0) WHEN tipo_movimiento='Egreso' AND transfer_group_id IS NULL THEN -COALESCE(monto_usd,monto_ars/NULLIF(cotizacion,0),0) ELSE 0 END) FROM cashflow_transactions WHERE period_key<=${periodKey} AND source<>'excel' AND voided_at IS NULL),0) AS cumulative_cashflow,
-      COALESCE((SELECT sum(CASE WHEN COALESCE(currency, CASE WHEN monto_usd IS NOT NULL THEN 'USD' ELSE 'ARS' END)='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END) FROM activo_entries WHERE period_key<=${periodKey} AND voided_at IS NULL),0) AS cobrar,
-      COALESCE((SELECT sum(CASE WHEN COALESCE(currency, CASE WHEN monto_usd IS NOT NULL THEN 'USD' ELSE 'ARS' END)='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END) FROM pasivo_entries WHERE period_key<=${periodKey} AND voided_at IS NULL),0) AS pagar,
-      COALESCE((SELECT sum(amount_usd) FROM revenue_events WHERE invoice_period=${periodKey} AND status <> 'cancelled'),0) AS facturacion,
-      COALESCE((SELECT direct_usd FROM fact_cost_month WHERE period_key=${periodKey}),0) AS costos_directos,
-      COALESCE((SELECT sum(cost_usd) FROM fact_labor_month WHERE period_key=${periodKey}),0) AS costos_directos_operativos,
-      COALESCE((SELECT indirect_usd FROM fact_cost_month WHERE period_key=${periodKey}),0) AS costos_indirectos,
-      COALESCE((SELECT sum(COALESCE(tax_amount,0)/CASE WHEN currency='ARS' THEN NULLIF(cotizacion,0) ELSE 1 END) FROM pasivo_entries WHERE period_key=${periodKey} AND voided_at IS NULL),0) AS iva_compras,
-      COALESCE((SELECT sum(amount_usd) FROM pl_adjustments WHERE period_key=${periodKey} AND type='impuesto'),0) AS impuestos,
-      COALESCE((SELECT sum(CASE WHEN currency='ARS' THEN COALESCE(remaining_amount,monto_provision,0)/${officialRate} ELSE COALESCE(remaining_amount,monto_provision,0) END) FROM provision_entries WHERE period_key<=${periodKey} AND status IN ('APPROVED','ACTIVE')),0) AS provisiones,
-      COALESCE((SELECT provisions_usd FROM fact_cost_month WHERE period_key=${periodKey}),0) AS provision_expense
-  `);
-  const row = rowsOf<Record<string, unknown>>(result)[0] ?? {};
-  const ingresos = numeric(row.ingresos);
-  const egresos = numeric(row.egresos);
-  const cajaTotal = numeric(row.opening_cash) + numeric(row.cumulative_cashflow);
-  const cuentasCobrarUsd = numeric(row.cobrar);
-  const cuentasPagarUsd = numeric(row.pagar);
-  const provisiones = numeric(row.provisiones);
-  return {
-    totalActivo: cajaTotal + cuentasCobrarUsd, totalPasivo: cuentasPagarUsd + provisiones,
-    cajaTotal,
-    cashflowIngresos: ingresos, cashflowEgresos: egresos,
-    cuentasCobrarUsd, cuentasPagarUsd,
-    facturacionTotal: numeric(row.facturacion), costosDirectos: numeric(row.costos_directos),
-    costosDirectosOperativos: numeric(row.costos_directos_operativos),
-    costosIndirectos: numeric(row.costos_indirectos), ivaCompras: numeric(row.iva_compras),
-    impuestosUsa: numeric(row.impuestos), provisiones, provisionExpense: numeric(row.provision_expense),
-  };
-}
 
 export async function requestFinancialCloseReview(periodKey: string, actorUserId: number, notes?: string | null) {
   assertPeriodKey(periodKey);
@@ -342,24 +289,27 @@ export async function closeFinancialPeriod(periodKey: string, actorUserId: numbe
     if (!period.officialFxRateId) throw closeError("Falta fijar la cotización oficial.", 409);
     const [fx] = await tx.select({ rate: exchangeRates.rate }).from(exchangeRates).where(eq(exchangeRates.id, period.officialFxRateId)).limit(1);
     if (!fx) throw closeError("La cotización oficial seleccionada ya no existe.", 409);
-    const snapshot = await calculateSnapshot(tx, periodKey, numeric(fx.rate));
+    // Same calculation the Resumen shows for a Mind month (native-month.ts), frozen
+    // with the official rate. Facts were rebuilt by the pre-close.
+    const month = await computeNativeMonth(periodKey, { officialRate: numeric(fx.rate) });
+    const ivaCompras = numeric(rowsOf<Record<string, unknown>>(await tx.execute(sql`SELECT COALESCE(sum(COALESCE(tax_amount,0)/CASE WHEN currency='ARS' THEN NULLIF(cotizacion,0) ELSE 1 END),0) AS iva FROM pasivo_entries WHERE period_key=${periodKey} AND voided_at IS NULL AND COALESCE(source,'') <> 'excel'`))[0]?.iva);
+    const snapshot = month;
     const [year, monthNumber] = periodKey.split("-").map(Number);
-    const balanceNeto = snapshot.totalActivo - snapshot.totalPasivo;
-    const cashflowNeto = snapshot.cashflowIngresos - snapshot.cashflowEgresos;
-    const ebit = snapshot.facturacionTotal - snapshot.costosDirectos - snapshot.costosIndirectos - snapshot.impuestosUsa;
-    const beneficio = ebit - snapshot.provisionExpense;
     const payload = {
       year, monthNumber, monthLabel: periodKey, cierreDate: new Date(),
-      totalActivo: String(snapshot.totalActivo), totalPasivo: String(snapshot.totalPasivo), balanceNeto: String(balanceNeto),
-      cajaTotal: String(snapshot.cajaTotal), cashflowIngresos: String(snapshot.cashflowIngresos), cashflowEgresos: String(snapshot.cashflowEgresos), cashflowNeto: String(cashflowNeto),
-      cuentasCobrarUsd: String(snapshot.cuentasCobrarUsd), cuentasPagarUsd: String(snapshot.cuentasPagarUsd), facturacionTotal: String(snapshot.facturacionTotal),
-      costosDirectos: String(snapshot.costosDirectos), costosIndirectos: String(snapshot.costosIndirectos), ivaCompras: String(snapshot.ivaCompras), impuestosUsa: String(snapshot.impuestosUsa),
-      pasivoFacturacionAdelantada: String(snapshot.provisiones), ebitOperativo: String(ebit), beneficioNeto: String(beneficio),
-      // Markup y P&L devengan el costo del equipo desde el mismo cierre de
-      // Operaciones; la facturación sólo determina Pasivo y sus fechas.
-      markupPromedio: snapshot.costosDirectosOperativos ? String(snapshot.facturacionTotal / snapshot.costosDirectosOperativos) : null,
-      margenOperativo: snapshot.facturacionTotal ? String((ebit / snapshot.facturacionTotal) * 100) : null,
-      margenNeto: snapshot.facturacionTotal ? String((beneficio / snapshot.facturacionTotal) * 100) : null,
+      totalActivo: String(month.activoTotal), totalPasivo: String(month.pasivoTotal), balanceNeto: String(month.balanceNeto),
+      cajaTotal: String(month.caja), inversiones: String(month.inversiones),
+      cashflowIngresos: String(month.cashflowIngresos), cashflowEgresos: String(month.cashflowEgresos), cashflowNeto: String(month.cashflowNeto),
+      cuentasCobrarUsd: String(month.cuentasCobrar), cuentasPagarUsd: String(month.cuentasPagar), facturacionTotal: String(month.ventas),
+      costosDirectos: String(month.costosDirectos), costosIndirectos: String(month.costosIndirectos), ivaCompras: String(ivaCompras),
+      impuestosUsa: String(month.impuestosUsaPorPagar), pasivoFacturacionAdelantada: String(month.provisiones),
+      ebitOperativo: String(month.ebit), beneficioNeto: String(month.beneficioNeto),
+      markupPromedio: month.markup == null ? null : String(month.markup),
+      margenOperativo: month.ventas ? String((month.ebit / month.ventas) * 100) : null,
+      margenNeto: month.ventas ? String((month.beneficioNeto / month.ventas) * 100) : null,
+      proyeccionResultado: String(month.proyeccionResultado),
+      // The dashboard reads balance_60_dias as the 60-day cashflow of a closed month.
+      balance60Dias: String(month.cashflow60Dias),
       updatedAt: new Date(),
     };
     await tx.insert(monthlyFinancialSummary).values({ periodKey, ...payload }).onConflictDoUpdate({ target: monthlyFinancialSummary.periodKey, set: payload });

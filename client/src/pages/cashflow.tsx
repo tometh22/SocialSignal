@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
+import { InvestmentsCard } from "@/components/finance/investments-card";
 import { PageShell } from "@/components/ui/page-shell";
 import { FinanceHeader, FinanceTableCard, StatusPill, amountTone, formatDate, formatUsd, periodLabel, useReasonDialog, usePeriodSource, PeriodSourceNotice } from "@/components/finance/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -133,6 +134,8 @@ export default function CashflowPage() {
           </div>)}
         </dl>
       </section>}
+
+      <InvestmentsCard period={period} />
 
       <FinanceTableCard
         title="Movimientos"

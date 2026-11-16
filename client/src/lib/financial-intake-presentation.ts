@@ -19,7 +19,7 @@ type IntakeImpact = {
 const INTAKE_IMPACTS: Record<FinancialIntakeDocumentKind, IntakeImpact> = {
   customer_invoice: {
     destinations: ["Cuentas por cobrar", "Ingresos"],
-    description: () => "Crea la cuenta a cobrar y reconoce el ingreso, sin duplicar un fee ya informado.",
+    description: () => "Crea la cuenta a cobrar y reconoce la venta sin IVA, sin duplicar un fee ya informado. Si cargás IIBB, crea esa deuda impositiva aparte.",
   },
   customer_collection: {
     destinations: ["Caja y bancos", "Cuentas por cobrar"],
@@ -27,7 +27,7 @@ const INTAKE_IMPACTS: Record<FinancialIntakeDocumentKind, IntakeImpact> = {
   },
   supplier_invoice: {
     destinations: ["Cuentas por pagar", "Costos"],
-    description: () => "Crea la cuenta a pagar y lleva el costo al proyecto, estructura o provisión elegida.",
+    description: () => "Crea la cuenta a pagar y lleva el costo al proyecto, estructura o provisión elegida. Si es solo deuda, no suma costo.",
   },
   supplier_payment: {
     destinations: ["Caja y bancos", "Cuentas por pagar"],
@@ -53,7 +53,7 @@ const INTAKE_IMPACTS: Record<FinancialIntakeDocumentKind, IntakeImpact> = {
   },
   tax_settlement: {
     destinations: ["Cuentas por pagar", "Resultado impositivo"],
-    description: () => "Crea la obligación a pagar y el ajuste impositivo, sin duplicarlo como costo operativo.",
+    description: () => "Registra IVA, IIBB, Impuestos USA o Intereses Oxean en el resultado y, si está pendiente, la deuda a pagar, sin duplicarlo como costo operativo.",
   },
   provision: {
     destinations: ["Provisiones"],

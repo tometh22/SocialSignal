@@ -6,7 +6,9 @@ import { aggregateMonths, type MonthData } from "./direct-sheets-dashboard";
 import { getMasterScenarioSnapshot } from './financial-master-scenario';
 import { buildMasterDashboard } from './financial-master-dashboard';
 import { getRevenueByBasis } from "./revenue-basis";
-import { getMasterSourcedPeriods } from "./finance-period-source";
+import { EFFECTIVE_ESTIMATED_COSTS_SQL, getMasterSourcedPeriods, getNativeStartPeriod } from "./finance-period-source";
+import { computeNativeMonth } from "./native-month";
+import { addMonths } from "../../shared/finance-native";
 
 const num = (value: unknown): number | null => value == null ? null : Number(value);
 
@@ -73,35 +75,27 @@ async function loadNativeExecutiveDashboard(
     pasivoFacturacionAdelantada: num(row.pasivo_facturacion_adelantada), pasivoProveedores: num(row.cuentas_pagar_usd),
     pasivoTotal: num(row.total_pasivo), balanceNeto: num(row.balance_neto), cashflow: num(row.cashflow_neto), cashflow60Dias: num(row.balance_60_dias),
   }]));
-  const nativePeriodsPresent = new Set(liveRows.map(row => row.period_key));
-  for (const row of rows) {
-    if (!row.is_closed && !masterSet.has(row.period_key) && !nativePeriodsPresent.has(row.period_key)) {
-      liveRows.push({ period_key: row.period_key, is_closed: false });
-    }
-  }
-  for (const row of liveRows) {
-    if (masterSet.has(row.period_key) || (row.is_closed && dataByPeriod.has(row.period_key))) continue;
-    const revenue = Number(row.facturacion_total) || 0;
-    const direct = Number(row.costos_directos) || 0;
-    const operationalDirect = Number(row.costos_directos_operativos) || 0;
-    const indirect = Number(row.costos_indirectos) || 0;
-    const provisionExpense = Number(row.gasto_provisiones) || 0;
-    const provisionLiability = Number(row.provision_liability) || 0;
-    const cash = (Number(row.opening_cash) || 0) + (Number(row.cumulative_cashflow) || 0);
-    const receivables = Number(row.cuentas_cobrar_usd) || 0;
-    const payables = Number(row.cuentas_pagar_usd) || 0;
-    const ebit = revenue - direct - indirect;
-    const benefit = ebit - provisionExpense;
-    const [year, month] = row.period_key.split("-").map(Number);
-    dataByPeriod.set(row.period_key, {
-      periodKey: row.period_key, year, month, monthLabel: row.period_key, cierre: Boolean(row.is_closed), fuenteDatos: 'mind',
-      ventasDelMes: revenue, ebitOperativo: ebit, beneficioNeto: benefit,
-      margenOperativo: revenue ? ebit / revenue * 100 : null, margenNeto: revenue ? benefit / revenue * 100 : null,
-      markup: operationalDirect ? revenue / operationalDirect : null, proyeccionResultado: benefit,
-      activoLiquido: cash, activoMedPlazo: null, clientesACobrar: receivables,
-      activoTotal: cash + receivables, pasivoImpuestosUSA: null, pasivoFacturacionAdelantada: provisionLiability,
-      pasivoProveedores: payables, pasivoTotal: payables + provisionLiability,
-      balanceNeto: cash + receivables - payables - provisionLiability, cashflow: Number(row.cashflow_neto) || 0, cashflow60Dias: null,
+  // Months that belong to Mind and are not closed: computed from Mind records only
+  // (native-month.ts), from the switchover month up to the current month plus any
+  // month that already has native activity.
+  const nativeStart = await getNativeStartPeriod();
+  const now = new Date();
+  const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const candidates = new Set<string>([...liveRows.map(row => row.period_key), ...rows.map(row => row.period_key)]);
+  if (nativeStart) for (let period = nativeStart; period <= currentPeriod; period = addMonths(period, 1)) candidates.add(period);
+  for (const period of [...candidates].sort()) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period) || masterSet.has(period) || dataByPeriod.has(period)) continue;
+    const month = await computeNativeMonth(period);
+    const [year, monthNumber] = period.split("-").map(Number);
+    dataByPeriod.set(period, {
+      periodKey: period, year, month: monthNumber, monthLabel: period, cierre: false, fuenteDatos: 'mind',
+      ventasDelMes: month.ventas, ebitOperativo: month.ebit, beneficioNeto: month.beneficioNeto,
+      margenOperativo: month.ventas ? month.ebit / month.ventas * 100 : null, margenNeto: month.ventas ? month.beneficioNeto / month.ventas * 100 : null,
+      markup: month.markup, proyeccionResultado: month.proyeccionResultado,
+      activoLiquido: month.caja, activoMedPlazo: month.inversiones, clientesACobrar: month.cuentasCobrar, activoTotal: month.activoTotal,
+      pasivoImpuestosUSA: month.impuestosUsaPorPagar, pasivoFacturacionAdelantada: month.provisiones, pasivoProveedores: month.cuentasPagar,
+      pasivoTotal: month.pasivoTotal, balanceNeto: month.balanceNeto, cashflow: month.cashflowNeto,
+      cashflow60Dias: month.cashflow60Dias, balance60Dias: month.balance60Dias,
     });
   }
   for (const month of masterRows) dataByPeriod.set(month.periodKey, month);
@@ -118,7 +112,8 @@ export async function getNativeProjectionSummary(year: number) {
         COALESCE(NULLIF(f.direct_usd+f.indirect_usd,0), e.estimated, 0)::float total
       FROM unnest($1::text[]) p(period_key)
       LEFT JOIN fact_cost_month f ON f.period_key=p.period_key
-      LEFT JOIN LATERAL (SELECT sum(monto_total_usd)::numeric estimated FROM fact_estimated_cost_month WHERE month_key=p.period_key) e ON true
+      -- Presupuesto del mes: filas del Máster o del Presupuesto de Mind, nunca ambas.
+      LEFT JOIN LATERAL (SELECT sum(monto_total_usd)::numeric estimated FROM (${EFFECTIVE_ESTIMATED_COSTS_SQL}) budget WHERE budget.month_key=p.period_key) e ON true
     `, [periods]),
     // El corte operativo no recorta el presupuesto anual ya importado del
     // Máster. Se conserva como base hasta que el mes tenga ingresos o cierre
@@ -132,6 +127,7 @@ export async function getNativeProjectionSummary(year: number) {
       LEFT JOIN monthly_financial_summary m ON m.period_key=p.period_key
       WHERE c.status='CLOSED' OR (
         m.period_key IS NOT NULL AND c.period_key IS NULL
+        AND p.period_key < COALESCE((SELECT description FROM system_config WHERE config_key='finance_native_start_period' AND description ~ '^[0-9]{4}-(0[1-9]|1[0-2])$' LIMIT 1), '9999-12')
         AND NOT EXISTS (
           SELECT 1 FROM revenue_events r
           WHERE r.invoice_period=p.period_key AND r.source_tab='mind_intake'

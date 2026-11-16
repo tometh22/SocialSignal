@@ -118,7 +118,7 @@ const BOARD_Y_HOLDING = ['Tomi Criado', 'Vicky Puricelli', 'Honorarios Oxean'];
 export async function getCostBreakdown(year: number): Promise<CostBreakdown> {
   // One source per month (finance-period-source): Master months come from the
   // Master rows behind its Resumen; only months that belong to Mind use Mind facts.
-  const { getMasterSourcedPeriods } = await import("./finance-period-source");
+  const { getMasterSourcedPeriods, EFFECTIVE_ESTIMATED_COSTS_SQL } = await import("./finance-period-source");
   const masterPeriods = (await getMasterSourcedPeriods()).filter((period) => period.startsWith(`${year}-`));
   let master: ReturnType<typeof masterCostSummary> | null = null;
   if (masterPeriods.length) {
@@ -148,7 +148,7 @@ export async function getCostBreakdown(year: number): Promise<CostBreakdown> {
        SELECT concepto, SUM(monto)::float AS monto
          FROM (
            SELECT detalle AS concepto, monto_total_usd::numeric AS monto
-             FROM fact_estimated_cost_month
+             FROM (${EFFECTIVE_ESTIMATED_COSTS_SQL}) fact_estimated_cost_month
             WHERE month_key LIKE $1 AND month_key <> ALL($2::text[]) AND detalle IS NOT NULL AND monto_total_usd IS NOT NULL
               AND NOT EXISTS (SELECT 1 FROM native_periods n WHERE n.period_key=month_key)
               AND (NOT EXISTS (SELECT 1 FROM cutover) OR month_key < (SELECT period_key FROM cutover))
@@ -157,7 +157,8 @@ export async function getCostBreakdown(year: number): Promise<CostBreakdown> {
                   COALESCE(CASE WHEN currency='ARS' THEN net_amount/NULLIF(cotizacion,0) ELSE net_amount END,monto_total_usd,monto_usd,monto_ars/NULLIF(cotizacion,0),0)::numeric AS monto
              FROM pasivo_entries
             WHERE period_key LIKE $1 AND period_key <> ALL($2::text[]) AND voided_at IS NULL AND source <> 'excel'
-              AND COALESCE(cost_treatment,'direct') <> 'balance_only'
+              AND COALESCE(cost_treatment,'direct') NOT IN ('balance_only','tax')
+              AND lower(translate(COALESCE(subtipo_costo,''),'ÁÉÍÓÚáéíóú','AEIOUaeiou')) NOT IN ('iva','iibb','impuestos usa','intereses oxean')
            UNION ALL
            SELECT modeled.concepto,modeled.modeled_usd::numeric AS monto
              FROM modeled_team modeled

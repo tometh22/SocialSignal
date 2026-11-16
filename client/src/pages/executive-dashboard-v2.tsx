@@ -379,6 +379,16 @@ export default function ExecutiveDashboardV2() {
                     <span className="text-muted-foreground">Caja Total</span>
                     <span className={`whitespace-nowrap tabular-nums font-medium ${kpiColor(d.activoLiquido, 0)}`}>{fmt(d.activoLiquido)}</span>
                   </div>
+                  {(d.balance60Dias != null || d.cashflow60Dias != null) && <TooltipProvider delayDuration={200}>
+                    {d.balance60Dias != null && <div className="flex justify-between py-1.5 px-3 text-sm">
+                      <div className="flex items-center gap-1.5"><span className="text-muted-foreground">Balance a 60 días</span><InfoTip label="Más información sobre el balance a 60 días" side="right">Balance neto más las ventas de los dos meses siguientes menos sus costos (sin impuestos de Estados Unidos), como en el Máster.</InfoTip></div>
+                      <span className={`whitespace-nowrap tabular-nums font-medium ${kpiColor(d.balance60Dias, 0)}`}>{fmt(d.balance60Dias)}</span>
+                    </div>}
+                    {d.cashflow60Dias != null && <div className="flex justify-between py-1.5 px-3 text-sm">
+                      <div className="flex items-center gap-1.5"><span className="text-muted-foreground">Cashflow a 60 días</span><InfoTip label="Más información sobre el cashflow a 60 días" side="right">Caja real de los dos meses siguientes cuando ya terminaron; antes, lo que vence a cobrar menos lo que vence a pagar en ese período.</InfoTip></div>
+                      <span className={`whitespace-nowrap tabular-nums font-medium ${kpiColor(d.cashflow60Dias, 0)}`}>{fmt(d.cashflow60Dias)}</span>
+                    </div>}
+                  </TooltipProvider>}
                   {runwayMonths != null && (
                     <div className="flex justify-between py-2 px-3 rounded bg-red-50 border border-red-200 text-sm">
                       <span className="font-semibold text-red-800">Runway</span>
@@ -434,6 +444,9 @@ export default function ExecutiveDashboardV2() {
                     { label: "Activo M.P. Crypto", value: d.activoMedPlazo, tooltip: "Saldo en criptomonedas valuado en USD." },
                     { label: "Clientes a Cobrar", value: d.clientesACobrar, tooltip: "Facturas emitidas no cobradas aún. Incluye facturación del mes + meses anteriores pendientes de cobro." },
                     { label: "Activo Total", value: d.activoTotal, bold: true, tooltip: "Activo Líquido + Crypto + Clientes a Cobrar." },
+                    { label: "Proveedores a pagar", value: d.pasivoProveedores, negative: true, tooltip: "Deudas con proveedores, equipo y otros, sin impuestos de Estados Unidos ni provisiones." },
+                    { label: "Impuestos de EE. UU.", value: d.pasivoImpuestosUSA, negative: true, tooltip: "Impuestos de Estados Unidos devengados y todavía no pagados." },
+                    { label: "Provisiones", value: d.pasivoFacturacionAdelantada, negative: true, tooltip: "Facturación adelantada y otras provisiones vigentes al cierre." },
                     { label: "Pasivo Total", value: d.pasivoTotal, bold: true, negative: true, tooltip: "Deudas de la empresa: impuestos USA, proveedores a pagar y facturación adelantada de clientes." },
                     { label: "Patrimonio Neto (Activo − Pasivo)", value: d.balanceNeto, bold: true, tooltip: "Activo Total − Pasivo Total. El valor neto de la empresa. Incluye utilidades de todos los períodos, no solo el actual." },
                   ].map((row, i) => (

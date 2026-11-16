@@ -54,6 +54,7 @@ const ReviewHubPage = lazy(() => import("@/pages/review/hub"));
 const ReviewRoomPage = lazy(() => import("@/pages/review/room"));
 const StatusObjectivesPage = lazy(() => import("@/pages/status-objectives"));
 const ProyeccionPage = lazy(() => import("@/pages/proyeccion"));
+const PresupuestoPage = lazy(() => import("@/pages/presupuesto"));
 const ArrPage = lazy(() => import("@/pages/arr"));
 const RendimientoPage = lazy(() => import("@/pages/rendimiento"));
 const CostosPage = lazy(() => import("@/pages/costos"));
@@ -66,6 +67,7 @@ const FinancialIntakePage = lazy(() => import("@/pages/financial-intake"));
 const TeamSettlementsPage = lazy(() => import("@/pages/team-monthly-close"));
 const TeamInvoiceReviewPage = lazy(() => import("@/pages/team-invoice-review"));
 const FinancialClosePage = lazy(() => import("@/pages/financial-close"));
+const FinanceOpeningPage = lazy(() => import("@/pages/finance-opening"));
 
 // Task Management Module
 const MyTasksPage = lazy(() => import("@/pages/my-tasks"));
@@ -357,7 +359,10 @@ function AppRoutes() {
                   <ProtectedRoute path="/finance/facturas-equipo" component={TeamInvoiceReviewPage} requiredPermission="finance" />
                   <Route path="/finance/liquidaciones-equipo">{() => <Redirect to="/operations/liquidaciones-equipo" />}</Route>
                   <ProtectedRoute path="/finance/cierre" component={FinancialClosePage} requiredPermission="finance" />
+                  <ProtectedRoute path="/finance/saldos-iniciales" component={FinanceOpeningPage} requiredPermission="finance" />
                   <ProtectedRoute path="/finance/proyeccion" component={ProyeccionPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
+                  {/* Lectura con el permiso del Resumen; cargar o editar el presupuesto exige "finance" (API y botones). */}
+                  <ProtectedRoute path="/finance/presupuesto" component={PresupuestoPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/finance/arr" component={ArrPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/finance/rendimiento" component={RendimientoPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/finance/costos" component={CostosPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />

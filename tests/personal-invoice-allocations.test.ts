@@ -54,7 +54,7 @@ describe("team cost and invoice integration contracts", () => {
     expect(builder).not.toContain("approved_fixed_invoice");
     expect(builder).not.toContain("invoice.actual_usd*allocation.allocation_percent/100");
     expect(breakdown).not.toContain("actual_fixed_team");
-    expect(breakdown).toContain("COALESCE(cost_treatment,'direct') <> 'balance_only'");
+    expect(breakdown).toContain("COALESCE(cost_treatment,'direct') NOT IN ('balance_only','tax')");
   });
 
   it("registra cada factura aprobada en Pasivo sin tratarla como costo", () => {

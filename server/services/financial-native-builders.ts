@@ -44,13 +44,22 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
         count(*) FILTER (WHERE cost_treatment='direct')::int direct_rows,
         count(*) FILTER (WHERE cost_treatment IN ('indirect','unclassified'))::int indirect_rows,
         count(*) FILTER (WHERE cost_treatment='provision')::int provision_rows
-      FROM pasivo_entries WHERE period_key=${periodKey} AND voided_at IS NULL
+      FROM (
+        -- Only records created in Mind. Taxes (IIBB, Impuestos USA), interest and IVA
+        -- are below EBIT or not a cost at all: native-month.ts accounts for them.
+        SELECT * FROM pasivo_entries
+        WHERE period_key=${periodKey} AND voided_at IS NULL AND COALESCE(source,'') <> 'excel'
+          AND COALESCE(cost_treatment,'') NOT IN ('tax','balance_only')
+          AND lower(translate(COALESCE(subtipo_costo,''),'ÁÉÍÓÚáéíóú','AEIOUaeiou')) NOT IN ('iva','iibb','impuestos usa','intereses oxean')
+      ) pasivo_entries
     ), provision_lines AS (
       SELECT pm.amount::numeric amount, pm.currency
       FROM provision_movements pm
       JOIN provision_entries pe ON pe.id=pm.provision_id
       WHERE pm.period_key=${periodKey}
         AND pe.status IN ('APPROVED','ACTIVE','RELEASED')
+        -- An opening balance is a liability carried from before the switchover, not an expense.
+        AND pm.movement_type <> 'opening'
       UNION ALL
       SELECT CASE WHEN pe.tipo='RECUPERO' THEN -pe.monto_provision::numeric ELSE pe.monto_provision::numeric END amount, pe.currency
       FROM provision_entries pe
@@ -58,7 +67,7 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
         AND pe.status IN ('APPROVED','ACTIVE','RELEASED')
         AND NOT EXISTS (
           SELECT 1 FROM provision_movements pm
-          WHERE pm.provision_id=pe.id AND pm.movement_type='initial'
+          WHERE pm.provision_id=pe.id AND pm.movement_type IN ('initial','opening')
         )
     ), provisions AS (
       SELECT
@@ -97,7 +106,8 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
           WHEN currency='ARS' AND COALESCE(delivery_start,invoice_period)=${periodKey} THEN amount_native
           ELSE 0 END) revenue_ars
       FROM revenue_events
-      WHERE project_id IS NOT NULL AND status <> 'cancelled'
+      WHERE project_id IS NOT NULL AND status <> 'cancelled' AND COALESCE(confirmed, true)
+        AND NOT COALESCE(is_estimate, false) AND COALESCE(source_tab,'') <> 'mind_budget'
         AND (invoice_period=${periodKey} OR ${periodKey} BETWEEN COALESCE(delivery_start,invoice_period) AND COALESCE(delivery_end,delivery_start,invoice_period))
       GROUP BY project_id
     ), modeled_labor AS (
@@ -113,7 +123,7 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
       SELECT project_id,
         sum(COALESCE(CASE WHEN currency='ARS' THEN net_amount/NULLIF(cotizacion,0) ELSE net_amount END,monto_total_usd,monto_usd,monto_ars/NULLIF(cotizacion,0),0)) cost_usd,
         sum(COALESCE(CASE WHEN currency='ARS' THEN net_amount ELSE net_amount*(SELECT rate FROM fx) END,monto_ars,CASE WHEN currency='USD' THEN monto_usd*(SELECT rate FROM fx) ELSE original_amount END,0)) cost_ars
-      FROM pasivo_entries WHERE period_key=${periodKey} AND voided_at IS NULL AND project_id IS NOT NULL AND cost_treatment='direct'
+      FROM pasivo_entries WHERE period_key=${periodKey} AND voided_at IS NULL AND project_id IS NOT NULL AND cost_treatment='direct' AND COALESCE(source,'') <> 'excel'
       GROUP BY project_id
     ), combined AS (
       SELECT COALESCE(revenue.project_id,labor.project_id,bills.project_id) project_id,

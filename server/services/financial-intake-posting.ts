@@ -68,8 +68,12 @@ function moneyColumns(data: FinancialExtraction, amount: number) {
   }
   if (data.netAmount != null && (data.netAmount < 0 || data.netAmount > amount)) throw error("El neto debe estar entre cero y el total.");
   if (data.taxAmount != null && (data.taxAmount < 0 || data.taxAmount > amount)) throw error("Los impuestos deben estar entre cero y el total.");
+  if (data.ivaAmount != null && (data.ivaAmount < 0 || data.ivaAmount > amount)) throw error("El IVA debe estar entre cero y el total.");
   const usd = normalizedUsd(amount, currency, data.exchangeRate);
-  const netOriginal = data.netAmount ?? (data.taxAmount == null ? amount : Math.max(0, amount - data.taxAmount));
+  // El IVA, cuando está separado, es el único impuesto que se descuenta del
+  // documento. El IIBB nunca reduce el neto: es una deuda impositiva aparte.
+  const documentTax = data.ivaAmount ?? data.taxAmount;
+  const netOriginal = data.netAmount ?? (documentTax == null ? amount : Math.max(0, amount - documentTax));
   const netUsd = normalizedUsd(netOriginal, currency, data.exchangeRate);
   return {
     currency,
@@ -79,12 +83,69 @@ function moneyColumns(data: FinancialExtraction, amount: number) {
     cotizacion: data.exchangeRate ? String(data.exchangeRate) : currency === "USD" ? "1" : null,
     montoTotalUSD: String(usd),
     netAmount: String(netOriginal),
-    taxAmount: data.taxAmount == null ? null : String(data.taxAmount),
+    taxAmount: documentTax == null ? null : String(documentTax),
     grossAmount: String(amount),
     outstandingAmount: String(amount),
     usd,
     netUsd,
   };
+}
+
+/** Venta neta de IVA, con el "Ajuste" del Máster ya aplicado, e IIBB aparte. */
+export function computeSaleBreakdown(data: FinancialExtraction, amount: number) {
+  const money = moneyColumns(data, amount);
+  if (data.iibbAmount != null && data.iibbAmount < 0) throw error("El IIBB no puede ser negativo.");
+  const toUsd = (value: number) => value === 0 ? 0 : Math.sign(value) * normalizedUsd(Math.abs(value), money.currency, data.exchangeRate);
+  const netOriginal = Number(money.netAmount);
+  const adjustmentOriginal = data.salesAdjustmentAmount ?? 0;
+  const revenueOriginal = netOriginal + adjustmentOriginal;
+  if (revenueOriginal < 0) throw error("El ajuste no puede dejar la venta en negativo.");
+  const adjustmentUsd = toUsd(adjustmentOriginal);
+  const iibbOriginal = data.iibbAmount && data.iibbAmount > 0 ? data.iibbAmount : 0;
+  return {
+    money,
+    netOriginal,
+    adjustmentOriginal,
+    adjustmentUsd: adjustmentOriginal === 0 ? null : adjustmentUsd,
+    revenueOriginal,
+    revenueUsd: money.netUsd + adjustmentUsd,
+    iibbOriginal,
+    iibbUsd: toUsd(iibbOriginal),
+  };
+}
+
+/** Qué registra una liquidación impositiva o de intereses según su concepto. */
+export function taxSettlementPlan(data: FinancialExtraction) {
+  const concept = data.taxConcept;
+  if (!concept) throw error("Elegí qué impuesto o interés estás liquidando (IVA, IIBB, Impuestos USA o Intereses Oxean).");
+  return {
+    adjustmentType: concept === "Intereses Oxean" ? "interes" : "impuesto",
+    concept,
+    subtipoCosto: concept,
+    // El impacto en resultados vive en pl_adjustments; la deuda no duplica costo.
+    costTreatment: "balance_only" as const,
+    createsPayable: data.createsPayable !== false,
+  };
+}
+
+async function createSaleIibbPayable(
+  tx: any,
+  input: { data: FinancialExtraction; periodKey: string; intakeItemId: number; userId: number; projectId: number | null; iibbOriginal: number; iibbUsd: number; currency: string; cotizacion: string | null },
+) {
+  const { data, iibbOriginal, currency } = input;
+  const client = data.clientName ?? data.counterparty ?? "cliente sin resolver";
+  const [pasivo] = await tx.insert(pasivoEntries).values({
+    periodKey: input.periodKey, detalle: "IIBB", vendorName: null, subtipoCosto: "IIBB",
+    concepto: data.documentNumber, descripcion: data.documentNumber ? `IIBB sobre la venta ${data.documentNumber} a ${client}` : `IIBB sobre la venta a ${client}`,
+    documentNumber: null, fechaEmision: asDate(data.issueDate), projectId: input.projectId,
+    status: "PENDING", costTreatment: "tax", source: "mind_intake", externalId: `intake:${input.intakeItemId}:iibb`,
+    originalAmount: String(iibbOriginal), netAmount: String(iibbOriginal), taxAmount: null, grossAmount: String(iibbOriginal),
+    outstandingAmount: String(iibbOriginal), currency, montoARS: currency === "ARS" ? String(iibbOriginal) : null,
+    montoUSD: currency === "USD" ? String(iibbOriginal) : null, cotizacion: input.cotizacion, montoTotalUSD: String(input.iibbUsd),
+    overrideManual: true, createdBy: input.userId, updatedBy: input.userId,
+  }).returning();
+  await audit(tx, { periodKey: input.periodKey, entityType: "pasivo_entry", entityId: pasivo.id, action: "created_from_intake", afterData: pasivo, intakeItemId: input.intakeItemId, actorUserId: input.userId });
+  return pasivo;
 }
 
 async function ensureOpenPeriod(tx: any, periodKey: string): Promise<void> {
@@ -374,7 +435,8 @@ export async function postFinancialIntakeItem(intakeItemId: number, userId: numb
       const periodKey = requirePeriod(data);
       await ensureOpenPeriod(tx, periodKey);
       const amount = requireAmount(data);
-      const money = moneyColumns(data, amount);
+      const sale = computeSaleBreakdown(data, amount);
+      const money = sale.money;
       const projectId = await resolveProjectId(tx, data.projectName);
       const [activo] = await tx.insert(activoEntries).values({
         periodKey, tipoActivo: "Cuentas a Cobrar", concepto: "Factura", detalle: data.description,
@@ -388,11 +450,13 @@ export async function postFinancialIntakeItem(intakeItemId: number, userId: numb
       linkedRecords.push({ type: "activo_entry", id: activo.id });
       await audit(tx, { periodKey, entityType: "activo_entry", entityId: activo.id, action: "created_from_intake", afterData: activo, intakeItemId, actorUserId: userId });
 
-      const matchingFee = await findMatchingFeeRevenue(tx, data, projectId, periodKey, money.netUsd);
+      const matchingFee = await findMatchingFeeRevenue(tx, data, projectId, periodKey, sale.revenueUsd);
       if (matchingFee) {
         const [revenue] = await tx.update(revenueEvents).set({
           projectId, clientName: data.clientName ?? data.counterparty ?? matchingFee.clientName, projectName: data.projectName ?? matchingFee.projectName,
-          amountUsd: String(money.netUsd), amountNative: money.netAmount, currency: money.currency, fxRate: money.cotizacion,
+          amountUsd: String(sale.revenueUsd), amountNative: String(sale.revenueOriginal), currency: money.currency, fxRate: money.cotizacion,
+          adjustmentAmountUsd: sale.adjustmentUsd == null ? matchingFee.adjustmentAmountUsd : String(sale.adjustmentUsd),
+          adjustmentNote: data.salesAdjustmentNote ?? matchingFee.adjustmentNote,
           invoicePeriod: periodKey, collectionPeriodExpected: data.dueDate?.slice(0, 7) ?? matchingFee.collectionPeriodExpected,
           paymentTermsDays: data.paymentTermsDays ?? matchingFee.paymentTermsDays, confirmed: true, status: "confirmed", isEstimate: false,
           deliveryStart: data.deliveryStart ?? matchingFee.deliveryStart ?? periodKey,
@@ -404,7 +468,8 @@ export async function postFinancialIntakeItem(intakeItemId: number, userId: numb
       } else {
         const [revenue] = await tx.insert(revenueEvents).values({
           projectId, clientName: data.clientName ?? data.counterparty ?? "Cliente sin resolver", projectName: data.projectName,
-          amountUsd: String(money.netUsd), amountNative: money.netAmount, currency: money.currency, fxRate: money.cotizacion,
+          amountUsd: String(sale.revenueUsd), amountNative: String(sale.revenueOriginal), currency: money.currency, fxRate: money.cotizacion,
+          adjustmentAmountUsd: sale.adjustmentUsd == null ? null : String(sale.adjustmentUsd), adjustmentNote: data.salesAdjustmentNote,
           invoicePeriod: periodKey,
           collectionPeriodExpected: data.dueDate?.slice(0, 7) ?? null,
           paymentTermsDays: data.paymentTermsDays, confirmed: true, status: "confirmed", sourceTab: "mind_intake",
@@ -415,6 +480,10 @@ export async function postFinancialIntakeItem(intakeItemId: number, userId: numb
         linkedRecords.push({ type: "revenue_event", id: revenue.id });
         await audit(tx, { periodKey, entityType: "revenue_event", entityId: revenue.id, action: "created_from_intake", afterData: revenue, intakeItemId, actorUserId: userId });
       }
+      if (sale.iibbOriginal > 0) {
+        const iibb = await createSaleIibbPayable(tx, { data, periodKey, intakeItemId, userId, projectId, iibbOriginal: sale.iibbOriginal, iibbUsd: sale.iibbUsd, currency: money.currency, cotizacion: money.cotizacion });
+        linkedRecords.push({ type: "pasivo_entry", id: iibb.id });
+      }
     } else if (data.documentKind === "supplier_invoice") {
       const periodKey = requirePeriod(data);
       await ensureOpenPeriod(tx, periodKey);
@@ -424,7 +493,8 @@ export async function postFinancialIntakeItem(intakeItemId: number, userId: numb
         periodKey, detalle: data.counterparty ?? "Proveedor sin resolver", vendorName: data.counterparty,
         concepto: data.documentNumber, descripcion: data.description, documentNumber: data.documentNumber,
         fechaEmision: asDate(data.issueDate), fechaVencimiento: asDate(data.dueDate), projectId: await resolveProjectId(tx, data.projectName),
-        subtipoCosto: data.costSubtype, status: "PENDING", costTreatment: data.costTreatment ?? "unclassified", source: "mind_intake", externalId: `intake:${intakeItemId}:pasivo`,
+        subtipoCosto: data.costSubtype, status: "PENDING", costTreatment: data.costTreatment ?? "unclassified", isMarketing: data.isMarketingCost === true,
+        source: "mind_intake", externalId: `intake:${intakeItemId}:pasivo`,
         originalAmount: money.originalAmount, netAmount: money.netAmount, taxAmount: money.taxAmount, grossAmount: money.grossAmount,
         outstandingAmount: money.outstandingAmount, currency: money.currency, montoARS: money.montoARS, montoUSD: money.montoUSD,
         cotizacion: money.cotizacion, montoTotalUSD: money.montoTotalUSD, overrideManual: true, createdBy: userId, updatedBy: userId,
@@ -452,16 +522,23 @@ export async function postFinancialIntakeItem(intakeItemId: number, userId: numb
       const periodKey = requirePeriod(data);
       await ensureOpenPeriod(tx, periodKey);
       const amount = requireAmount(data);
-      const money = moneyColumns(data, amount);
+      const sale = computeSaleBreakdown(data, amount);
+      const money = sale.money;
+      const projectId = await resolveProjectId(tx, data.projectName);
       const [revenue] = await tx.insert(revenueEvents).values({
-        projectId: await resolveProjectId(tx, data.projectName), clientName: data.clientName ?? data.counterparty ?? "Cliente sin resolver",
-        projectName: data.projectName, amountUsd: String(money.netUsd), amountNative: money.netAmount, currency: money.currency,
+        projectId, clientName: data.clientName ?? data.counterparty ?? "Cliente sin resolver",
+        projectName: data.projectName, amountUsd: String(sale.revenueUsd), amountNative: String(sale.revenueOriginal), currency: money.currency,
+        adjustmentAmountUsd: sale.adjustmentUsd == null ? null : String(sale.adjustmentUsd), adjustmentNote: data.salesAdjustmentNote,
         fxRate: money.cotizacion, invoicePeriod: periodKey, deliveryStart: data.deliveryStart ?? periodKey, deliveryEnd: data.deliveryEnd ?? data.deliveryStart ?? periodKey,
         deliveryCurve: data.deliveryCurve ?? "invoice", paymentTermsDays: data.paymentTermsDays, confirmed: true, status: "confirmed",
         sourceTab: "mind_intake", sourceRowId: `intake:${intakeItemId}:revenue`, isEstimate: false, periodClosed: false, note: data.description,
       }).returning();
       linkedRecords.push({ type: "revenue_event", id: revenue.id });
       await audit(tx, { periodKey, entityType: "revenue_event", entityId: revenue.id, action: "created_from_intake", afterData: revenue, intakeItemId, actorUserId: userId });
+      if (sale.iibbOriginal > 0) {
+        const iibb = await createSaleIibbPayable(tx, { data, periodKey, intakeItemId, userId, projectId, iibbOriginal: sale.iibbOriginal, iibbUsd: sale.iibbUsd, currency: money.currency, cotizacion: money.cotizacion });
+        linkedRecords.push({ type: "pasivo_entry", id: iibb.id });
+      }
     } else if (data.documentKind === "exchange_rate") {
       const rateRows = data.lineItems.length
         ? data.lineItems.map((line) => ({ periodKey: line.date!.slice(0, 7), rate: line.amount, date: line.date, note: line.description, estimated: true }))
@@ -507,17 +584,30 @@ export async function postFinancialIntakeItem(intakeItemId: number, userId: numb
       await ensureOpenPeriod(tx, periodKey);
       const amount = requireAmount(data);
       const money = moneyColumns(data, amount);
-      const [adjustment] = await tx.insert(plAdjustments).values({ periodKey, type: "impuesto", concept: data.description ?? data.documentNumber ?? "Liquidación impositiva", amountUsd: String(money.usd) }).returning();
-      const [pasivo] = await tx.insert(pasivoEntries).values({
-        periodKey, detalle: data.counterparty ?? "Impuestos", vendorName: data.counterparty, subtipoCosto: "Impuestos",
-        concepto: data.documentNumber, descripcion: data.description, documentNumber: data.documentNumber,
-        fechaEmision: asDate(data.issueDate), fechaVencimiento: asDate(data.dueDate), status: "PENDING", costTreatment: "balance_only",
-        source: "mind_intake", externalId: `intake:${intakeItemId}:tax`, originalAmount: money.originalAmount,
-        netAmount: money.netAmount, taxAmount: money.taxAmount, grossAmount: money.grossAmount, outstandingAmount: money.outstandingAmount,
-        currency: money.currency, montoARS: money.montoARS, montoUSD: money.montoUSD, cotizacion: money.cotizacion,
-        montoTotalUSD: money.montoTotalUSD, overrideManual: true, createdBy: userId, updatedBy: userId,
-      }).returning();
-      linkedRecords.push({ type: "pl_adjustment", id: adjustment.id }, { type: "pasivo_entry", id: pasivo.id });
+      const plan = taxSettlementPlan(data);
+      // concept guarda el nombre canónico exacto: el P&L excluye IVA y lleva
+      // IIBB / Impuestos USA / Intereses Oxean debajo del EBIT.
+      const [adjustment] = await tx.insert(plAdjustments).values({ periodKey, type: plan.adjustmentType, concept: plan.concept, amountUsd: String(money.usd) }).returning();
+      linkedRecords.push({ type: "pl_adjustment", id: adjustment.id });
+      let pasivo: any = null;
+      if (plan.createsPayable) {
+        [pasivo] = await tx.insert(pasivoEntries).values({
+          periodKey, detalle: data.counterparty ?? plan.concept, vendorName: data.counterparty, subtipoCosto: plan.subtipoCosto,
+          concepto: data.documentNumber, descripcion: data.description, documentNumber: data.documentNumber,
+          fechaEmision: asDate(data.issueDate), fechaVencimiento: asDate(data.dueDate), status: "PENDING", costTreatment: plan.costTreatment,
+          source: "mind_intake", externalId: `intake:${intakeItemId}:tax`, originalAmount: money.originalAmount,
+          netAmount: money.netAmount, taxAmount: money.taxAmount, grossAmount: money.grossAmount, outstandingAmount: money.outstandingAmount,
+          currency: money.currency, montoARS: money.montoARS, montoUSD: money.montoUSD, cotizacion: money.cotizacion,
+          montoTotalUSD: money.montoTotalUSD, overrideManual: true, createdBy: userId, updatedBy: userId,
+        }).returning();
+        linkedRecords.push({ type: "pasivo_entry", id: pasivo.id });
+      }
+      if (plan.concept === "IIBB") {
+        const [saleIibb] = await tx.select({ id: pasivoEntries.id }).from(pasivoEntries).where(and(
+          eq(pasivoEntries.periodKey, periodKey), eq(pasivoEntries.subtipoCosto, "IIBB"), eq(pasivoEntries.costTreatment, "tax"), isNull(pasivoEntries.voidedAt),
+        )).limit(1);
+        if (saleIibb) warnings.push(`En ${periodKey} ya hay IIBB cargado por venta (Pasivo #${saleIibb.id}). Revisá que esta liquidación no lo duplique.`);
+      }
       await audit(tx, { periodKey, entityType: "tax_settlement", entityId: adjustment.id, action: "created_from_intake", afterData: { adjustment, pasivo }, intakeItemId, actorUserId: userId });
     }
 

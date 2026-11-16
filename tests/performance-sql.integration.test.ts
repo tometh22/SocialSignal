@@ -13,7 +13,7 @@ describe.skipIf(!url)("financial dashboard SQL preserves balances while removing
     client = new Client({ connectionString: url }); await client.connect();
     await client.query(`CREATE SCHEMA ${schema}; SET search_path TO ${schema}`);
     await client.query(`
-      CREATE TABLE revenue_events(invoice_period text,status text,amount_usd numeric);
+      CREATE TABLE revenue_events(invoice_period text,status text,amount_usd numeric,confirmed boolean DEFAULT true,is_estimate boolean DEFAULT false,source_tab text);
       CREATE TABLE activo_entries(period_key text,voided_at timestamp,currency text,monto_usd numeric,outstanding_amount numeric,cotizacion numeric);
       CREATE TABLE pasivo_entries(LIKE activo_entries);
       CREATE TABLE cashflow_transactions(period_key text,voided_at timestamp,monto_usd numeric,monto_ars numeric,cotizacion numeric,source text,tipo_movimiento text,transfer_group_id text);
@@ -23,7 +23,7 @@ describe.skipIf(!url)("financial dashboard SQL preserves balances while removing
       CREATE TABLE financial_accounts(currency text,opening_balance numeric,opening_balance_date date,is_active boolean);
       CREATE TABLE financial_close_periods(period_key text,status text);
       CREATE TABLE exchange_rates(id serial,year int,month int,rate numeric,is_active boolean,rate_type text,updated_at timestamp DEFAULT now());
-      INSERT INTO revenue_events VALUES ('2026-01','active',100),('2026-01','cancelled',999),('2026-02','active',200);
+      INSERT INTO revenue_events(invoice_period,status,amount_usd) VALUES ('2026-01','active',100),('2026-01','cancelled',999),('2026-02','active',200);
       INSERT INTO activo_entries VALUES ('2026-01',NULL,'USD',100,100,1),('2026-02',NULL,'ARS',NULL,2000,1000),('2026-01',now(),'USD',999,999,1);
       INSERT INTO pasivo_entries VALUES ('2026-01',NULL,'ARS',NULL,1000,1000);
       INSERT INTO fact_cost_month VALUES ('2026-01',10,5,2),('2026-02',20,6,3),('2026-03',0,0,0);

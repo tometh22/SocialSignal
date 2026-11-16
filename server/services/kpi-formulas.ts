@@ -164,7 +164,8 @@ export async function fetchFinancialSummary(periodKey: string): Promise<Financia
     const { rows: [nativeData] } = await pool.query(`
       SELECT COALESCE(SUM(amount_usd::numeric), 0) as total_revenue
       FROM revenue_events
-      WHERE invoice_period = $1 AND status <> 'cancelled'
+      WHERE invoice_period = $1 AND status <> 'cancelled' AND COALESCE(confirmed, true)
+        AND NOT COALESCE(is_estimate, false) AND COALESCE(source_tab,'') <> 'mind_budget'
     `, [periodKey]);
     const nativeRevenue = parseFloat(nativeData?.total_revenue || '0');
     if (nativeRevenue > 0) {
@@ -193,27 +194,12 @@ export async function fetchFinancialSummary(periodKey: string): Promise<Financia
   let liveActivo = activoTotal;
   let livePasivo = pasivoTotal;
   if (cajaTotalIsNull) {
-    const { rows: [live] } = await pool.query(`
-      WITH fx AS (
-        SELECT COALESCE((SELECT rate::numeric FROM exchange_rates WHERE year=left($1,4)::int AND month=right($1,2)::int AND is_active=true ORDER BY CASE WHEN rate_type='end_of_month' THEN 0 WHEN rate_type='average' THEN 1 ELSE 2 END,updated_at DESC,id DESC LIMIT 1),1) rate
-      ), cash AS (
-        SELECT COALESCE(sum(CASE WHEN tipo_movimiento='Ingreso' AND transfer_group_id IS NULL THEN COALESCE(monto_usd,monto_ars/NULLIF(cotizacion,0),0) WHEN tipo_movimiento='Egreso' AND transfer_group_id IS NULL THEN -COALESCE(monto_usd,monto_ars/NULLIF(cotizacion,0),0) ELSE 0 END),0) total
-        FROM cashflow_transactions WHERE period_key<=$1 AND source<>'excel' AND voided_at IS NULL
-      ), opening AS (
-        SELECT COALESCE(sum(CASE WHEN currency='ARS' THEN opening_balance/(SELECT rate FROM fx) ELSE opening_balance END),0) total FROM financial_accounts WHERE is_active=true
-      ), receivables AS (
-        SELECT COALESCE(sum(CASE WHEN currency='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END),0) total FROM activo_entries WHERE period_key<=$1 AND voided_at IS NULL
-      ), payables AS (
-        SELECT COALESCE(sum(CASE WHEN currency='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END),0) total FROM pasivo_entries WHERE period_key<=$1 AND voided_at IS NULL
-      ), provisions AS (
-        SELECT COALESCE(sum(CASE WHEN currency='ARS' THEN COALESCE(remaining_amount,0)/(SELECT rate FROM fx) ELSE COALESCE(remaining_amount,0) END),0) total FROM provision_entries WHERE period_key<=$1 AND status IN ('APPROVED','ACTIVE')
-      )
-      SELECT (opening.total+cash.total)::float caja, (opening.total+cash.total+receivables.total)::float activo, (payables.total+provisions.total)::float pasivo
-      FROM opening,cash,receivables,payables,provisions
-    `, [periodKey]);
-    liveCaja = Number(live?.caja ?? 0);
-    liveActivo = Number(live?.activo ?? 0);
-    livePasivo = Number(live?.pasivo ?? 0);
+    // Same month-end balances as the Resumen for a Mind month (native-month.ts).
+    const { computeNativeMonth } = await import('./native-month');
+    const live = await computeNativeMonth(periodKey);
+    liveCaja = live.caja;
+    liveActivo = live.activoTotal;
+    livePasivo = live.pasivoTotal;
     warnings.push(`Caja, Activo y Pasivo calculados en vivo desde el ledger de Mind para ${periodKey}`);
   }
 

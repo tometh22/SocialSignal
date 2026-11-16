@@ -924,6 +924,40 @@ const authoredTrainingLessons: AuthoredLesson[] = [
       "Los controles deben revisarse antes del cierre definitivo por Administración.",
   },
   {
+    id: "saldos-iniciales",
+    version: 1,
+    module: "Finanzas",
+    title: "Saldos iniciales y mes de cambio",
+    access: {
+      audience: "internal",
+      any: ["finance"],
+    },
+    covers: ["/finance/saldos-iniciales"],
+    description: "Definí desde qué mes Finanzas se registra en Mind y cargá los saldos con los que arranca.",
+    explanation: [
+      "Desde el mes de cambio, todos los meses se informan sólo con lo cargado en Mind, aunque la planilla Máster tenga datos.",
+      "Los saldos iniciales son lo pendiente al cierre del mes anterior: bancos, facturas sin cobrar, deudas, provisiones e inversiones. No son ventas ni gastos.",
+      "El botón Importar del Máster trae esos saldos de las pestañas Activo, Pasivo y Provisión pasivo y los compara con el Resumen Ejecutivo.",
+    ],
+    example:
+      "Para pasar en enero, el administrador elige enero como mes de cambio, importás los saldos de diciembre del Máster y agregás una factura que faltaba en la planilla.",
+    minutes: 2,
+    links: [
+      {
+        label: "Abrir Saldos iniciales",
+        href: "/finance/saldos-iniciales",
+      },
+    ],
+    instructions: [
+      "En Finanzas abrí Saldos iniciales.",
+      "Un administrador elige el primer mes que se registra en Mind y guarda.",
+      "Elegí Importar del Máster y revisá la comparación con el Resumen Ejecutivo.",
+      "Agregá o quitá los ítems que no coincidan. Cuando el mes de cambio se cierra, los saldos quedan fijos.",
+    ],
+    verification:
+      "Los totales de saldos iniciales deben coincidir con el cierre del mes anterior en el Máster o tener la diferencia explicada.",
+  },
+  {
     id: "cashflow",
     version: 3,
     module: "Finanzas",
@@ -1039,6 +1073,7 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     covers: [
       "/dashboard",
       "/finance/proyeccion",
+      "/finance/presupuesto",
       "/finance/arr",
       "/finance/rendimiento",
       "/finance/costos",
@@ -1063,6 +1098,10 @@ const authoredTrainingLessons: AuthoredLesson[] = [
         href: "/finance/proyeccion",
       },
       {
+        label: "Abrir Presupuesto",
+        href: "/finance/presupuesto",
+      },
+      {
         label: "Abrir Ingresos recurrentes",
         href: "/finance/arr",
       },
@@ -1078,6 +1117,7 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     instructions: [
       "Entrá a Finanzas → Resumen y elegí el mes de referencia compartido.",
       "Para comparar meses cerrados y estimados, consultá Proyección; para ingresos mensuales Fee y su equivalente anual, abrí Clientes y proyectos → Ingresos recurrentes.",
+      "En Proyección → Presupuesto cargá los costos estimados y las ventas estimadas de los meses que ya se registran en Mind; los meses que informa el Máster se corrigen en la planilla.",
       "En Clientes y proyectos podés consultar la contribución mensual, el seguimiento acumulado y el desglose anual de costos. Los importes pendientes no deben interpretarse como cero.",
       "Antes de comparar resultados, alineá período, moneda y filtros. Abrí el detalle disponible para entender las diferencias.",
     ],

@@ -180,7 +180,8 @@ async function loadEvents(opts: RevenueBasisOptions = {}): Promise<RevenueEventI
   const values: unknown[] = [];
 
   if (!opts.includePipeline) {
-    conditions.push('confirmed = true');
+    // Actual sales only: budget rows and estimates never count as executed.
+    conditions.push(`confirmed = true AND NOT COALESCE(is_estimate, false) AND COALESCE(source_tab,'') <> 'mind_budget'`);
   }
   if (opts.clientName) {
     values.push(opts.clientName);
