@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.14.57 — 2026-11-16
+
+- Una sola fuente por mes en todo Finanzas: un mes se informa desde el Máster hasta que Mind tiene un cierre o ventas propias. Resumen, Caja, Cobros y pagos, Provisiones y Desglose de costos aplican la misma regla y avisan de dónde vienen los datos.
+- Activo, Pasivo, CashFlow y Provisión pasivo del Máster se sincronizan cada 30 minutos para todos los meses del Máster (antes se cortaban en agosto de 2026). Sólo se reescriben los meses que cambiaron y nunca se borran registros creados en Mind.
+- Caja: los movimientos se leen con su fecha e importe reales (antes se confundían día y mes, se tomaban saldos como ingresos y los egresos de junio a agosto llegaban a USD 1,2 millones). Los saldos bancarios de los meses del Máster son el activo líquido de su solapa Activo.
+- Por cobrar muestra sólo facturas: los saldos bancarios y la cripto ya no se suman como cobros pendientes. El estado cobrado/pagado sigue al Máster; antes un pago registrado después de la primera importación no llegaba a Mind.
+- Provisiones se calcula desde la matriz de Provisión pasivo y se valida contra el Resumen Ejecutivo mes a mes; los meses que no concilian se informan en lugar de importarse.
+- Desglose de costos usa los mismos costos que el Resumen del Máster: el total anual coincide con Ventas menos EBIT y los meses futuros muestran el estimado.
+- Los registros que vienen del Máster no se pueden anular ni conciliar desde Mind, porque la próxima sincronización los restauraría: se corrigen en la planilla.
+
 ## 1.14.56 — 2026-11-14
 
 - Todas las vistas de Finanzas comparten el mismo diseño: encabezado, tarjetas de indicadores, tablas con estados de carga, error y vacío, y montos en formato "USD 1.234". La barra común suma flechas de mes anterior y siguiente, pestañas con íconos y acciones compactas en el celular.

@@ -87,7 +87,7 @@ export function buildMasterScenario(data: MasterScenarioSnapshot, requestedPerio
           .map(text).filter(Boolean).join(' · ') : text(row[5]),
         date: null, source, sourceDetail: `${sourceDetail} · fila ${index + 2}`,
         // Keep source precision until the monthly aggregate, exactly as SUMIFS does.
-        amountUsd: amount(row[isActual ? 18 : 12]), impact,
+        amountUsd: amount(row[isActual ? 18 : 12]), impact, costType: isActual ? text(row[5]) || null : null,
       };
       (isActual ? allActual : allEstimates).push(cost);
     });

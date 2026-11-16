@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
 import { PageShell } from "@/components/ui/page-shell";
-import { FinanceHeader, FinanceTableCard, StatusPill, formatUsd, periodLabel } from "@/components/finance/ui";
+import { FinanceHeader, FinanceTableCard, StatusPill, formatUsd, periodLabel, usePeriodSource, PeriodSourceNotice } from "@/components/finance/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ export default function ProvisionsPage() {
   const [releaseNote, setReleaseNote] = useState("");
   const { toast } = useToast();
   const qc = useQueryClient();
+  const periodSource = usePeriodSource(period);
 
 
   const { data: provisionData, isLoading, isError, refetch } = useQuery<any[]>({
@@ -50,8 +51,8 @@ export default function ProvisionsPage() {
   });
 
   const rows = provisionData ?? [];
-  const totalActivo = rows.filter(r => r.tipo === "NUEVA_PROVISION" && ["APPROVED", "ACTIVE"].includes(r.status)).reduce((s, r) => s + parseFloat(r.remainingAmount ?? r.montoProvision ?? "0"), 0);
-  const totalRecupero = rows.filter(r => r.tipo === "RECUPERO" && ["APPROVED", "ACTIVE"].includes(r.status)).reduce((s, r) => s + parseFloat(r.montoProvision ?? "0"), 0);
+  const totalActivo = rows.filter(r => r.tipo === "NUEVA_PROVISION" && ["APPROVED", "ACTIVE", "MASTER"].includes(r.status)).reduce((s, r) => s + parseFloat(r.remainingAmount ?? r.montoProvision ?? "0"), 0);
+  const totalRecupero = rows.filter(r => r.tipo === "RECUPERO" && ["APPROVED", "ACTIVE", "MASTER"].includes(r.status)).reduce((s, r) => s + parseFloat(r.montoProvision ?? "0"), 0);
 
   const net = provisionData ? totalActivo - totalRecupero : null;
 
@@ -62,6 +63,7 @@ export default function ProvisionsPage() {
         description={`Facturación adelantada y contingencias vigentes en ${periodLabel(period)}.`}
         actions={<Button asChild variant="outline"><Link href={`/finance/cargar?period=${period}`}><UploadCloud className="mr-2 h-4 w-4" />Cargar provisión</Link></Button>}
       />
+      <PeriodSourceNotice source={periodSource.data} otherRecords={periodSource.data?.otherSourceRecords.provisions} noun="las provisiones" />
 
       {isError && <QueryError message="No se pudieron cargar las provisiones del período." retry={refetch} />}
       <MetricGrid>
@@ -72,7 +74,7 @@ export default function ProvisionsPage() {
 
       <FinanceTableCard
         title="Provisiones del período"
-        description="Las propuestas requieren aprobación antes de afectar el resultado."
+        description={periodSource.data?.source === "master" ? "Saldo de cada provisión al cierre del mes según la solapa Provisión pasivo del Máster." : "Las propuestas requieren aprobación antes de afectar el resultado."}
         loading={isLoading} error={isError} onRetry={refetch} empty={rows.length === 0}
         emptyMessage={`No hay provisiones para ${periodLabel(period)}.`}
       >
@@ -93,13 +95,13 @@ export default function ProvisionsPage() {
             {rows.map((row: any) => {
               const status = row.status || "PROPOSED";
               return <TableRow key={row.id}>
-                <TableCell><span className="font-medium">{row.clienteNombre || "—"}</span><span className="block text-xs text-muted-foreground">{row.importBatch ? "Importado de Excel" : "Registrado en Mind"}</span></TableCell>
+                <TableCell><span className="font-medium">{row.clienteNombre || "—"}</span><span className="block text-xs text-muted-foreground">{row.importBatch ? "Máster" : "Registrado en Mind"}</span></TableCell>
                 <TableCell>{row.tipo === "RECUPERO" ? <StatusPill tone="success">Recupero</StatusPill> : <StatusPill tone="info">Nueva provisión</StatusPill>}</TableCell>
                 <TableCell className="whitespace-nowrap text-sm">{row.mesAplicacion || row.periodKey}</TableCell>
                 <TableCell className="whitespace-nowrap text-right tabular-nums">{formatUsd(parseFloat(row.montoProvision ?? "0"))}</TableCell>
                 <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">{formatUsd(parseFloat(row.remainingAmount ?? row.montoProvision ?? "0"))}</TableCell>
                 <TableCell className="max-w-[220px]"><span className="block truncate text-sm text-muted-foreground" title={row.criterio || undefined}>{row.criterio || "—"}</span></TableCell>
-                <TableCell><StatusPill tone={status === "PROPOSED" ? "warning" : ["APPROVED", "ACTIVE"].includes(status) ? "success" : "neutral"}>{statusLabel(row.status, "Propuesta")}</StatusPill></TableCell>
+                <TableCell><StatusPill tone={status === "PROPOSED" ? "warning" : ["APPROVED", "ACTIVE"].includes(status) ? "success" : status === "MASTER" ? "info" : "neutral"}>{statusLabel(row.status, "Propuesta")}</StatusPill></TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     {status === "PROPOSED" && <Button size="sm" variant="outline" disabled={approveMutation.isPending} onClick={() => approveMutation.mutate(row.id)}>Aprobar</Button>}

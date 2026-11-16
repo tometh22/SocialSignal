@@ -32,10 +32,27 @@ import { requirePermission } from "./middleware/requirePermission";
 import { googleSheetsWorkingService } from "./services/googleSheetsWorking";
 import { getCutoverDate } from "./etl/time-entries-to-fact-labor";
 import { rebuildNativeFinancialFacts } from "./services/financial-native-builders";
+import { getPeriodSource, type FinancePeriodSource } from "./services/finance-period-source";
 
 export function createLedgerRouter(requireAuth: any) {
   const router = Router();
   const finance = [requireAuth, requirePermission("finance")];
+  // One source per month (finance-period-source): Master months show the rows
+  // imported from the Master; Mind months show only records created in Mind.
+  const sourceCondition = (column: any, source: FinancePeriodSource) =>
+    source === "master" ? sql`${column} = 'excel'` : sql`COALESCE(${column}, '') <> 'excel'`;
+  const importedProvisionCondition = (source: FinancePeriodSource) =>
+    source === "master" ? sql`${provisionEntries.importBatch} IS NOT NULL` : sql`${provisionEntries.importBatch} IS NULL`;
+  // Bank balances and crypto live in the Master "Activo" tab but are not receivables.
+  const receivableOnly = sql`lower(translate(COALESCE(${activoEntries.tipoActivo}, ''), 'íÍ', 'iI')) NOT IN ('activo liquido', 'mediano plazo')`;
+  // Rows imported from the Master are rewritten by the next sync: edit them in the Master.
+  const assertEditableInMind = async (row: { periodKey?: string | null; source?: string | null; importBatch?: string | null } | undefined) => {
+    if (!row?.periodKey) return;
+    const imported = row.source === "excel" || (row.source === undefined && row.importBatch != null);
+    if (imported && await getPeriodSource(row.periodKey) === "master") {
+      throw Object.assign(new Error("Este registro viene del Máster. Corregilo en la planilla: Mind lo actualiza en la próxima sincronización (cada 30 minutos)."), { statusCode: 409 });
+    }
+  };
   const ensurePeriodMutable = async (periodKey: string) => {
     const [close] = await db.select({ status: financialClosePeriods.status }).from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, periodKey)).limit(1);
     if (["IN_REVIEW", "CLOSED"].includes(close?.status ?? "")) throw Object.assign(new Error(`El período ${periodKey} está ${close?.status === "CLOSED" ? "cerrado" : "en revisión"}.`), { statusCode: 409 });
@@ -136,13 +153,32 @@ export function createLedgerRouter(requireAuth: any) {
 
   // ==================== ACTIVO ====================
 
+  router.get("/finance/period-source", ...finance, async (req, res) => {
+    try {
+      const period = String(req.query.period ?? "");
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return res.status(400).json({ message: "period debe usar el formato YYYY-MM" });
+      const source = await getPeriodSource(period);
+      const other = source === "master" ? sql`<> 'excel'` : sql`= 'excel'`;
+      const { rows } = await db.execute(sql`SELECT
+          (SELECT count(*) FROM activo_entries WHERE period_key=${period} AND voided_at IS NULL AND COALESCE(source,'') ${other})::int activo,
+          (SELECT count(*) FROM pasivo_entries WHERE period_key=${period} AND voided_at IS NULL AND COALESCE(source,'') ${other})::int pasivo,
+          (SELECT count(*) FROM cashflow_transactions WHERE period_key=${period} AND voided_at IS NULL AND COALESCE(source,'') ${other})::int cashflow,
+          (SELECT count(*) FROM provision_entries WHERE period_key=${period} AND ${source === "master" ? sql`import_batch IS NULL` : sql`import_batch IS NOT NULL`})::int provisions`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.json({ period, source, otherSourceRecords: rows[0] });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   router.get("/activo", ...finance, async (req, res) => {
     try {
       const pagination = parseLedgerQuery(req.query);
       if ("error" in pagination) return res.status(400).json({ message: pagination.error });
       const { period, estado, cliente } = req.query as Record<string, string>;
       const { page, pageSize } = pagination;
-      const conditions: any[] = [eq(activoEntries.periodKey, pagination.period), isNull(activoEntries.voidedAt)];
+      const periodSource = await getPeriodSource(pagination.period);
+      const conditions: any[] = [eq(activoEntries.periodKey, pagination.period), isNull(activoEntries.voidedAt), receivableOnly, sourceCondition(activoEntries.source, periodSource)];
       if (estado === "cobrado") conditions.push(eq(activoEntries.cobradoAlCierre, true));
       if (estado === "pendiente") conditions.push(eq(activoEntries.cobradoAlCierre, false));
       if (estado === "vencido") conditions.push(eq(activoEntries.vencido, true));
@@ -160,6 +196,7 @@ export function createLedgerRouter(requireAuth: any) {
           vencido: activoEntries.vencido,
           cobradoAlCierre: activoEntries.cobradoAlCierre,
           overrideManual: activoEntries.overrideManual,
+          source: activoEntries.source,
           montoTotalUSD: activoUSD,
           outstandingUSD: activoOutstandingUSD,
           status: activoEntries.status,
@@ -191,6 +228,7 @@ export function createLedgerRouter(requireAuth: any) {
     try {
       const parsed = parseLedgerQuery(req.query);
       if ("error" in parsed) return res.status(400).json({ message: parsed.error });
+      const periodSource = await getPeriodSource(parsed.period);
       const [summary] = await db.select({
         total: sql<number>`COALESCE(SUM(${activoUSD}), 0)::double precision`,
         cobrado: sql<number>`COALESCE(SUM(${activoUSD} - ${activoOutstandingUSD}), 0)::double precision`,
@@ -199,7 +237,7 @@ export function createLedgerRouter(requireAuth: any) {
           WHERE ${activoEntries.vencido} = true
         ), 0)::double precision`,
         count: sql<number>`COUNT(*)::integer`,
-      }).from(activoEntries).where(and(eq(activoEntries.periodKey, parsed.period), isNull(activoEntries.voidedAt)));
+      }).from(activoEntries).where(and(eq(activoEntries.periodKey, parsed.period), isNull(activoEntries.voidedAt), receivableOnly, sourceCondition(activoEntries.source, periodSource)));
       const total = Number(summary?.total ?? 0);
       const cobrado = Number(summary?.cobrado ?? 0);
       res.json({
@@ -243,6 +281,7 @@ export function createLedgerRouter(requireAuth: any) {
       const parsed = insertActivoEntrySchema.partial().safeParse(normalizeLedgerMoneyInput(req.body));
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
       const [existing] = await db.select().from(activoEntries).where(eq(activoEntries.id, id)).limit(1);
+      await assertEditableInMind(existing as any);
       if (!existing) return res.status(404).json({ message: "No encontrado" });
       await ensurePeriodMutable(existing.periodKey);
       if (existing.source === "mind_intake") return res.status(409).json({ message: "Las facturas nativas se corrigen anulando la carga y registrándola nuevamente." });
@@ -280,7 +319,8 @@ export function createLedgerRouter(requireAuth: any) {
       if ("error" in pagination) return res.status(400).json({ message: pagination.error });
       const { period, subtipo, estado } = req.query as Record<string, string>;
       const { page, pageSize } = pagination;
-      const conditions: any[] = [eq(pasivoEntries.periodKey, pagination.period), isNull(pasivoEntries.voidedAt)];
+      const periodSource = await getPeriodSource(pagination.period);
+      const conditions: any[] = [eq(pasivoEntries.periodKey, pagination.period), isNull(pasivoEntries.voidedAt), sourceCondition(pasivoEntries.source, periodSource)];
       if (subtipo) conditions.push(eq(pasivoEntries.subtipoCosto, subtipo));
       if (estado === "pagado") conditions.push(eq(pasivoEntries.pagadoAlCierre, true));
       if (estado === "pendiente") conditions.push(eq(pasivoEntries.pagadoAlCierre, false));
@@ -298,6 +338,7 @@ export function createLedgerRouter(requireAuth: any) {
           vencido: pasivoEntries.vencido,
           pagadoAlCierre: pasivoEntries.pagadoAlCierre,
           overrideManual: pasivoEntries.overrideManual,
+          source: pasivoEntries.source,
           montoTotalUSD: pasivoUSD,
           outstandingUSD: pasivoOutstandingUSD,
           status: pasivoEntries.status,
@@ -329,7 +370,8 @@ export function createLedgerRouter(requireAuth: any) {
     try {
       const parsed = parseLedgerQuery(req.query);
       if ("error" in parsed) return res.status(400).json({ message: parsed.error });
-      const periodCondition = and(eq(pasivoEntries.periodKey, parsed.period), isNull(pasivoEntries.voidedAt));
+      const periodSource = await getPeriodSource(parsed.period);
+      const periodCondition = and(eq(pasivoEntries.periodKey, parsed.period), isNull(pasivoEntries.voidedAt), sourceCondition(pasivoEntries.source, periodSource));
       const [summaryRows, subtipoRows] = await Promise.all([
         db.select({
           total: sql<number>`COALESCE(SUM(${pasivoUSD}), 0)::double precision`,
@@ -396,6 +438,7 @@ export function createLedgerRouter(requireAuth: any) {
       const parsed = insertPasivoEntrySchema.partial().safeParse(normalizeLedgerMoneyInput(req.body));
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
       const [existing] = await db.select().from(pasivoEntries).where(eq(pasivoEntries.id, id)).limit(1);
+      await assertEditableInMind(existing as any);
       if (!existing) return res.status(404).json({ message: "No encontrado" });
       await ensurePeriodMutable(existing.periodKey);
       if (existing.source === "mind_intake") return res.status(409).json({ message: "Las facturas nativas se corrigen anulando la carga y registrándola nuevamente." });
@@ -433,7 +476,7 @@ export function createLedgerRouter(requireAuth: any) {
     try {
       const { period } = req.query as Record<string, string>;
       const rows = period
-        ? await db.select().from(provisionEntries).where(eq(provisionEntries.periodKey, period)).orderBy(desc(provisionEntries.createdAt))
+        ? await db.select().from(provisionEntries).where(and(eq(provisionEntries.periodKey, period), importedProvisionCondition(await getPeriodSource(period)))).orderBy(desc(provisionEntries.createdAt))
         : await db.select().from(provisionEntries).orderBy(desc(provisionEntries.createdAt));
       res.json(rows);
     } catch (error: any) {
@@ -461,6 +504,7 @@ export function createLedgerRouter(requireAuth: any) {
       const parsed = insertProvisionEntrySchema.partial().safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
       const [existing] = await db.select().from(provisionEntries).where(eq(provisionEntries.id, id)).limit(1);
+      await assertEditableInMind(existing as any);
       if (!existing) return res.status(404).json({ message: "No encontrado" });
       await ensurePeriodMutable(existing.periodKey);
       const [updated] = await db.update(provisionEntries).set({ ...parsed.data, updatedAt: new Date() }).where(eq(provisionEntries.id, id)).returning();
@@ -469,7 +513,7 @@ export function createLedgerRouter(requireAuth: any) {
       if (updated.periodKey !== existing.periodKey) await refreshNativeFacts(updated.periodKey);
       res.json(updated);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(error.statusCode ?? 500).json({ message: error.message });
     }
   });
 
@@ -525,7 +569,7 @@ export function createLedgerRouter(requireAuth: any) {
     try {
       const { period, banco, tipo } = req.query as Record<string, string>;
       const conditions: any[] = [isNull(cashflowTransactions.voidedAt)];
-      if (period) conditions.push(eq(cashflowTransactions.periodKey, period));
+      if (period) conditions.push(eq(cashflowTransactions.periodKey, period), sourceCondition(cashflowTransactions.source, await getPeriodSource(period)));
       if (banco) conditions.push(eq(cashflowTransactions.banco, banco));
       if (tipo) conditions.push(eq(cashflowTransactions.tipoMovimiento, tipo));
 
@@ -558,6 +602,7 @@ export function createLedgerRouter(requireAuth: any) {
       const parsed = insertCashflowTransactionSchema.partial().safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
       const [existing] = await db.select().from(cashflowTransactions).where(eq(cashflowTransactions.id, id)).limit(1);
+      await assertEditableInMind(existing as any);
       if (!existing) return res.status(404).json({ message: "No encontrado" });
       await ensurePeriodMutable(existing.periodKey);
       const [updated] = await db.update(cashflowTransactions)
@@ -567,7 +612,7 @@ export function createLedgerRouter(requireAuth: any) {
       if (!updated) return res.status(404).json({ message: "No encontrado" });
       res.json(updated);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(error.statusCode ?? 500).json({ message: error.message });
     }
   });
 
@@ -582,6 +627,7 @@ export function createLedgerRouter(requireAuth: any) {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + peek.periodKey}))`);
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-cashflow:' + id}))`);
         const [existing] = await tx.select().from(cashflowTransactions).where(eq(cashflowTransactions.id, id)).limit(1);
+        await assertEditableInMind(existing as any);
         if (!existing) throw Object.assign(new Error("Movimiento no encontrado."), { statusCode: 404 });
         const [close] = await tx.select({ id: financialClosePeriods.id, status: financialClosePeriods.status }).from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, existing.periodKey)).limit(1);
         if (["IN_REVIEW", "CLOSED"].includes(close?.status ?? "")) throw Object.assign(new Error(`El período ${existing.periodKey} no admite cambios.`), { statusCode: 409 });
@@ -599,6 +645,19 @@ export function createLedgerRouter(requireAuth: any) {
       const { date } = req.query as Record<string, string>;
       if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         return res.status(400).json({ message: "Se requiere el parámetro date con formato YYYY-MM-DD" });
+      }
+      // Master months: the month-end bank balances are the "Activo Liquido" rows of
+      // the Master Activo tab, the same figure the Resumen shows as Activo líquido.
+      if (await getPeriodSource(date.slice(0, 7)) === "master") {
+        const liquid = await db.select({ concepto: activoEntries.concepto, monto: activoUSD }).from(activoEntries).where(and(
+          eq(activoEntries.periodKey, date.slice(0, 7)), isNull(activoEntries.voidedAt), eq(activoEntries.source, "excel"),
+          sql`lower(translate(COALESCE(${activoEntries.tipoActivo}, ''), 'íÍ', 'iI')) = 'activo liquido'`,
+        ));
+        if (liquid.length) {
+          const balances: Record<string, number> = {};
+          for (const row of liquid) balances[row.concepto || "Sin cuenta"] = (balances[row.concepto || "Sin cuenta"] ?? 0) + Number(row.monto);
+          return res.json({ date, balances, totalUSD: Object.values(balances).reduce((sum, value) => sum + value, 0), source: "master" });
+        }
       }
       const cutoff = new Date(date + "T23:59:59Z");
       const cutover = await getCutoverDate();
@@ -670,6 +729,7 @@ export function createLedgerRouter(requireAuth: any) {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + peek.periodKey}))`);
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-document:receivable:' + id}))`);
         const [existing] = await tx.select().from(activoEntries).where(eq(activoEntries.id, id)).limit(1);
+        await assertEditableInMind(existing as any);
         if (!existing) throw Object.assign(new Error("Activo no encontrado."), { statusCode: 404 });
         const [close] = await tx.select({ status: financialClosePeriods.status }).from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, existing.periodKey)).limit(1);
         if (["IN_REVIEW", "CLOSED"].includes(close?.status ?? "")) throw Object.assign(new Error(`El período ${existing.periodKey} no admite cambios.`), { statusCode: 409 });
@@ -696,6 +756,7 @@ export function createLedgerRouter(requireAuth: any) {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + peek.periodKey}))`);
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-document:payable:' + id}))`);
         const [existing] = await tx.select().from(pasivoEntries).where(eq(pasivoEntries.id, id)).limit(1);
+        await assertEditableInMind(existing as any);
         if (!existing) throw Object.assign(new Error("Pasivo no encontrado."), { statusCode: 404 });
         const [close] = await tx.select({ status: financialClosePeriods.status }).from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, existing.periodKey)).limit(1);
         if (["IN_REVIEW", "CLOSED"].includes(close?.status ?? "")) throw Object.assign(new Error(`El período ${existing.periodKey} no admite cambios.`), { statusCode: 409 });
@@ -716,6 +777,7 @@ export function createLedgerRouter(requireAuth: any) {
       const id = Number(req.params.id); const { reason } = reasonSchema.parse(req.body);
       const result = await db.transaction(async (tx) => {
         const [peek] = await tx.select().from(cashflowTransactions).where(eq(cashflowTransactions.id, id)).limit(1);
+        await assertEditableInMind(peek as any);
         if (!peek) throw Object.assign(new Error("Movimiento no encontrado."), { statusCode: 404 });
 
         // Una transferencia es un único hecho económico expresado en dos patas.
@@ -798,6 +860,7 @@ export function createLedgerRouter(requireAuth: any) {
       const { existing, updated } = await db.transaction(async (tx) => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-provision:' + id}))`);
         const [existing] = await tx.select().from(provisionEntries).where(eq(provisionEntries.id, id)).limit(1);
+        await assertEditableInMind(existing as any);
         if (!existing) throw Object.assign(new Error("Provisión no encontrada."), { statusCode: 404 });
         if (existing.status !== "PROPOSED") return { existing, updated: existing };
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + existing.periodKey}))`);
@@ -824,6 +887,7 @@ export function createLedgerRouter(requireAuth: any) {
         if (["IN_REVIEW", "CLOSED"].includes(close?.status ?? "")) throw Object.assign(new Error(`El período ${input.periodKey} no admite cambios.`), { statusCode: 409 });
         if (close?.status === "PRE_CLOSE") await tx.update(financialClosePeriods).set({ status: "OPEN", updatedAt: new Date() }).where(eq(financialClosePeriods.periodKey, input.periodKey));
         const [existing] = await tx.select().from(provisionEntries).where(eq(provisionEntries.id, id)).limit(1);
+        await assertEditableInMind(existing as any);
         if (!existing) throw Object.assign(new Error("Provisión no encontrada."), { statusCode: 404 });
         if (!["APPROVED", "ACTIVE"].includes(existing.status)) throw Object.assign(new Error("La provisión debe estar aprobada y activa para liberarla."), { statusCode: 409 });
         if (input.periodKey < existing.periodKey) throw Object.assign(new Error("La liberación no puede ser anterior a la provisión."), { statusCode: 400 });
@@ -917,17 +981,12 @@ export function createLedgerRouter(requireAuth: any) {
     }
   });
 
-  // ==================== ADMIN: BACKFILL ACTIVO/PASIVO ====================
-  // Carga histórica manual desde el Excel MAESTRO. El sync automático
-  // (autoSyncService.syncLedger) sólo importa el mes en curso y deja de
-  // tocar activo/pasivo desde app_mode_cutover_date en adelante — por
-  // diseño, para no pisar la carga manual en Mind. Este endpoint es la
-  // excepción explícita: un admin pide un rango histórico anterior al
-  // cutover y se trae esos meses tal cual están en la hoja "Activo"/
-  // "Pasivo" del Excel MAESTRO. Reutiliza los mismos parsers que el cron
-  // (importActivoEntries/importPasivoEntries), así que nunca diverge de
-  // cómo se interpreta la planilla. Filas con overrideManual=true (carga
-  // manual previa en Mind) nunca se pisan, sea cual sea el rango pedido.
+  // ==================== ADMIN: BACKFILL DEL MÁSTER ====================
+  // Fuerza la misma sincronización que corre cada 30 minutos para un rango:
+  // Activo, Pasivo, CashFlow y Provisión pasivo de los meses que todavía se
+  // informan desde el Máster (finance-period-source). Los meses que ya son de
+  // Mind se informan como advertencia y no se tocan; las filas cargadas en Mind
+  // nunca se pisan.
   router.post("/ledger/backfill", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
       const from = String(req.body?.from || "").trim();
@@ -944,36 +1003,9 @@ export function createLedgerRouter(requireAuth: any) {
       if (from > to) {
         return res.status(400).json({ message: "from no puede ser posterior a to" });
       }
-      const cutoverDate = await getCutoverDate();
-      if (cutoverDate && to >= cutoverDate) {
-        return res.status(400).json({ message: `El backfill sólo admite períodos anteriores al corte ${cutoverDate}. Desde ese mes la fuente es Mind.` });
-      }
-
-      const periods: string[] = [];
-      let [y, m] = from.split("-").map(Number);
-      const [toY, toM] = to.split("-").map(Number);
-      while (y < toY || (y === toY && m <= toM)) {
-        periods.push(`${y}-${String(m).padStart(2, "0")}`);
-        m++;
-        if (m > 12) { m = 1; y++; }
-      }
-      if (periods.length > 24) {
-        return res.status(400).json({ message: "Rango demasiado grande (máx. 24 meses por corrida)" });
-      }
-
-      const results: Record<string, { activo: any; pasivo: any }> = {};
-      for (const period of periods) {
-        const [activo, pasivo] = await Promise.allSettled([
-          googleSheetsWorkingService.importActivoEntries(storage, period),
-          googleSheetsWorkingService.importPasivoEntries(storage, period),
-        ]);
-        results[period] = {
-          activo: activo.status === "fulfilled" ? activo.value : { errors: [String((activo as PromiseRejectedResult).reason)] },
-          pasivo: pasivo.status === "fulfilled" ? pasivo.value : { errors: [String((pasivo as PromiseRejectedResult).reason)] },
-        };
-      }
-
-      res.json({ periods, results });
+      const { syncMasterLedger } = await import("./services/master-ledger-sync");
+      const report = await syncMasterLedger({ from, to });
+      res.json(report);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

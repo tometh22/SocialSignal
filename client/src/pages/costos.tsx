@@ -28,8 +28,8 @@ const fmt = (n: number | null | undefined) =>
 
 interface Concepto { concepto: string; montoUsd: number; sharePct: number }
 interface Mensual {
-  periodKey: string; directo: number; indirecto: number;
-  provisiones: number; total: number; overheadPct: number;
+  periodKey: string; directo: number; indirecto: number; estimado: number;
+  provisiones: number; total: number; overheadPct: number | null;
 }
 interface Equipo {
   periodKey: string; horasObjetivo: number; horasAsana: number;
@@ -42,6 +42,7 @@ interface Data {
   boardYHolding: { conceptos: string[]; montoUsd: number; sharePct: number };
   mensual: Mensual[];
   equipo: Equipo[];
+  avisos?: string[];
 }
 
 function InfoTip({ children }: { children: string }) {
@@ -71,7 +72,7 @@ export default function CostosPage() {
     <PageShell width="wide" spacing="compact">
       <FinanceHeader
         title="Desglose de costos"
-        description={`Costos del ejercicio ${year} en USD, por concepto, tipo y equipo, desde los registros de Mind.`}
+        description={`Costos operativos del ejercicio ${year} en USD, por concepto, tipo y equipo. Coinciden con Ventas menos EBIT del Resumen.`}
       />
 
       {isLoading && <FinanceLoading label="Cargando desglose de costos" />}
@@ -80,10 +81,14 @@ export default function CostosPage() {
       {data && (
         <TooltipProvider delayDuration={200}>
           <div className="space-y-6">
+            {data.avisos && data.avisos.length > 0 && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <p className="font-medium">Hay costos del Resumen sin detalle en el Máster</p>
+              <ul className="mt-1 space-y-0.5 text-xs">{data.avisos.map((aviso) => <li key={aviso}>{aviso}</li>)}</ul>
+            </div>}
             <MetricGrid>
               <MetricCard
                 label={<span className="flex items-center justify-between gap-2"><span>Costo total</span>
-                  <InfoTip>Suma de costos del ejercicio. Desde el corte combina horas, proveedores, impuestos y provisiones registrados en Mind.</InfoTip></span>}
+                  <InfoTip>Costos operativos del ejercicio: es la misma base que Ventas menos EBIT del Resumen. Los meses que informa el Máster usan sus costos reales o, si todavía no cerraron, los estimados. No incluye impuestos sobre el resultado ni provisiones.</InfoTip></span>}
                 value={fmt(data.totalConceptos)}
                 icon={<Coins className="h-5 w-5" />}
                 detail={`${data.conceptos.length} conceptos`}
@@ -97,15 +102,16 @@ export default function CostosPage() {
                 tone={data.boardYHolding.sharePct >= 20 ? "warning" : "neutral"}
               />
               {data.mensual.length > 0 && (() => {
-                const ult = data.mensual[data.mensual.length - 1];
+                const ult = [...data.mensual].reverse().find((month) => month.directo + month.indirecto > 0);
+                if (!ult) return null;
                 return (
                   <MetricCard
                     label={<span className="flex items-center justify-between gap-2"><span>Peso de la estructura</span>
                       <InfoTip>Costos indirectos sobre el costo operativo del último mes con costos registrados. Alto significa estructura pesada respecto del equipo asignado a clientes.</InfoTip></span>}
-                    value={`${ult.overheadPct.toFixed(1)}%`}
+                    value={`${(ult.overheadPct ?? 0).toFixed(1)}%`}
                     icon={<Layers className="h-5 w-5" />}
                     detail={`${ult.periodKey} · ${fmt(ult.indirecto)} de ${fmt(ult.directo + ult.indirecto)}`}
-                    tone={ult.overheadPct >= 70 ? "danger" : ult.overheadPct >= 55 ? "warning" : "success"}
+                    tone={(ult.overheadPct ?? 0) >= 70 ? "danger" : (ult.overheadPct ?? 0) >= 55 ? "warning" : "success"}
                   />
                 );
               })()}
@@ -153,7 +159,7 @@ export default function CostosPage() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     Directos vs indirectos
-                    <InfoTip>Directo es el equipo asignado a proyectos de clientes; indirecto es todo lo demás. La línea muestra qué porcentaje del costo operativo es overhead.</InfoTip>
+                    <InfoTip>Directo es el equipo asignado a proyectos de clientes; indirecto es todo lo demás. Los meses que todavía no tienen costos reales muestran el estimado del Máster. La línea muestra qué porcentaje del costo operativo es overhead.</InfoTip>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -169,6 +175,7 @@ export default function CostosPage() {
                       <Legend />
                       <Bar yAxisId="l" dataKey="directo" name="Directo" stackId="c" fill="#2563eb" />
                       <Bar yAxisId="l" dataKey="indirecto" name="Indirecto" stackId="c" fill="#f1a1a1" />
+                      {data.mensual.some((month) => month.estimado > 0) && <Bar yAxisId="l" dataKey="estimado" name="Estimado" stackId="c" fill="#cbd5e1" />}
                       <Line yAxisId="r" dataKey="overheadPct" name="Overhead" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} />
                     </ComposedChart>
                   </ResponsiveContainer>

@@ -88,3 +88,40 @@ describe('equipo', () => {
     expect(valorHora(5000, 0)).toBeNull();
   });
 });
+
+import { masterCostSummary, SIN_DETALLE } from '../server/services/cost-breakdown';
+
+describe('meses informados por el Máster', () => {
+  const cost = (periodKey: string, concept: string, amountUsd: number, extra: Record<string, unknown> = {}) =>
+    ({ id: `${periodKey}:${concept}`, periodKey, concept, description: '', category: '', date: null, source: 'master' as const, amountUsd, impact: 'operating' as const, ...extra });
+
+  it('suma lo mismo que Ventas − EBIT del Resumen y separa directo, indirecto y estimado', () => {
+    const months = [
+      { periodKey: '2026-10', monthLabel: '10 oct', revenueUsd: 104919.09, costUsd: 43687.1, ebitUsd: 61231.99, netProfitUsd: 40122.13 },
+      { periodKey: '2026-12', monthLabel: '12 dic', revenueUsd: 47812.94, costUsd: 300, ebitUsd: 47512.94, netProfitUsd: null },
+    ];
+    const costs = [
+      cost('2026-10', 'Equipo creativo', 15885.84, { costType: 'Directo' }),
+      cost('2026-10', 'Alquiler', 27801.26, { costType: 'Indirecto' }),
+      cost('2026-10', 'Impuestos USA', 9919, { impact: 'net' }),
+      cost('2026-10', 'Provisión Pasivo', 10927.04, { impact: 'net' }),
+      cost('2026-12', 'Equipo creativo', 300, { source: 'estimate', impact: 'ebit' }),
+    ];
+    const result = masterCostSummary(months, costs);
+    const [oct, dic] = result.mensual;
+    expect(oct.directo + oct.indirecto).toBeCloseTo(43687.1, 2);
+    expect(oct).toMatchObject({ directo: 15885.84, indirecto: 27801.26, provisiones: 10927.04, estimado: 0 });
+    expect(dic).toMatchObject({ directo: 0, indirecto: 0, estimado: 300 });
+    // Below-EBIT items (taxes, provisions) are not operating cost concepts.
+    expect(result.concepts.has('Impuestos USA')).toBe(false);
+    expect(result.avisos).toEqual([]);
+  });
+
+  it('muestra como concepto propio la parte del Resumen que el detalle no explica', () => {
+    const months = [{ periodKey: '2026-09', monthLabel: '09 sep', revenueUsd: 1000, costUsd: 800, ebitUsd: 200, netProfitUsd: null }];
+    const result = masterCostSummary(months, [cost('2026-09', 'Equipo', 500, { costType: 'Directo' })]);
+    expect(result.concepts.get(SIN_DETALLE)).toBeCloseTo(300, 2);
+    expect(result.mensual[0].directo + result.mensual[0].indirecto).toBeCloseTo(800, 2);
+    expect(result.avisos[0]).toContain('2026-09');
+  });
+});

@@ -6,6 +6,7 @@ import { aggregateMonths, type MonthData } from "./direct-sheets-dashboard";
 import { getMasterScenarioSnapshot } from './financial-master-scenario';
 import { buildMasterDashboard } from './financial-master-dashboard';
 import { getRevenueByBasis } from "./revenue-basis";
+import { getMasterSourcedPeriods } from "./finance-period-source";
 
 const num = (value: unknown): number | null => value == null ? null : Number(value);
 
@@ -58,8 +59,7 @@ async function loadNativeExecutiveDashboard(
   const { rows: liveRows } = await pool.query(NATIVE_DASHBOARD_SQL);
   // Imported liabilities/cash/facts do not prove that a month has migrated to Mind.
   // Keep the same source boundary as Projection, including cancelled native revenue.
-  const masterPeriods = rows.filter(row => row.native_close_status == null && !row.has_native_revenue
-    && row.facturacion_total != null).map(row => row.period_key);
+  const masterPeriods = await getMasterSourcedPeriods();
   const masterSnapshot = masterPeriods.length ? await getMasterScenarioSnapshot() : null;
   const masterRows = masterSnapshot ? buildMasterDashboard(masterSnapshot, masterPeriods) : [];
   const masterSet = new Set(masterPeriods);

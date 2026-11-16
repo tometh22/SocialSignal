@@ -490,39 +490,16 @@ export class AutoSyncService {
 
   private async syncLedger(): Promise<void> {
     try {
+      // Every month still reported by the Master (finance-period-source) is kept
+      // equal to it, from January of the previous year to the current month. Months
+      // that already belong to Mind are skipped; unchanged months are not rewritten.
       const now = new Date();
-      const currMonth = now.getMonth() + 1;
-      const currYear = now.getFullYear();
-      const prevMonth = now.getMonth() === 0 ? 12 : now.getMonth();
-      const prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-      const allPeriods = [
-        `${currYear}-${String(currMonth).padStart(2, '0')}`,
-        `${prevYear}-${String(prevMonth).padStart(2, '0')}`,
-      ];
-
-      // Cutover Excel→App: desde el cutover, el ledger (activo/pasivo/cashflow/
-      // provisiones) se carga a mano en la app — no pisar esos períodos con Excel.
-      const { getCutoverDate } = await import('../etl/time-entries-to-fact-labor');
-      const cutoverDate = await getCutoverDate();
-      const periods = cutoverDate ? allPeriods.filter(p => p < cutoverDate) : allPeriods;
-      const currentPeriod = allPeriods[0];
-      const snapshotPeriods = cutoverDate && currentPeriod >= cutoverDate ? [] : [currentPeriod];
-
-      console.log(`📒 Syncing ledger snapshots for ${snapshotPeriods.join(', ') || 'none'}; historical tables for ${periods.join(', ') || 'none'}`);
-
-      for (const period of snapshotPeriods) {
-        await Promise.allSettled([
-          googleSheetsWorkingService.importActivoEntries(storage, period),
-          googleSheetsWorkingService.importPasivoEntries(storage, period),
-        ]);
-      }
-
-      for (const period of periods) {
-        await Promise.allSettled([
-          googleSheetsWorkingService.importCashflowTransactions(storage, period),
-          googleSheetsWorkingService.importProvisionEntries(storage, period),
-        ]);
-      }
+      const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const { syncMasterLedger } = await import('./master-ledger-sync');
+      const report = await syncMasterLedger({ from: `${now.getFullYear() - 1}-01`, to: current });
+      const changed = Object.entries(report.results).filter(([, result]) => Object.values(result).some(value => !/sin cambios|sin provisiones|sin datos|sin movimientos/.test(value)));
+      console.log(`📒 Ledger del Máster: ${report.periods.length} meses revisados, ${changed.length} con cambios${changed.length ? ` (${changed.map(([period]) => period).join(', ')})` : ''}`);
+      for (const warning of report.warnings) console.warn(`⚠️ ${warning}`);
     } catch (err: any) {
       console.error('⚠️ syncLedger error (non-critical):', err?.message);
     }

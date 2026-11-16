@@ -4167,7 +4167,8 @@ class GoogleSheetsWorkingService {
     return null;
   }
 
-  async importActivoEntries(_storage: any, periodKey: string): Promise<{ inserted: number; updated: number; errors: string[] }> {
+  async importActivoEntries(_storage: any, periodKey: string, prefetched?: unknown[][]): Promise<{ inserted: number; updated: number; errors: string[]; unchanged?: boolean }> {
+    let unchanged = false;
     const errors: string[] = [];
     let inserted = 0;
     let updated = 0;
@@ -4179,19 +4180,22 @@ class GoogleSheetsWorkingService {
       const { activoEntries } = await import('@shared/schema');
       const { eq, and, sql } = await import('drizzle-orm');
 
-      const sheets = this.createSheetsClientFromJSON();
-      if (!sheets) return { inserted, updated, errors: ['Google Sheets client not available'] };
+      let values = prefetched;
+      if (!values) {
+        const sheets = this.createSheetsClientFromJSON();
+        if (!sheets) return { inserted, updated, errors: ['Google Sheets client not available'] };
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: 'Activo!A:Z',
+        }).catch(() => null);
+        values = response?.data.values ?? undefined;
+      }
 
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: this.spreadsheetId,
-        range: 'Activo!A:Z',
-      }).catch(() => null);
-
-      if (!response?.data.values || response.data.values.length < 2) {
+      if (!values || values.length < 2) {
         return { inserted, updated, errors: [`No data found in Activo sheet for ${periodKey}`] };
       }
 
-      const snapshot = parseActivoSnapshot(response.data.values, periodKey);
+      const snapshot = parseActivoSnapshot(values, periodKey);
       read = snapshot.read;
       skipped = snapshot.skipped;
       if (snapshot.rows.length === 0) {
@@ -4223,6 +4227,11 @@ class GoogleSheetsWorkingService {
         const current = await tx.select({
           sourceRowKey: activoEntries.sourceRowKey,
           cobradoAlCierre: activoEntries.cobradoAlCierre,
+          montoTotalUSD: activoEntries.montoTotalUSD,
+          vencido: activoEntries.vencido,
+          tipoActivo: activoEntries.tipoActivo,
+          fechaPago: activoEntries.fechaPago,
+          fechaVencimiento: activoEntries.fechaVencimiento,
           concepto: activoEntries.concepto,
           clienteNombre: activoEntries.clienteNombre,
           montoARS: activoEntries.montoARS,
@@ -4231,27 +4240,37 @@ class GoogleSheetsWorkingService {
           nroFactura: activoEntries.nroFactura,
         }).from(activoEntries).where(and(
           eq(activoEntries.periodKey, periodKey),
+          eq(activoEntries.source, 'excel'),
           sql`COALESCE(${activoEntries.overrideManual}, false) = false`,
         ));
-        const preservedState = new Map<string, boolean>();
-        for (const row of current) {
-          const businessKey = row.sourceRowKey?.split(':')[0] ?? activoBusinessKey(row);
-          preservedState.set(
-            businessKey,
-            (preservedState.get(businessKey) ?? false) || Boolean(row.cobradoAlCierre),
-          );
+        const existingKeys = new Set(current.map((row) => row.sourceRowKey ?? `${activoBusinessKey(row)}:1`));
+
+        // Rows created in Mind (Carga financiera, facturas del equipo, altas manuales)
+        // are never part of the Master snapshot and must survive its replacement.
+        const fingerprint = (row: { sourceRowKey?: string | null; montoTotalUSD?: unknown; cobradoAlCierre?: unknown; vencido?: unknown; tipoActivo?: unknown; subtipoCosto?: unknown; fechaPago?: unknown; fechaVencimiento?: unknown }) => [
+          row.sourceRowKey, Number(row.montoTotalUSD ?? 0).toFixed(2), Boolean(row.cobradoAlCierre), Boolean(row.vencido),
+          row.tipoActivo ?? row.subtipoCosto ?? '', row.fechaPago ? new Date(row.fechaPago as any).toISOString().slice(0, 10) : '',
+          row.fechaVencimiento ? new Date(row.fechaVencimiento as any).toISOString().slice(0, 10) : '',
+        ].join('|');
+        // Only Master months are synchronized, so the settled status is the Master's.
+        // (Mind payments are applied to Mind records; none target imported rows.)
+        const nextRows = snapshot.rows;
+        const currentPrints = current.map(fingerprint).sort();
+        const nextPrints = nextRows.map(fingerprint).sort();
+        if (currentPrints.length === nextPrints.length && currentPrints.every((value, index) => value === nextPrints[index])) {
+          unchanged = true;
+          return;
         }
 
         const deletedRows = await tx.delete(activoEntries).where(and(
           eq(activoEntries.periodKey, periodKey),
+          eq(activoEntries.source, 'excel'),
           sql`COALESCE(${activoEntries.overrideManual}, false) = false`,
         )).returning({ id: activoEntries.id });
         deleted = deletedRows.length;
 
         const rows = snapshot.rows.map((row) => ({
           ...row,
-          cobradoAlCierre: preservedState.get(row.sourceRowKey.split(':')[0])
-            ?? row.cobradoAlCierre,
           importBatch,
           overrideManual: false,
           importedAt: new Date(),
@@ -4259,19 +4278,20 @@ class GoogleSheetsWorkingService {
         }));
         await tx.insert(activoEntries).values(rows);
         inserted = rows.length;
-        updated = rows.filter((row) => preservedState.has(row.sourceRowKey.split(':')[0])).length;
+        updated = rows.filter((row) => existingKeys.has(row.sourceRowKey)).length;
       });
     } catch (err: any) {
       errors.push(err.message);
     }
     console.log(
       `✅ Activo snapshot ${periodKey}: read=${read}, valid=${inserted}, skipped=${skipped}, `
-      + `inserted=${inserted}, updated=${updated}, deleted=${deleted}, errors=${errors.length}`,
+      + `inserted=${inserted}, updated=${updated}, deleted=${deleted}, unchanged=${unchanged}, errors=${errors.length}`,
     );
-    return { inserted, updated, errors };
+    return { inserted, updated, errors, unchanged };
   }
 
-  async importPasivoEntries(_storage: any, periodKey: string): Promise<{ inserted: number; updated: number; errors: string[] }> {
+  async importPasivoEntries(_storage: any, periodKey: string, prefetched?: unknown[][]): Promise<{ inserted: number; updated: number; errors: string[]; unchanged?: boolean }> {
+    let unchanged = false;
     const errors: string[] = [];
     let inserted = 0;
     let updated = 0;
@@ -4283,19 +4303,22 @@ class GoogleSheetsWorkingService {
       const { pasivoEntries } = await import('@shared/schema');
       const { eq, and, sql } = await import('drizzle-orm');
 
-      const sheets = this.createSheetsClientFromJSON();
-      if (!sheets) return { inserted, updated, errors: ['Google Sheets client not available'] };
+      let values = prefetched;
+      if (!values) {
+        const sheets = this.createSheetsClientFromJSON();
+        if (!sheets) return { inserted, updated, errors: ['Google Sheets client not available'] };
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: 'Pasivo!A:Z',
+        }).catch(() => null);
+        values = response?.data.values ?? undefined;
+      }
 
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: this.spreadsheetId,
-        range: 'Pasivo!A:Z',
-      }).catch(() => null);
-
-      if (!response?.data.values || response.data.values.length < 2) {
+      if (!values || values.length < 2) {
         return { inserted, updated, errors: [`No data found in Pasivo sheet for ${periodKey}`] };
       }
 
-      const snapshot = parsePasivoSnapshot(response.data.values, periodKey);
+      const snapshot = parsePasivoSnapshot(values, periodKey);
       read = snapshot.read;
       skipped = snapshot.skipped;
       if (snapshot.rows.length === 0) {
@@ -4327,6 +4350,10 @@ class GoogleSheetsWorkingService {
         const current = await tx.select({
           sourceRowKey: pasivoEntries.sourceRowKey,
           pagadoAlCierre: pasivoEntries.pagadoAlCierre,
+          montoTotalUSD: pasivoEntries.montoTotalUSD,
+          vencido: pasivoEntries.vencido,
+          fechaPago: pasivoEntries.fechaPago,
+          fechaVencimiento: pasivoEntries.fechaVencimiento,
           detalle: pasivoEntries.detalle,
           subtipoCosto: pasivoEntries.subtipoCosto,
           montoARS: pasivoEntries.montoARS,
@@ -4335,27 +4362,37 @@ class GoogleSheetsWorkingService {
           fechaEmision: pasivoEntries.fechaEmision,
         }).from(pasivoEntries).where(and(
           eq(pasivoEntries.periodKey, periodKey),
+          eq(pasivoEntries.source, 'excel'),
           sql`COALESCE(${pasivoEntries.overrideManual}, false) = false`,
         ));
-        const preservedState = new Map<string, boolean>();
-        for (const row of current) {
-          const businessKey = row.sourceRowKey?.split(':')[0] ?? pasivoBusinessKey(row);
-          preservedState.set(
-            businessKey,
-            (preservedState.get(businessKey) ?? false) || Boolean(row.pagadoAlCierre),
-          );
+        const existingKeys = new Set(current.map((row) => row.sourceRowKey ?? `${pasivoBusinessKey(row)}:1`));
+
+        // Rows created in Mind (Carga financiera, facturas del equipo, altas manuales)
+        // are never part of the Master snapshot and must survive its replacement.
+        const fingerprint = (row: { sourceRowKey?: string | null; montoTotalUSD?: unknown; pagadoAlCierre?: unknown; vencido?: unknown; tipoActivo?: unknown; subtipoCosto?: unknown; fechaPago?: unknown; fechaVencimiento?: unknown }) => [
+          row.sourceRowKey, Number(row.montoTotalUSD ?? 0).toFixed(2), Boolean(row.pagadoAlCierre), Boolean(row.vencido),
+          row.tipoActivo ?? row.subtipoCosto ?? '', row.fechaPago ? new Date(row.fechaPago as any).toISOString().slice(0, 10) : '',
+          row.fechaVencimiento ? new Date(row.fechaVencimiento as any).toISOString().slice(0, 10) : '',
+        ].join('|');
+        // Only Master months are synchronized, so the settled status is the Master's.
+        // (Mind payments are applied to Mind records; none target imported rows.)
+        const nextRows = snapshot.rows;
+        const currentPrints = current.map(fingerprint).sort();
+        const nextPrints = nextRows.map(fingerprint).sort();
+        if (currentPrints.length === nextPrints.length && currentPrints.every((value, index) => value === nextPrints[index])) {
+          unchanged = true;
+          return;
         }
 
         const deletedRows = await tx.delete(pasivoEntries).where(and(
           eq(pasivoEntries.periodKey, periodKey),
+          eq(pasivoEntries.source, 'excel'),
           sql`COALESCE(${pasivoEntries.overrideManual}, false) = false`,
         )).returning({ id: pasivoEntries.id });
         deleted = deletedRows.length;
 
         const rows = snapshot.rows.map((row) => ({
           ...row,
-          pagadoAlCierre: preservedState.get(row.sourceRowKey.split(':')[0])
-            ?? row.pagadoAlCierre,
           importBatch,
           overrideManual: false,
           importedAt: new Date(),
@@ -4363,155 +4400,19 @@ class GoogleSheetsWorkingService {
         }));
         await tx.insert(pasivoEntries).values(rows);
         inserted = rows.length;
-        updated = rows.filter((row) => preservedState.has(row.sourceRowKey.split(':')[0])).length;
+        updated = rows.filter((row) => existingKeys.has(row.sourceRowKey)).length;
       });
     } catch (err: any) {
       errors.push(err.message);
     }
     console.log(
       `✅ Pasivo snapshot ${periodKey}: read=${read}, valid=${inserted}, skipped=${skipped}, `
-      + `inserted=${inserted}, updated=${updated}, deleted=${deleted}, errors=${errors.length}`,
+      + `inserted=${inserted}, updated=${updated}, deleted=${deleted}, unchanged=${unchanged}, errors=${errors.length}`,
     );
-    return { inserted, updated, errors };
+    return { inserted, updated, errors, unchanged };
   }
 
-  async importProvisionEntries(storage: any, periodKey: string): Promise<{ inserted: number; errors: string[] }> {
-    const errors: string[] = [];
-    let inserted = 0;
-    try {
-      const { db } = await import('../db');
-      const { provisionEntries } = await import('@shared/schema');
-
-      const sheets = this.createSheetsClientFromJSON();
-      if (!sheets) return { inserted, errors: ['Google Sheets client not available'] };
-
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: this.spreadsheetId,
-        range: `'Provisión Pasivo'!A:Z`,
-      }).catch(() => null);
-
-      if (!response?.data.values || response.data.values.length < 2) {
-        return { inserted, errors: [`No data found in Provisión Pasivo sheet`] };
-      }
-
-      const headers: string[] = response.data.values[0].map((h: any) => String(h || '').trim());
-      const importBatch = `provision_${periodKey}_${Date.now()}`;
-
-      for (let i = 1; i < response.data.values.length; i++) {
-        const row = response.data.values[i];
-        if (!row || row.length === 0) continue;
-
-        const get = (name: string) => {
-          const idx = headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
-          return idx >= 0 ? String(row[idx] || '').trim() : '';
-        };
-
-        const clienteNombre = get('cliente') || get('nombre');
-        const tipo = get('tipo') || 'NUEVA_PROVISION';
-        const montoProvision = parseFloat((get('provision') || get('monto') || '0').replace(/[^0-9.-]/g, '')) || null;
-
-        if (!clienteNombre || !montoProvision) continue;
-
-        try {
-          await db.insert(provisionEntries).values({
-            periodKey,
-            clienteNombre,
-            tipo: tipo.toUpperCase().includes('RECUP') ? 'RECUPERO' : 'NUEVA_PROVISION',
-            montoProvision: montoProvision ? String(montoProvision) : null,
-            mesAplicacion: periodKey,
-            importBatch,
-          });
-          inserted++;
-        } catch (rowErr: any) {
-          errors.push(`Row ${i}: ${rowErr.message}`);
-        }
-      }
-    } catch (err: any) {
-      errors.push(err.message);
-    }
-    console.log(`✅ Provisiones ${periodKey}: ${inserted} inserted`);
-    return { inserted, errors };
-  }
-
-  async importCashflowTransactions(storage: any, periodKey: string): Promise<{ inserted: number; errors: string[] }> {
-    const errors: string[] = [];
-    let inserted = 0;
-    let skipped = 0;
-    try {
-      const { db } = await import('../db');
-      const { cashflowTransactions } = await import('@shared/schema');
-
-      const sheets = this.createSheetsClientFromJSON();
-      if (!sheets) return { inserted, errors: ['Google Sheets client not available'] };
-
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: this.spreadsheetId,
-        range: 'Cashflow!A:Z',
-      }).catch(() => null);
-
-      if (!response?.data.values || response.data.values.length < 2) {
-        return { inserted, errors: [`No data found in Cashflow sheet for ${periodKey}`] };
-      }
-
-      const headers: string[] = response.data.values[0].map((h: any) => String(h || '').trim());
-      const importBatch = `cashflow_${periodKey}_${Date.now()}`;
-
-      for (let i = 1; i < response.data.values.length; i++) {
-        const row = response.data.values[i];
-        if (!row || row.length === 0) continue;
-
-        const get = (name: string) => {
-          const idx = headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
-          return idx >= 0 ? String(row[idx] || '').trim() : '';
-        };
-
-        const fechaRaw = get('fecha');
-        if (!fechaRaw) continue;
-        const fecha = this.parseDateValue(fechaRaw);
-        if (!fecha) continue;
-
-        const rowYear = fecha.getFullYear();
-        const rowMonth = fecha.getMonth() + 1;
-        const rowPeriod = `${rowYear}-${String(rowMonth).padStart(2, '0')}`;
-        if (rowPeriod !== periodKey) continue;
-
-        const tipoMovimiento = (get('tipo') || get('ingreso') || 'Ingreso').toLowerCase().includes('egreso') ? 'Egreso' : 'Ingreso';
-        const banco = get('banco') || get('cuenta') || null;
-        const detalleOperacion = get('detalle') || get('operacion') || get('concepto');
-        const montoARSRaw = parseFloat((get('monto ars') || get('ars') || get('monto') || '0').replace(/[^0-9.-]/g, '')) || null;
-        const montoUSDRaw = parseFloat((get('monto usd') || get('usd') || '0').replace(/[^0-9.-]/g, '')) || null;
-
-        if (!detalleOperacion && !montoARSRaw && !montoUSDRaw) continue;
-
-        try {
-          // Upsert contra el hash de la clave natural (migración 0052). Antes
-          // era un INSERT plano con import_batch nuevo en cada corrida: la tabla
-          // llegó a 299.866 filas para 389 movimientos reales, creciendo sola.
-          const [row] = await db.insert(cashflowTransactions).values({
-            fecha,
-            periodKey,
-            tipoMovimiento,
-            banco,
-            detalleOperacion: detalleOperacion || null,
-            montoARS: montoARSRaw ? String(montoARSRaw) : null,
-            montoUSD: montoUSDRaw ? String(montoUSDRaw) : null,
-            importBatch,
-          })
-            .onConflictDoNothing({ target: cashflowTransactions.rowHash })
-            .returning({ id: cashflowTransactions.id });
-
-          if (row) inserted++;
-          else skipped++;
-        } catch (rowErr: any) {
-          errors.push(`Row ${i}: ${rowErr.message}`);
-        }
-      }
-    } catch (err: any) {
-      errors.push(err.message);
-    }
-    console.log(`✅ Cashflow ${periodKey}: ${inserted} nuevos, ${skipped} ya existían`);
-    return { inserted, errors };
-  }
+  // CashFlow y Provisión pasivo se sincronizan en services/master-ledger-sync.ts.
 }
 
 // Tipo para cuentas a cobrar (facturas futuras = provisiones)

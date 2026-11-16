@@ -105,3 +105,14 @@ test('voiding a receivable asks for an audited reason in an in-app dialog', asyn
   await page.getByRole('dialog').getByRole('button', { name: 'Anular factura' }).click();
   await expect.poll(() => posts).toEqual([{ reason: 'Factura duplicada' }]);
 });
+
+test('master months explain their source and do not offer edits that the next sync would undo', async ({ page }) => {
+  await page.route('**/api/finance/period-source?*', route => route.fulfill({ json: { period: '2026-10', source: 'master', otherSourceRecords: { activo: 0, pasivo: 2, cashflow: 0, provisions: 0 } } }));
+  await page.route('**/api/pasivo/summary**', route => route.fulfill({ json: { total: 2000, pagado: 0, pendiente: 2000, vencido: 0, bySubtipo: { Equipo: 2000 } } }));
+  await page.route('**/api/pasivo?*', route => route.fulfill({ json: { items: [{ id: 9, detalle: 'Honorarios equipo', subtipoCosto: 'Equipo', montoTotalUSD: '2000', outstandingUSD: '2000', source: 'excel' }], pagination: { page: 1, pageSize: 50, total: 1, totalPages: 1 } } }));
+  await page.goto('/finance/pasivo?period=2026-10');
+  await expect(page.getByTestId('period-source')).toContainText('Este mes se informa desde el Máster');
+  await expect(page.getByTestId('period-source')).toContainText('2 registros de Mind no se suman');
+  await expect(page.getByRole('cell', { name: /Honorarios equipo/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Anular', exact: true })).toHaveCount(0);
+});

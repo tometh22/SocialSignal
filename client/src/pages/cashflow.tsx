@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
 import { PageShell } from "@/components/ui/page-shell";
-import { FinanceHeader, FinanceTableCard, StatusPill, amountTone, formatDate, formatUsd, periodLabel, useReasonDialog } from "@/components/finance/ui";
+import { FinanceHeader, FinanceTableCard, StatusPill, amountTone, formatDate, formatUsd, periodLabel, useReasonDialog, usePeriodSource, PeriodSourceNotice } from "@/components/finance/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -27,11 +27,13 @@ interface CashflowRow {
   montoUSD?: string;
   reconciliationStatus?: "matched" | "unmatched" | "ignored";
   transferGroupId?: string | null;
+  source?: string | null;
 }
 
 interface CashflowBalance {
   balances: Record<string, number>;
   totalUSD?: number;
+  source?: "master";
 }
 interface FinancialAccount { id: number; name: string; bankName?: string | null; currency: string; openingBalance: string; isActive: boolean }
 
@@ -47,6 +49,8 @@ export default function CashflowPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const reason = useReasonDialog();
+  const periodSource = usePeriodSource(period);
+  const masterMonth = periodSource.data?.source === "master";
 
 
   // Last day of selected month
@@ -111,10 +115,11 @@ export default function CashflowPage() {
         description={`Saldos y movimientos bancarios de ${periodLabel(period)}.`}
         actions={<><Button variant="outline" asChild><Link href={`/finance/cargar?period=${period}`}><UploadCloud className="mr-2 h-4 w-4" />Cargar movimientos</Link></Button><Dialog open={accountOpen} onOpenChange={setAccountOpen}><DialogTrigger asChild><Button variant="outline"><Settings2 className="mr-2 h-4 w-4" />Cuentas</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Cuentas financieras</DialogTitle></DialogHeader><div className="space-y-2">{accounts.map((account) => <div key={account.id} className="flex items-center justify-between rounded-lg border p-3 text-sm"><span>{account.name}</span><span className="text-xs text-muted-foreground">{account.currency} · saldo inicial {account.openingBalance}</span></div>)}</div><div className="grid gap-3 border-t pt-4"><div><Label>Nombre / banco</Label><Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Ej. Santander USD" /></div><div className="grid grid-cols-2 gap-3"><div><Label>Moneda</Label><Select value={accountCurrency} onValueChange={setAccountCurrency}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="USD">USD</SelectItem><SelectItem value="ARS">ARS</SelectItem><SelectItem value="EUR">EUR</SelectItem></SelectContent></Select></div><div><Label>Saldo inicial</Label><Input type="number" value={openingBalance} onChange={(e) => setOpeningBalance(e.target.value)} /></div></div><div><Label>Fecha del saldo inicial</Label><Input type="date" value={openingBalanceDate} onChange={(e) => setOpeningBalanceDate(e.target.value)} /></div><Button disabled={!accountName.trim() || !openingBalanceDate || accountMutation.isPending} onClick={() => accountMutation.mutate()}>Agregar cuenta</Button></div></DialogContent></Dialog></>}
       />
+      <PeriodSourceNotice source={periodSource.data} otherRecords={periodSource.data?.otherSourceRecords.cashflow} noun="los movimientos" />
 
       {(isError || balanceError) && <QueryError message="No se pudieron cargar los movimientos o los saldos bancarios." retry={() => { void refetch(); void retryBalance(); }} />}
       <MetricGrid>
-        <MetricCard label="Saldo de todas las cuentas" value={formatUsd(balance?.totalUSD)} icon={<Wallet />} tone="neutral" detail={`Al cierre de ${periodLabel(period)}`} />
+        <MetricCard label="Saldo de todas las cuentas" value={formatUsd(balance?.totalUSD)} icon={<Wallet />} tone="neutral" detail={balance?.source === "master" ? `Activo líquido del Máster al cierre de ${periodLabel(period)}` : `Al cierre de ${periodLabel(period)}`} />
         <MetricCard label="Ingresos" value={formatUsd(movementData ? ingresos : null)} icon={<ArrowUp />} tone="success" detail="Sin transferencias entre cuentas" />
         <MetricCard label="Egresos" value={formatUsd(movementData ? egresos : null)} icon={<ArrowDown />} tone="danger" detail="Sin transferencias entre cuentas" />
         <MetricCard label="Movimiento neto del mes" value={formatUsd(net)} icon={<DollarSign />} tone={net == null ? "neutral" : net >= 0 ? "success" : "danger"} detail={net == null ? undefined : net >= 0 ? "Entró más de lo que salió" : "Salió más de lo que entró"} />
@@ -131,7 +136,7 @@ export default function CashflowPage() {
 
       <FinanceTableCard
         title="Movimientos"
-        description={movementData && rows.length > 0 ? (pendingCount > 0 ? `${pendingCount} de ${rows.length} movimientos sin conciliar.` : `Los ${rows.length} movimientos están conciliados.`) : undefined}
+        description={movementData && rows.length > 0 ? masterMonth ? `${rows.length} movimientos del Máster.` : (pendingCount > 0 ? `${pendingCount} de ${rows.length} movimientos sin conciliar.` : `Los ${rows.length} movimientos están conciliados.`) : undefined}
         toolbar={<>
           <Select value={banco} onValueChange={setBanco}>
             <SelectTrigger className="h-9 w-44" aria-label="Filtrar por cuenta"><SelectValue /></SelectTrigger>
@@ -158,7 +163,7 @@ export default function CashflowPage() {
               <TableHead>Fecha</TableHead>
               <TableHead>Detalle</TableHead>
               <TableHead>Cuenta</TableHead>
-              <TableHead>Conciliación</TableHead>
+              {!masterMonth && <TableHead>Conciliación</TableHead>}
               <TableHead className="text-right">Monto</TableHead>
               <TableHead className="w-px text-right"><span className="sr-only">Acciones</span></TableHead>
             </TableRow>
@@ -171,9 +176,9 @@ export default function CashflowPage() {
                 <TableCell className="whitespace-nowrap text-sm">{formatDate(row.fecha)}</TableCell>
                 <TableCell className="max-w-[320px]"><span className="block truncate" title={row.detalleOperacion || row.concepto || undefined}>{row.detalleOperacion || row.concepto || "—"}</span>{row.transferGroupId && <span className="text-xs text-muted-foreground">Transferencia entre cuentas</span>}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{row.banco || "—"}</TableCell>
-                <TableCell>{row.reconciliationStatus === "matched" ? <StatusPill tone="success">Conciliado</StatusPill> : row.reconciliationStatus === "ignored" ? <StatusPill tone="neutral">Ignorado</StatusPill> : <StatusPill tone="warning">Pendiente</StatusPill>}</TableCell>
+                {!masterMonth && <TableCell>{row.reconciliationStatus === "matched" ? <StatusPill tone="success">Conciliado</StatusPill> : row.reconciliationStatus === "ignored" ? <StatusPill tone="neutral">Ignorado</StatusPill> : <StatusPill tone="warning">Pendiente</StatusPill>}</TableCell>}
                 <TableCell className={`whitespace-nowrap text-right font-medium tabular-nums ${income ? "text-emerald-700" : "text-red-600"}`}>{income ? "+" : "−"}{formatUsd(Math.abs(amount))}</TableCell>
-                <TableCell className="text-right"><div className="flex justify-end gap-1">{row.reconciliationStatus !== "matched" && <Button size="sm" variant="outline" disabled={reconcileMutation.isPending} onClick={() => reconcileMutation.mutate(row.id)}>Conciliar</Button>}<Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-red-700" aria-label="Anular" title="Anular" disabled={voidMutation.isPending} onClick={() => void voidRow(row)}><Ban className="h-4 w-4" /></Button></div></TableCell>
+                <TableCell className="text-right">{masterMonth && row.source === "excel" ? null : <div className="flex justify-end gap-1">{row.reconciliationStatus !== "matched" && <Button size="sm" variant="outline" disabled={reconcileMutation.isPending} onClick={() => reconcileMutation.mutate(row.id)}>Conciliar</Button>}<Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-red-700" aria-label="Anular" title="Anular" disabled={voidMutation.isPending} onClick={() => void voidRow(row)}><Ban className="h-4 w-4" /></Button></div>}</TableCell>
               </TableRow>;
             })}
           </TableBody>

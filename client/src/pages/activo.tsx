@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
 import { PageShell } from "@/components/ui/page-shell";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FinanceHeader, FinancePagination, FinanceTableCard, StatusPill, formatDate, formatUsd, periodLabel, useReasonDialog } from "@/components/finance/ui";
+import { FinanceHeader, FinancePagination, FinanceTableCard, StatusPill, formatDate, formatUsd, periodLabel, useReasonDialog, usePeriodSource, PeriodSourceNotice } from "@/components/finance/ui";
 import { CheckCircle, DollarSign, AlertCircle, Clock, UploadCloud, Ban } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +25,8 @@ export default function ActivoPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const reason = useReasonDialog();
+  const periodSource = usePeriodSource(period);
+  const masterMonth = periodSource.data?.source === "master";
 
   useEffect(() => { setPage(1); }, [period]);
 
@@ -64,6 +66,7 @@ export default function ActivoPage() {
         description={`Facturas emitidas, cobros y saldos de ${periodLabel(period)}.`}
         actions={<Button asChild variant="outline"><Link href={`/finance/cargar?period=${period}`}><UploadCloud className="mr-2 h-4 w-4" />Cargar facturas</Link></Button>}
       />
+      <PeriodSourceNotice source={periodSource.data} otherRecords={periodSource.data?.otherSourceRecords.activo} noun="las facturas por cobrar" />
 
       {(isError || summaryError) && <QueryError message="No se pudieron cargar todos los datos del período. Los importes no disponibles se muestran como Sin datos." retry={() => { void refetch(); void retrySummary(); }} />}
       <MetricGrid>
@@ -107,7 +110,7 @@ export default function ActivoPage() {
               const outstanding = Number(row.outstandingUSD ?? row.montoTotalUSD ?? 0);
               return <TableRow key={row.id}>
                 <TableCell className="font-medium">{row.clienteNombre || "—"}</TableCell>
-                <TableCell className="max-w-[260px]"><span className="block truncate" title={row.concepto || undefined}>{row.concepto || "—"}</span><span className="text-xs text-muted-foreground">{row.overrideManual ? "Registrado en Mind" : "Histórico"}</span></TableCell>
+                <TableCell className="max-w-[260px]"><span className="block truncate" title={row.concepto || undefined}>{row.concepto || "—"}</span><span className="text-xs text-muted-foreground">{row.source === "excel" ? "Máster" : "Registrado en Mind"}</span></TableCell>
                 <TableCell className="whitespace-nowrap font-mono text-xs">{row.nroFactura || "—"}</TableCell>
                 <TableCell className="whitespace-nowrap text-sm">{formatDate(row.fechaVencimiento)}</TableCell>
                 <TableCell className="whitespace-nowrap text-right tabular-nums">{formatUsd(Number(row.montoTotalUSD ?? 0))}</TableCell>
@@ -118,7 +121,7 @@ export default function ActivoPage() {
                     : row.vencido ? <StatusPill tone="danger">Vencido</StatusPill>
                     : <StatusPill tone="warning">Pendiente</StatusPill>}
                 </TableCell>
-                <TableCell className="text-right"><Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-red-700" aria-label="Anular" title="Anular" disabled={voidMutation.isPending} onClick={() => void voidRow(row)}><Ban className="h-4 w-4" /></Button></TableCell>
+                <TableCell className="text-right">{masterMonth && row.source === "excel" ? null : <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-red-700" aria-label="Anular" title="Anular" disabled={voidMutation.isPending} onClick={() => void voidRow(row)}><Ban className="h-4 w-4" /></Button>}</TableCell>
               </TableRow>;
             })}
           </TableBody>
