@@ -19,6 +19,8 @@ export interface ScenarioCost {
   amountUsd: number | null;
   impact: 'operating' | 'net' | 'ebit';
   sourceDetail?: string;
+  /** "Directo"/"Indirecto" from the Master actual-costs tab; absent for estimates. */
+  costType?: string | null;
 }
 
 export interface FinancialScenario {

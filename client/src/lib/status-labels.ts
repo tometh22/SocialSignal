@@ -72,6 +72,7 @@ const STATUS_LABELS: Record<string, string> = {
 
   // Provisiones
   released: "Liberada",
+  master: "Informada en el Máster",
 };
 
 export function statusLabel(status: string | null | undefined, fallback = "Sin estado"): string {

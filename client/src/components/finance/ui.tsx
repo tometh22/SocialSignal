@@ -1,4 +1,6 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Database } from "lucide-react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -120,5 +122,28 @@ export function FinanceLoading({ label = "Cargando datos financieros" }: { label
     <div className="ui-metric-grid">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-[7.5rem] rounded-2xl" />)}</div>
     <Skeleton className="h-72 rounded-2xl" />
     <span className="sr-only">{label}…</span>
+  </div>;
+}
+
+export type PeriodSource = { period: string; source: "master" | "mind"; otherSourceRecords: { activo: number; pasivo: number; cashflow: number; provisions: number } };
+
+/** Whether the month is reported from the Master or from Mind (same rule as the Resumen). */
+export function usePeriodSource(period: string) {
+  return useQuery<PeriodSource>({ queryKey: [`/api/finance/period-source?period=${period}`], staleTime: 60_000 });
+}
+
+/** States where the month's figures come from and which records are not counted. */
+export function PeriodSourceNotice({ source, otherRecords, noun }: { source?: PeriodSource; otherRecords?: number; noun: string }) {
+  if (!source) return null;
+  const master = source.source === "master";
+  return <div data-testid="period-source" className="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm text-sky-950">
+    <Database className="mt-0.5 h-4 w-4 shrink-0 text-sky-700" aria-hidden="true" />
+    <div className="space-y-0.5">
+      <p className="font-medium">{master ? "Este mes se informa desde el Máster" : "Este mes se registra en Mind"}</p>
+      <p className="text-xs leading-5 text-sky-900/80">
+        {master ? `Mind sincroniza ${noun} del Máster cada 30 minutos. Para corregir un registro, cambialo en la planilla.` : `Se muestran ${noun} cargados en Mind. El Máster ya no actualiza este mes.`}
+        {otherRecords ? ` ${otherRecords} ${otherRecords === 1 ? "registro" : "registros"} de ${master ? "Mind" : "la importación del Máster"} no se suman para no duplicar importes.` : ""}
+      </p>
+    </div>
   </div>;
 }
