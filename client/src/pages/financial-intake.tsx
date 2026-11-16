@@ -20,6 +20,23 @@ import { getFinancialIntakeImpact, getLinkedRecordPresentation, type FinancialIn
 import { AlertCircle, ArrowRight, Building2, CheckCircle2, FileText, Image, Landmark, Loader2, Paperclip, Plus, RefreshCw, Search, Send, ShieldAlert, Sparkles, TrendingUp, UploadCloud, WalletCards, XCircle } from "lucide-react";
 
 type DocumentKind = FinancialIntakeDocumentKind;
+// Nombres canónicos compartidos con el Máster: el P&L los usa para clasificar.
+const TAX_CONCEPTS = ["IVA", "IIBB", "Impuestos USA", "Intereses Oxean"] as const;
+type TaxConcept = typeof TAX_CONCEPTS[number];
+const TAX_CONCEPT_HINTS: Record<TaxConcept, string> = {
+  IVA: "No es venta ni costo: no afecta el resultado.",
+  IIBB: "Impuesto debajo del EBIT. Si ya lo cargaste en cada venta, no lo repitas acá.",
+  "Impuestos USA": "Impuesto debajo del EBIT.",
+  "Intereses Oxean": "Resultado financiero debajo del EBIT.",
+};
+const COST_TREATMENT_HINTS: Record<NonNullable<Extraction["costTreatment"]>, string> = {
+  direct: "Costo del proyecto: suma al costo directo del mes.",
+  indirect: "Costo de estructura: suma a los indirectos del mes.",
+  provision: "Se registra como provisión.",
+  balance_only: "Sólo crea la deuda en Pasivo, sin sumar costo. Usalo para préstamos, pagos de un pasivo ya registrado como gasto o impuestos ya liquidados.",
+  tax: "Impuesto (IIBB, Impuestos USA): crea la deuda y queda debajo del EBIT, no como costo operativo.",
+  unclassified: "Suma a indirectos hasta que lo clasifiques.",
+};
 type LineItem = { date: string | null; description: string | null; amount: number; currency: "ARS" | "USD" | "EUR" | "OTHER"; direction: "IN" | "OUT"; bank: string | null; reference: string | null; isInternalTransfer: boolean; transferReference: string | null };
 type Extraction = {
   documentKind: DocumentKind; suggestedTarget: string; periodKey: string | null; issueDate: string | null;
@@ -27,7 +44,9 @@ type Extraction = {
   clientName: string | null; projectName: string | null; description: string | null; currency: "ARS" | "USD" | "EUR" | "OTHER" | null;
   netAmount: number | null; taxAmount: number | null; totalAmount: number | null; exchangeRate: number | null;
   bank: string | null; paymentTermsDays: number | null; lineItems: LineItem[]; confidence: number;
-  costTreatment: "direct" | "indirect" | "provision" | "unclassified" | null; costSubtype: string | null;
+  costTreatment: "direct" | "indirect" | "provision" | "balance_only" | "tax" | "unclassified" | null; costSubtype: string | null;
+  ivaAmount?: number | null; iibbAmount?: number | null; salesAdjustmentAmount?: number | null; salesAdjustmentNote?: string | null;
+  isMarketingCost?: boolean | null; taxConcept?: TaxConcept | null; createsPayable?: boolean | null;
   deliveryStart: string | null; deliveryEnd: string | null; deliveryCurve: "invoice" | "linear" | "milestone" | null;
   fieldConfidence: Record<string, number>; missingFields: string[]; warnings: string[];
 };
@@ -41,7 +60,7 @@ type IntakeItem = {
 const KIND_LABELS: Record<DocumentKind, string> = {
   customer_invoice: "Factura a cliente", customer_collection: "Cobro de cliente", supplier_invoice: "Factura de proveedor",
   supplier_payment: "Pago a proveedor", bank_statement: "Extracto bancario", fee_confirmation: "Fee confirmado",
-  exchange_rate: "Tipo de cambio", tax_settlement: "Liquidación impositiva", provision: "Provisión", unknown: "Sin clasificar",
+  exchange_rate: "Tipo de cambio", tax_settlement: "Liquidación impositiva / intereses", provision: "Provisión", unknown: "Sin clasificar",
   inflation: "Inflación / IPC",
 };
 const TARGET_BY_KIND: Record<DocumentKind, string> = {
@@ -63,6 +82,9 @@ const MISSING_FIELD_LABELS: Record<string, string> = {
   exchangeRate: "cotización ARS/USD",
   netAmount: "importe neto válido",
   taxAmount: "importe de impuestos válido",
+  ivaAmount: "IVA válido (entre cero y el total)",
+  iibbAmount: "IIBB válido (no negativo)",
+  taxConcept: "concepto de la liquidación (IVA, IIBB, Impuestos USA o Intereses Oxean)",
   issueDate: "fecha de emisión",
   documentNumber: "número de documento",
   counterparty: "cliente o contraparte",
@@ -94,6 +116,9 @@ function missingFields(data: Extraction): string[] {
   else if (data.documentKind !== "unknown") { if (!(Number(data.totalAmount) > 0)) missing.add("totalAmount"); if (!data.currency) missing.add("currency"); if (["EUR", "OTHER"].includes(data.currency ?? "")) missing.add("currencyConversion"); if (data.currency === "ARS" && !(Number(data.exchangeRate) > 0)) missing.add("exchangeRate"); if (data.netAmount != null && (data.netAmount < 0 || data.netAmount > Number(data.totalAmount))) missing.add("netAmount"); if (data.taxAmount != null && (data.taxAmount < 0 || data.taxAmount > Number(data.totalAmount))) missing.add("taxAmount"); }
   if (["customer_invoice", "supplier_invoice"].includes(data.documentKind)) { if (!validIsoDate(data.issueDate)) missing.add("issueDate"); if (!data.documentNumber) missing.add("documentNumber"); if (!data.counterparty && !data.clientName) missing.add("counterparty"); }
   if (["customer_collection", "supplier_payment"].includes(data.documentKind) && !validIsoDate(data.paymentDate) && !validIsoDate(data.issueDate)) missing.add("paymentDate");
+  if (data.ivaAmount != null && (data.ivaAmount < 0 || data.ivaAmount > Number(data.totalAmount))) missing.add("ivaAmount");
+  if (data.iibbAmount != null && data.iibbAmount < 0) missing.add("iibbAmount");
+  if (data.documentKind === "tax_settlement" && !data.taxConcept) missing.add("taxConcept");
   if (data.dueDate && !validIsoDate(data.dueDate)) missing.add("dueDate");
   if (data.deliveryStart && !/^\d{4}-(0[1-9]|1[0-2])$/.test(data.deliveryStart)) missing.add("deliveryStart");
   if (data.deliveryEnd && !/^\d{4}-(0[1-9]|1[0-2])$/.test(data.deliveryEnd)) missing.add("deliveryEnd");
@@ -177,6 +202,7 @@ export default function FinancialIntakePage() {
   const needsCount = allItems.filter((i) => i.status === "needs_review" || i.status === "failed").length;
   const currentMissing = draft ? missingFields(draft) : [];
   const currentImpact = draft ? getFinancialIntakeImpact(draft.documentKind, draft.lineItems.length) : null;
+  const isSale = draft?.documentKind === "customer_invoice" || draft?.documentKind === "fee_confirmation";
 
   function acceptFiles(files: File[]) { if (files.length) setPendingFiles(files.slice(0, 10)); }
   function onDrop(event: DragEvent<HTMLDivElement>) { event.preventDefault(); setDragging(false); acceptFiles(Array.from(event.dataTransfer.files)); }
@@ -286,11 +312,19 @@ export default function FinancialIntakePage() {
                   <Field label="Proyecto"><Input value={draft.projectName ?? ""} onChange={(e) => setField("projectName", e.target.value || null)} /></Field>
                   <Field label="Banco / cuenta"><Input value={draft.bank ?? ""} onChange={(e) => setField("bank", e.target.value || null)} /></Field>
                   <Field label="Plazo (días)"><Input type="number" min="0" value={draft.paymentTermsDays ?? ""} onChange={(e) => setField("paymentTermsDays", numberValue(e.target.value))} /></Field>
-                  <Field label="Neto"><Input type="number" step="0.01" value={draft.netAmount ?? ""} onChange={(e) => setField("netAmount", numberValue(e.target.value))} /></Field>
-                  <Field label="Impuestos"><Input type="number" step="0.01" value={draft.taxAmount ?? ""} onChange={(e) => setField("taxAmount", numberValue(e.target.value))} /></Field>
+                  {isSale ? <>
+                    <Field label="Neto (venta sin IVA)" hint="Si lo dejás vacío, Mind lo calcula como total menos IVA."><Input type="number" step="0.01" value={draft.netAmount ?? ""} onChange={(e) => setField("netAmount", numberValue(e.target.value))} /></Field>
+                    <Field label="IVA" hint="No es venta ni costo."><Input type="number" step="0.01" min="0" value={draft.ivaAmount ?? draft.taxAmount ?? ""} onChange={(e) => { const ivaAmount = numberValue(e.target.value); setDraft((old) => old ? { ...old, ivaAmount, taxAmount: null } : old); }} /></Field>
+                    <Field label="IIBB" hint="Ingresos Brutos de esta venta, en la moneda del documento. No reduce la venta: crea la deuda impositiva en Pasivo."><Input type="number" step="0.01" min="0" value={draft.iibbAmount ?? ""} onChange={(e) => setField("iibbAmount", numberValue(e.target.value))} /></Field>
+                  </> : <>
+                    <Field label="Neto"><Input type="number" step="0.01" value={draft.netAmount ?? ""} onChange={(e) => setField("netAmount", numberValue(e.target.value))} /></Field>
+                    <Field label="Impuestos"><Input type="number" step="0.01" value={draft.taxAmount ?? ""} onChange={(e) => setField("taxAmount", numberValue(e.target.value))} /></Field>
+                  </>}
                   <Field label="Total"><Input type="number" step="0.01" value={draft.totalAmount ?? ""} onChange={(e) => setField("totalAmount", numberValue(e.target.value))} /></Field>
                   <Field label="Cotización ARS/USD"><Input type="number" step="0.0001" value={draft.exchangeRate ?? ""} onChange={(e) => setField("exchangeRate", numberValue(e.target.value))} /></Field>
-                  {(draft.documentKind === "supplier_invoice" || draft.documentKind === "tax_settlement") && <><Field label="Tratamiento del costo"><Select value={draft.costTreatment ?? "unclassified"} onValueChange={(v: NonNullable<Extraction["costTreatment"]>) => setField("costTreatment", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="direct">Directo al proyecto</SelectItem><SelectItem value="indirect">Indirecto / estructura</SelectItem><SelectItem value="provision">Provisión</SelectItem><SelectItem value="unclassified">Pendiente de clasificar</SelectItem></SelectContent></Select></Field><Field label="Subtipo de costo"><Input value={draft.costSubtype ?? ""} onChange={(e) => setField("costSubtype", e.target.value || null)} /></Field></>}
+                  {draft.documentKind === "supplier_invoice" && <><Field label="Tratamiento del costo" hint={COST_TREATMENT_HINTS[draft.costTreatment ?? "unclassified"]}><Select value={draft.costTreatment ?? "unclassified"} onValueChange={(v: NonNullable<Extraction["costTreatment"]>) => setField("costTreatment", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="direct">Directo al proyecto</SelectItem><SelectItem value="indirect">Indirecto / estructura</SelectItem><SelectItem value="provision">Provisión</SelectItem><SelectItem value="balance_only">Solo deuda, sin costo</SelectItem><SelectItem value="tax">Impuesto (debajo del EBIT)</SelectItem><SelectItem value="unclassified">Pendiente de clasificar</SelectItem></SelectContent></Select></Field><Field label="Subtipo de costo"><Input value={draft.costSubtype ?? ""} onChange={(e) => setField("costSubtype", e.target.value || null)} /></Field><Field label="Costo de marketing" hint="Equivale a la columna «Costo Marketing» del Máster."><label className="flex h-10 items-center gap-2 text-sm"><Checkbox checked={draft.isMarketingCost === true} onCheckedChange={(checked) => setField("isMarketingCost", checked === true)} />Es un gasto de marketing</label></Field></>}
+                  {draft.documentKind === "tax_settlement" && <><Field label="Concepto" hint={draft.taxConcept ? TAX_CONCEPT_HINTS[draft.taxConcept] : "Elegí qué se liquida para que el resultado lo clasifique bien."}><Select value={draft.taxConcept ?? "none"} onValueChange={(v) => setField("taxConcept", v === "none" ? null : v as TaxConcept)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Elegir</SelectItem>{TAX_CONCEPTS.map((concept) => <SelectItem key={concept} value={concept}>{concept}</SelectItem>)}</SelectContent></Select></Field><Field label="Deuda" hint="Desmarcalo si ya está pagado y sólo querés registrar el resultado."><label className="flex h-10 items-center gap-2 text-sm"><Checkbox checked={draft.createsPayable !== false} onCheckedChange={(checked) => setField("createsPayable", checked === true)} />Queda pendiente de pago (crear en Pasivo)</label></Field></>}
+                  {isSale && <><Field label="Ajuste de venta" hint="Equivale a «Ajuste» del Máster. Se suma a la venta neta; usá negativo para descontar."><Input type="number" step="0.01" value={draft.salesAdjustmentAmount ?? ""} onChange={(e) => setField("salesAdjustmentAmount", numberValue(e.target.value))} /></Field><Field label="Motivo del ajuste"><Input value={draft.salesAdjustmentNote ?? ""} onChange={(e) => setField("salesAdjustmentNote", e.target.value || null)} placeholder="Ej.: actualización por inflación" /></Field></>}
                   {(draft.documentKind === "customer_invoice" || draft.documentKind === "fee_confirmation") && <><Field label="Inicio del devengamiento"><Input type="month" value={draft.deliveryStart ?? ""} onChange={(e) => setField("deliveryStart", e.target.value || null)} /></Field><Field label="Fin del devengamiento"><Input type="month" value={draft.deliveryEnd ?? ""} onChange={(e) => setField("deliveryEnd", e.target.value || null)} /></Field><Field label="Curva"><Select value={draft.deliveryCurve ?? "invoice"} onValueChange={(v: NonNullable<Extraction["deliveryCurve"]>) => setField("deliveryCurve", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="invoice">Al facturar</SelectItem><SelectItem value="linear">Lineal</SelectItem><SelectItem value="milestone">Por hitos</SelectItem></SelectContent></Select></Field></>}
                 </div>
                 <Field label="Descripción"><Textarea value={draft.description ?? ""} onChange={(e) => setField("description", e.target.value || null)} /></Field>
@@ -314,7 +348,7 @@ export default function FinancialIntakePage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-1.5"><Label>{label}</Label>{children}</div>; }
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) { return <div className="space-y-1.5"><Label>{label}</Label>{children}{hint && <p className="text-xs text-muted-foreground">{hint}</p>}</div>; }
 function StatusBadge({ status }: { status: string }) { return <Badge variant={status === "failed" || status === "rejected" ? "destructive" : status === "posted" ? "default" : "secondary"}>{STATUS_LABELS[status] ?? status}</Badge>; }
 function RateItemsEditor({ rows, onChange }: { rows: LineItem[]; onChange: (rows: LineItem[]) => void }) {
   const update = (index: number, next: Partial<LineItem>) => onChange(rows.map((row, i) => i === index ? { ...row, ...next } : row));

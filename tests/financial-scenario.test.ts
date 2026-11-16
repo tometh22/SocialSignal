@@ -113,9 +113,11 @@ describe('native cost sources', () => {
       { ...base, id: 1, cost_treatment: 'direct', subtipo_costo: 'Equipo - Bono' },
       { ...base, id: 2, cost_treatment: 'provision' },
       { ...base, id: 3, cost_treatment: 'unclassified', subtipo_costo: 'Impuestos ARG' },
+      { ...base, id: 4, cost_treatment: 'tax', subtipo_costo: 'IIBB' },
     ]);
     expect(rows.find(row => row.id === 'ledger:1')?.impact).toBe('operating');
     expect(rows.find(row => row.id === 'ledger:2')?.impact).toBe('net');
     expect(rows.find(row => row.id === 'ledger:3')?.impact).toBe('operating');
+    expect(rows.find(row => row.id === 'ledger:4')?.impact).toBe('net');
   });
 });
