@@ -72,7 +72,9 @@ describe("financial native integration contracts", () => {
     expect(index).toContain("0059 financial native ledger");
     expect(read("server/routes.ts")).toContain("fetchNativeExecutiveDashboard");
     expect(read("server/services/financial-intake-posting.ts")).toContain("rebuildNativeFinancialFacts");
-    expect(read("server/services/autoSyncService.ts")).toContain("Auto-sync financiero desde Excel desactivado por cutover");
+    expect(read("server/services/autoSyncService.ts")).toContain("Auto-sync de ventas y costos desde Excel desactivado por cutover");
+    // The ledger follows the one-source-per-month rule, not the cutover.
+    expect(read("server/services/autoSyncService.ts")).toMatch(/desactivado por cutover[\s\S]{0,300}await this\.syncLedger\(\)/);
     expect(read("server/services/recurring-revenue.ts")).toContain("revenue_events");
   });
 

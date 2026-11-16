@@ -4227,6 +4227,8 @@ class GoogleSheetsWorkingService {
         const current = await tx.select({
           sourceRowKey: activoEntries.sourceRowKey,
           cobradoAlCierre: activoEntries.cobradoAlCierre,
+          outstandingAmount: activoEntries.outstandingAmount,
+          currency: activoEntries.currency,
           montoTotalUSD: activoEntries.montoTotalUSD,
           vencido: activoEntries.vencido,
           tipoActivo: activoEntries.tipoActivo,
@@ -4247,14 +4249,20 @@ class GoogleSheetsWorkingService {
 
         // Rows created in Mind (Carga financiera, facturas del equipo, altas manuales)
         // are never part of the Master snapshot and must survive its replacement.
-        const fingerprint = (row: { sourceRowKey?: string | null; montoTotalUSD?: unknown; cobradoAlCierre?: unknown; vencido?: unknown; tipoActivo?: unknown; subtipoCosto?: unknown; fechaPago?: unknown; fechaVencimiento?: unknown }) => [
+        const fingerprint = (row: { sourceRowKey?: string | null; montoTotalUSD?: unknown; cobradoAlCierre?: unknown; vencido?: unknown; tipoActivo?: unknown; subtipoCosto?: unknown; fechaPago?: unknown; fechaVencimiento?: unknown; currency?: unknown; outstandingAmount?: unknown }) => [
           row.sourceRowKey, Number(row.montoTotalUSD ?? 0).toFixed(2), Boolean(row.cobradoAlCierre), Boolean(row.vencido),
           row.tipoActivo ?? row.subtipoCosto ?? '', row.fechaPago ? new Date(row.fechaPago as any).toISOString().slice(0, 10) : '',
           row.fechaVencimiento ? new Date(row.fechaVencimiento as any).toISOString().slice(0, 10) : '',
+          row.currency ?? '', row.outstandingAmount == null ? '' : Number(row.outstandingAmount).toFixed(2),
         ].join('|');
         // Only Master months are synchronized, so the settled status is the Master's.
         // (Mind payments are applied to Mind records; none target imported rows.)
-        const nextRows = snapshot.rows;
+        // Every row is stored complete, in USD as the Master reports it, so the
+        // startup backfill in financial-ledger-native.ts has nothing to infer.
+        const nextRows = snapshot.rows.map((row) => {
+          const usd = row.montoTotalUSD == null ? null : String(row.montoTotalUSD);
+          return { ...row, currency: 'USD', originalAmount: usd, grossAmount: usd, outstandingAmount: row.cobradoAlCierre ? '0' : usd, status: row.cobradoAlCierre ? 'PAID' : row.vencido ? 'OVERDUE' : 'PENDING' };
+        });
         const currentPrints = current.map(fingerprint).sort();
         const nextPrints = nextRows.map(fingerprint).sort();
         if (currentPrints.length === nextPrints.length && currentPrints.every((value, index) => value === nextPrints[index])) {
@@ -4269,7 +4277,7 @@ class GoogleSheetsWorkingService {
         )).returning({ id: activoEntries.id });
         deleted = deletedRows.length;
 
-        const rows = snapshot.rows.map((row) => ({
+        const rows = nextRows.map((row) => ({
           ...row,
           importBatch,
           overrideManual: false,
@@ -4350,6 +4358,8 @@ class GoogleSheetsWorkingService {
         const current = await tx.select({
           sourceRowKey: pasivoEntries.sourceRowKey,
           pagadoAlCierre: pasivoEntries.pagadoAlCierre,
+          outstandingAmount: pasivoEntries.outstandingAmount,
+          currency: pasivoEntries.currency,
           montoTotalUSD: pasivoEntries.montoTotalUSD,
           vencido: pasivoEntries.vencido,
           fechaPago: pasivoEntries.fechaPago,
@@ -4369,14 +4379,20 @@ class GoogleSheetsWorkingService {
 
         // Rows created in Mind (Carga financiera, facturas del equipo, altas manuales)
         // are never part of the Master snapshot and must survive its replacement.
-        const fingerprint = (row: { sourceRowKey?: string | null; montoTotalUSD?: unknown; pagadoAlCierre?: unknown; vencido?: unknown; tipoActivo?: unknown; subtipoCosto?: unknown; fechaPago?: unknown; fechaVencimiento?: unknown }) => [
+        const fingerprint = (row: { sourceRowKey?: string | null; montoTotalUSD?: unknown; pagadoAlCierre?: unknown; vencido?: unknown; tipoActivo?: unknown; subtipoCosto?: unknown; fechaPago?: unknown; fechaVencimiento?: unknown; currency?: unknown; outstandingAmount?: unknown }) => [
           row.sourceRowKey, Number(row.montoTotalUSD ?? 0).toFixed(2), Boolean(row.pagadoAlCierre), Boolean(row.vencido),
           row.tipoActivo ?? row.subtipoCosto ?? '', row.fechaPago ? new Date(row.fechaPago as any).toISOString().slice(0, 10) : '',
           row.fechaVencimiento ? new Date(row.fechaVencimiento as any).toISOString().slice(0, 10) : '',
+          row.currency ?? '', row.outstandingAmount == null ? '' : Number(row.outstandingAmount).toFixed(2),
         ].join('|');
         // Only Master months are synchronized, so the settled status is the Master's.
         // (Mind payments are applied to Mind records; none target imported rows.)
-        const nextRows = snapshot.rows;
+        // Every row is stored complete, in USD as the Master reports it, so the
+        // startup backfill in financial-ledger-native.ts has nothing to infer.
+        const nextRows = snapshot.rows.map((row) => {
+          const usd = row.montoTotalUSD == null ? null : String(row.montoTotalUSD);
+          return { ...row, vendorName: row.detalle, currency: 'USD', originalAmount: usd, grossAmount: usd, outstandingAmount: row.pagadoAlCierre ? '0' : usd, status: row.pagadoAlCierre ? 'PAID' : row.vencido ? 'OVERDUE' : 'PENDING' };
+        });
         const currentPrints = current.map(fingerprint).sort();
         const nextPrints = nextRows.map(fingerprint).sort();
         if (currentPrints.length === nextPrints.length && currentPrints.every((value, index) => value === nextPrints[index])) {
@@ -4391,7 +4407,7 @@ class GoogleSheetsWorkingService {
         )).returning({ id: pasivoEntries.id });
         deleted = deletedRows.length;
 
-        const rows = snapshot.rows.map((row) => ({
+        const rows = nextRows.map((row) => ({
           ...row,
           importBatch,
           overrideManual: false,

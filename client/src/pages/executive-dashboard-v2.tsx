@@ -9,6 +9,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FinanceHeader, StatusPill, periodLabel } from "@/components/finance/ui";
+import { MasterControlCard } from "@/components/finance/master-control";
+import { usePermissions } from "@/hooks/use-permissions";
 import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
 import { PageShell } from "@/components/ui/page-shell";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -57,6 +59,7 @@ export default function ExecutiveDashboardV2() {
   const now = new Date();
   const [viewMode, setViewMode] = useState<"month" | "quarter" | "year" | "custom">("month");
   const { period, year, month } = useFinancePeriod();
+  const { hasPermission } = usePermissions();
   const selectedYear = Number(year), selectedMonth = Number(month);
   const [selectedQuarter, setSelectedQuarter] = useState(Math.ceil((now.getMonth() + 1) / 3));
   const [customStartYear, setCustomStartYear] = useState(now.getFullYear());
@@ -243,6 +246,7 @@ export default function ExecutiveDashboardV2() {
             {control.error && <QueryError message="No se pudo comprobar la conciliación de este mes." retry={control.refetch} />}
             {control.data && !control.error && control.data.report.status !== 'matched' && control.data.report.warnings.length > 0 && <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900"><p>Hay gastos o importes pendientes. Completalos antes de usar el resultado de este mes.</p><details className="mt-1"><summary className="cursor-pointer text-xs font-medium">Ver registros pendientes</summary><ul className="mt-2 space-y-1 text-xs">{control.data.report.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></details></div>}
           </Card>}
+          {viewMode === "month" && hasPermission("finance") && <MasterControlCard period={period} />}
           <details className="rounded-xl border bg-card p-4"><summary className="cursor-pointer text-sm font-semibold">Indicadores de rentabilidad: resultado operativo, márgenes y markup</summary><div className="mt-4">
           {/* KPI Cards */}
           <TooltipProvider delayDuration={200}>

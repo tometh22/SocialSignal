@@ -116,3 +116,17 @@ test('master months explain their source and do not offer edits that the next sy
   await expect(page.getByRole('cell', { name: /Honorarios equipo/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Anular', exact: true })).toHaveCount(0);
 });
+
+test('the summary shows the monthly Máster–Mind control with differences to fix in the spreadsheet', async ({ page }) => {
+  const check = (id: string, kind: 'sync' | 'master', label: string, expectedUsd: number, actualUsd: number) => ({ id, kind, label, hint: 'Corregilo en la planilla.', expectedLabel: 'Planilla', expectedUsd, actualLabel: 'Mind', actualUsd, differenceUsd: actualUsd - expectedUsd, ok: Math.abs(actualUsd - expectedUsd) <= 1 });
+  await page.route('**/api/finance/master-control?*', route => route.fulfill({ json: { period: '2026-10', source: 'master', checkedAt: '2026-11-16T18:00:00Z',
+    checks: [check('receivables', 'sync', 'Facturas por cobrar', 106390.62, 106390.62), check('master-receivables', 'master', 'Clientes a cobrar del Resumen', 102370.17, 147346.21)], pending: ['Falta el importe de 19 costo(s)'] } }));
+  await page.goto('/dashboard?period=2026-10');
+  const card = page.getByTestId('master-control');
+  await expect(card).toContainText('Mind coincide con la planilla');
+  await expect(card).toContainText('1 diferencia dentro de la planilla');
+  await card.getByText('Ver el detalle del control').click();
+  await expect(card).toContainText('Clientes a cobrar del Resumen');
+  await expect(card).toContainText('Diferencia USD 44.976');
+  await expect(card).toContainText('Falta el importe de 19 costo(s)');
+});

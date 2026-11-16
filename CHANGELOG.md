@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.58 — 2026-11-16
+
+- La sincronización automática del ledger del Máster (Activo, Pasivo, CashFlow y Provisión pasivo) corre cada 30 minutos aunque esté activo el corte de agosto: antes el corte la salteaba y sólo funcionaba al dispararla a mano.
+- Control mensual Máster–Mind en el Resumen (para usuarios de Finanzas): compara lo que muestra Mind con el detalle de la planilla y el Resumen Ejecutivo con sus propias pestañas, explica qué corregir en cada caso y lista los datos pendientes. El control también corre después de cada sincronización.
+- Los registros importados del Máster se guardan completos en dólares (moneda, importe y saldo pendiente), así que reiniciar el servidor ya no recalcula su saldo pendiente en pesos.
+
 ## 1.14.57 — 2026-11-16
 
 - Una sola fuente por mes en todo Finanzas: un mes se informa desde el Máster hasta que Mind tiene un cierre o ventas propias. Resumen, Caja, Cobros y pagos, Provisiones y Desglose de costos aplican la misma regla y avisan de dónde vienen los datos.

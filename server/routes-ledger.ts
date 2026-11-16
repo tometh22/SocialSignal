@@ -153,6 +153,18 @@ export function createLedgerRouter(requireAuth: any) {
 
   // ==================== ACTIVO ====================
 
+  router.get("/finance/master-control", ...finance, async (req, res) => {
+    try {
+      const period = String(req.query.period ?? "");
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return res.status(400).json({ message: "period debe usar el formato YYYY-MM" });
+      const { getMasterControl } = await import("./services/master-control");
+      res.setHeader("Cache-Control", "private, no-store");
+      res.json(await getMasterControl(period));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   router.get("/finance/period-source", ...finance, async (req, res) => {
     try {
       const period = String(req.query.period ?? "");
