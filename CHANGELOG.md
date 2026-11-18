@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.60 — 2026-11-18
+
+- Mi nombre: cada persona puede cambiar su nombre y apellido desde el menú de usuario. El cambio se ve en Tareas, Proyectos y Status, porque también actualiza su ficha de Personal.
+- Cuando un administrador cambia el nombre de un usuario, su ficha de Personal se actualiza igual. Antes Usuarios y Tareas podían mostrar nombres distintos para la misma persona.
+- El nombre anterior queda como alias del Máster para que la sincronización de valores hora la siga reconociendo.
+
 ## 1.14.59 — 2026-11-16
 
 Preparación para registrar Finanzas sólo en Mind desde enero de 2027.

@@ -52,7 +52,10 @@ describe.skipIf(!fixture.url)("account invitations and recovery with PostgreSQL"
       is_active BOOLEAN DEFAULT true,permissions TEXT[] DEFAULT '{}',role TEXT NOT NULL DEFAULT 'member',
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),updated_at TIMESTAMP NOT NULL DEFAULT NOW());
       CREATE TABLE password_reset_tokens(id SERIAL PRIMARY KEY,token TEXT UNIQUE,email TEXT,used BOOLEAN DEFAULT false,expires_at TIMESTAMP);
-      CREATE TABLE sessions(sid VARCHAR PRIMARY KEY,sess JSON NOT NULL,expire TIMESTAMP NOT NULL);`);
+      CREATE TABLE sessions(sid VARCHAR PRIMARY KEY,sess JSON NOT NULL,expire TIMESTAMP NOT NULL);
+      CREATE TABLE personnel(id SERIAL PRIMARY KEY,name TEXT NOT NULL,email TEXT);
+      CREATE TABLE sheet_personnel_aliases(id SERIAL PRIMARY KEY,sheet_name TEXT NOT NULL UNIQUE,personnel_id INTEGER REFERENCES personnel(id) ON DELETE CASCADE,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),updated_at TIMESTAMP NOT NULL DEFAULT NOW());`);
     await pool.query(accountAccessLinksMigrationSql);
     await pool.query(accountAccessLinksMigrationSql);
     const PgStore = connectPgSimple(session);
@@ -83,7 +86,7 @@ describe.skipIf(!fixture.url)("account invitations and recovery with PostgreSQL"
     vi.stubEnv("RESEND_API_KEY", "fake-test-only");
     vi.stubEnv("APP_URL", "https://mind.example.test");
     fixture.send.mockReset().mockResolvedValue([{ headers: { "x-message-id": "fake-provider" } }]);
-    await pool.query("TRUNCATE users,account_access_links,password_reset_tokens,sessions RESTART IDENTITY CASCADE");
+    await pool.query("TRUNCATE users,account_access_links,password_reset_tokens,sessions,personnel,sheet_personnel_aliases RESTART IDENTITY CASCADE");
     await pool.query(`INSERT INTO users(first_name,last_name,email,password,is_admin,permissions) VALUES
       ('Admin','Uno','admin@example.test',$1,true,'{}'),('Miembro','Dos','member@example.test',$1,false,'{status}')`, [initialPassword]);
   });
@@ -233,6 +236,24 @@ describe.skipIf(!fixture.url)("account invitations and recovery with PostgreSQL"
     await pool.query("UPDATE users SET is_active=false WHERE id=2");
     expect((await http("/api/admin/users/2/invitation", {})).status).toBe(409);
     expect(fixture.send).not.toHaveBeenCalled();
+  });
+  it("lets members rename themselves and mirrors the name on their personnel record", async () => {
+    await pool.query("INSERT INTO personnel(name,email) VALUES ('Miembro Viejo',' Member@Example.test '),('Otra Persona','other@example.test')");
+    expect((await http("/api/me/profile", { firstName: "X", lastName: "Y" }, 0, "PATCH")).status).toBe(401);
+    expect((await http("/api/me/profile", { firstName: " ", lastName: "Y" }, 2, "PATCH")).status).toBe(400);
+    const response = await http("/api/me/profile", { firstName: " Mari ", lastName: "Pérez", isAdmin: true, email: "x@example.test" }, 2, "PATCH");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    const user = await response.json();
+    expect(user).toMatchObject({ id: 2, firstName: "Mari", lastName: "Pérez", email: "member@example.test", isAdmin: false });
+    expect(user.password).toBeUndefined();
+    expect((await pool.query("SELECT name FROM personnel ORDER BY id")).rows.map(r => r.name)).toEqual(["Mari Pérez", "Otra Persona"]);
+    expect((await pool.query("SELECT sheet_name,personnel_id FROM sheet_personnel_aliases")).rows).toEqual([{ sheet_name: "Miembro Viejo", personnel_id: 1 }]);
+    // An administrator's edit follows the same rule; an existing alias is not duplicated.
+    expect((await http("/api/admin/users/2", { firstName: "Miembro", lastName: "Viejo" }, 1, "PATCH")).status).toBe(200);
+    expect((await http("/api/admin/users/2", { firstName: "Maricel" }, 1, "PATCH")).status).toBe(200);
+    expect((await pool.query("SELECT name FROM personnel WHERE id=1")).rows[0].name).toBe("Maricel Viejo");
+    expect((await pool.query("SELECT sheet_name FROM sheet_personnel_aliases ORDER BY id")).rows.map(r => r.sheet_name)).toEqual(["Miembro Viejo", "Mari Pérez"]);
   });
   it("rate limits anonymous recovery requests without sending duplicates", async () => {
     const responses = [];
