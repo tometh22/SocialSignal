@@ -7,6 +7,7 @@ import { users } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { createInvitedUser, getInvitationStatuses, sendAccountLink } from "./services/account-access";
 import { hashPassword } from "./services/passwords";
+import { syncPersonnelNameFromUser } from "./services/user-display-name";
 
 const sections = z.enum(["dashboard", "crm", "quotations", "projects", "status", "finance", "admin", "operations", "task_manager"]);
 const userInput = z.object({
@@ -17,6 +18,7 @@ const userInput = z.object({
   isAdmin: z.boolean().default(false),
   isActive: z.boolean().default(true),
 });
+const profileInput = userInput.pick({ firstName: true, lastName: true });
 const updateInput = userInput.partial().extend({
   password: accountPasswordSchema.optional(), isActive: z.boolean().optional(),
 });
@@ -71,12 +73,28 @@ export function registerAdminUserRoutes(app: Express, storage: IStorage, require
           await tx.execute(sql`DELETE FROM sessions WHERE sess->>'userId'=${String(id.data)}`);
         }
         const [user] = await tx.update(users).set({ ...input, updatedAt: new Date() }).where(eq(users.id, id.data)).returning();
+        if (input.firstName !== undefined || input.lastName !== undefined) await syncPersonnelNameFromUser(tx, user.email, user.firstName, user.lastName);
         return user;
       });
       if (!updated) return res.status(404).json({ message: "Usuario no encontrado" });
       const { password, ...user } = updated;
       res.json(user);
     } catch (error) { failure(res, error, "Error al actualizar usuario"); }
+  });
+  // Any signed-in user can change how their name is shown; Tareas follows it.
+  app.patch("/api/me/profile", requireAuth, noStore, async (req, res) => {
+    const parsed = profileInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0].message });
+    try {
+      const updated = await db.transaction(async tx => {
+        const [user] = await tx.update(users).set({ ...parsed.data, updatedAt: new Date() }).where(eq(users.id, req.user!.id)).returning();
+        if (user) await syncPersonnelNameFromUser(tx, user.email, user.firstName, user.lastName);
+        return user;
+      });
+      if (!updated) return res.status(404).json({ message: "Usuario no encontrado" });
+      const { password, ...user } = updated;
+      res.json(user);
+    } catch (error) { failure(res, error, "No se pudo actualizar tu nombre"); }
   });
   app.delete("/api/admin/users/:id", ...guards, async (req, res) => {
     const id = userId.safeParse(req.params.id);

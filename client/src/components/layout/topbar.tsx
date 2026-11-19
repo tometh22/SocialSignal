@@ -27,6 +27,7 @@ import {
   Search,
   Settings,
   Sparkles,
+  UserPen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -38,6 +39,7 @@ import { disableWebPush, enableWebPush, getWebPushState } from "@/lib/notificati
 import { reviewApi, reviewKeys, type ReviewRoomSummary } from "@/lib/review-api";
 import { GlobalSearch } from "@/components/features/global-search";
 import { MessagesPopup } from "@/components/features/messages-popup";
+import { ProfileNameDialog } from "@/components/layout/profile-name-dialog";
 import { HelpPopup } from "@/components/features/help-popup";
 import BrandMark from "@/components/layout/brand-mark";
 
@@ -144,6 +146,7 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [notificationSetupSaving, setNotificationSetupSaving] = useState(false);
   const [notificationSetupError, setNotificationSetupError] = useState("");
+  const [profileNameOpen, setProfileNameOpen] = useState(false);
   const { user, logoutMutation, isLoading } = useAuth();
   const { hasPermission } = usePermissions();
 
@@ -480,6 +483,10 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
                     </div>
                   </div>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setProfileNameOpen(true)} className="rounded-xl">
+                    <UserPen className="h-4 w-4" />
+                    <span>Mi nombre</span>
+                  </DropdownMenuItem>
                   {!isProvider && (
                     <DropdownMenuItem asChild className="rounded-xl">
                       <Link href="/my-invoices" className="flex items-center gap-2">
@@ -514,6 +521,14 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
       </header>
 
       <GlobalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      {user && (
+        <ProfileNameDialog
+          open={profileNameOpen}
+          onOpenChange={setProfileNameOpen}
+          firstName={user.firstName}
+          lastName={user.lastName}
+        />
+      )}
 
       <Dialog open={Boolean(user && notificationPreferences?.availableCategories?.length && !notificationPreferences.setupCompletedAt)} onOpenChange={() => {}}>
         <DialogContent
