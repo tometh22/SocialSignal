@@ -32,6 +32,7 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => htmlEn
 const notificationCategory: Record<string, string> = {
   quotation_approval: "Aprobación de cotización",
   mind_reply: "Conversación",
+  mind_mention: "Mención en Status",
   mind_daily: "Daily de Mind",
   task_assigned: "Tarea asignada",
   task_reply: "Conversación de tarea",
@@ -45,6 +46,7 @@ const notificationCategory: Record<string, string> = {
 
 const discreetEmailCopy: Record<string, { subject: string; message: string }> = {
   quotation_approval: { subject: "Hay una cotización para aprobar", message: "Una cotización requiere tu revisión. Abrí Mind para consultar los detalles." },
+  mind_mention: { subject: "Te mencionaron en Status", message: "Abrí Mind para leer la actualización." },
   mind_reply: { subject: "Nueva respuesta en una conversación", message: "Alguien respondió en una conversación de Mind. Abrí Mind para leer el mensaje." },
   mind_daily: { subject: "Hay novedades en tu Daily", message: "Hay una actualización en el Daily de Mind. Abrí Mind para verla." },
   task_assigned: { subject: "Te asignaron una tarea", message: "Tenés una nueva tarea asignada. Abrí Mind para consultar los detalles." },

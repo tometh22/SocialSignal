@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.14.61 — 2026-11-20
+
+- Status: mencioná a los miembros de la sala en una actualización, publicá desde Actividad y creá tareas o iniciá proyectos con el contexto del tema.
+- Tareas: mové tareas con sus subtareas, plegá todas las secciones y eliminá secciones sin trasladar sus tareas. Las horas registradas protegen el historial contra el borrado.
+- Horas: el Panel de horas totaliza por tarea y los miembros pueden consultar las cargas del equipo dentro de su proyecto.
+- Cierre del equipo y Mis facturas: el cierre directo en USD conserva la tarifa histórica en dólares y habilita la autorización sin pedir un tipo de cambio.
+- Capacitación: acceso desde el menú de usuario y guías actualizadas de Mis facturas y Proyectos de tareas.
+
 ## 1.14.60 — 2026-11-18
 
 - Mi nombre: cada persona puede cambiar su nombre y apellido desde el menú de usuario. El cambio se ve en Tareas, Proyectos y Status, porque también actualiza su ficha de Personal.

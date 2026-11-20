@@ -18,7 +18,7 @@ export function settlementProgress(row: ProgressInput) {
   for (const phase of settlementPhases(row.settlement)) {
     const stage = flow[phase];
     if (stage.status === "rejected") return state("team", `Corregir importe ${phase.toUpperCase()}`, "rose", 3);
-    if (stage.status !== "approved") return state("team", phase === "usd" ? flow.requiresInvoice === false ? "Completar TC de conversión" : "Completar TC al facturar" : usesUSD ? "Confirmar cobro, TC y extras" : "Confirmar importe y extras ARS", "amber", 3);
+    if (stage.status !== "approved") return state("team", phase === "usd" ? flow.directUSD ? "Confirmar importe en USD" : flow.requiresInvoice === false ? "Completar TC de conversión" : "Completar TC al facturar" : usesUSD ? "Confirmar cobro, TC y extras" : "Confirmar importe y extras ARS", "amber", 3);
     if (flow.requiresInvoice !== false && Number(stage.amount) > 0 && !row.invoices.some(i => i.invoiceComponent === (separateInvoices ? phase : "single") && i.approvalStatus === "approved")) return state("team", `Adjuntar factura ${phase.toUpperCase()}`, "amber", 3);
   }
   return state("done", flow.requiresInvoice === false ? "Liquidación autorizada sin factura" : "Facturación completa", "emerald", 4);

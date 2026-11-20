@@ -1,3 +1,4 @@
+import { closedUsdBase, nativeUsdClosing } from "@shared/utils/personnel-settlement";
 import { registerPipelineFinanceRoutes } from "./pipeline/finance";
 import { registerPipelineRoutes } from "./pipeline/routes";
 import { registerPipelineShareRoutes } from "./pipeline/share";
@@ -49,7 +50,7 @@ import { taskCostCoverage } from "./domain/task-cost-coverage";
 import { normalizeProjectTimeFilter } from "./domain/project-request-period";
 import { getPersonalHours, hoursCivilBoundary } from "./domain/personal-hours";
 import { reconcileHourSources, hoursCivilDate } from "@shared/utils/hours-reconciliation";
-import { deleteEmptyTaskTrees } from "./domain/task-delete";
+import { deleteEmptyTaskTrees, deleteTaskTreesInTransaction } from "./domain/task-delete";
 import { taskDateSchema, taskDateWindowSchema, taskDateWindowEnd } from "@shared/utils/task-civil-date";
 import { TASK_PROJECT_ROLES } from "@shared/task-project-roles";
 import { projectTemplateKeySchema, projectTaskTemplates, findProjectTaskTemplate, templateTaskValues } from "./services/project-task-templates";
@@ -13984,7 +13985,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return {
             person,
             closing,
-            system: { hours, hourlyRateARS, totalARS },
+            system: { hours, hourlyRateARS, totalARS, directUSD: closedUsdBase(closing) },
             settlement,
             suggestion: prior ? {
               sourcePeriod: prior.period,
@@ -23614,7 +23615,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Browser views share a flat response so every task is transferred once.
       // Existing consumers keep the original grouped response by default.
       const flat = req.query.layout === "flat";
-      res.json({ canManageSections: await canManageTaskProject(req, parsedProjectId), canEditSections: true, canCreateSections: true, canDeleteTasks: true, tasks: enrichedTasks.map(task => ({ ...task, clientId: project?.clientId ?? null, clientName: project?.clientName ?? null })), sections: flat ? Object.fromEntries(Object.keys(sections).map(name => [name, []])) : sections, ...(flat ? { layout: "flat" } : {}) });
+      const hoursByPerson = req.query.includeHoursByPerson === "true"
+        ? (await db.execute(sql`SELECT entry.task_id AS "taskId", entry.personnel_id AS "personnelId", SUM(entry.hours)::float8 AS hours
+          FROM task_time_entries entry JOIN tasks t ON t.id=entry.task_id
+          WHERE t.project_id=${parsedProjectId}
+          GROUP BY entry.task_id, entry.personnel_id`)).rows
+        : undefined;
+      res.json({ hoursByPerson, canManageSections: true, canEditSections: true, canCreateSections: true, canDeleteTasks: true, tasks: enrichedTasks.map(task => ({ ...task, clientId: project?.clientId ?? null, clientName: project?.clientName ?? null })), sections: flat ? Object.fromEntries(Object.keys(sections).map(name => [name, []])) : sections, ...(flat ? { layout: "flat" } : {}) });
     } catch (error) {
       res.status(500).json({ message: "Error al obtener tareas del proyecto" });
     }
@@ -23646,6 +23653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a este proyecto" });
       if (oldName === newName) return res.json({ message: "Sin cambios" });
       await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(293, ${projectId})`);
         const names = await lockProjectSectionNames(tx, projectId);
         const [conflict] = await tx.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.projectId, projectId), eq(tasks.sectionName, newName))).limit(1);
         if (names.includes(newName) || conflict) throw Object.assign(new Error("Ya existe una sección con ese nombre"), { status: 409 });
@@ -23714,23 +23722,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return created;
   }
 
-  // DELETE /api/tasks/section — eliminar sección (mueve tareas a General)
-  app.delete("/api/tasks/section", requireAuth, async (req: Request, res: Response) => {
+  // DELETE /api/tasks/section — delete the section and its tasks atomically.
+  app.delete("/api/tasks/section", requireAuth, async (req, res) => {
     try {
-      const { projectId, sectionName } = req.body;
-      if (!projectId || !sectionName) return res.status(400).json({ message: "Faltan datos" });
-      if (!(await canManageTaskProject(req, Number(projectId)))) {
-        return res.status(403).json({ message: "Solo responsables del proyecto u Operaciones pueden administrar secciones" });
-      }
-      await db.transaction(async tx => {
-        const names = await lockProjectSectionNames(tx, Number(projectId));
-        await tx.update(tasks).set({ sectionName: "General" }).where(and(eq(tasks.projectId, Number(projectId)), eq(tasks.sectionName, sectionName)));
-        await moveCapacitySectionEstimates(tx, Number(projectId), sectionName, "General");
-        await tx.update(activeProjects).set({ taskSectionNames: names.filter(name => name !== sectionName) }).where(eq(activeProjects.id, Number(projectId)));
+      const { projectId, sectionName } = z.object({
+        projectId: z.number().int().positive(),
+        sectionName: z.string().trim().min(1).max(250),
+      }).strict().parse(req.body);
+      if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+      const result = await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(293, ${projectId})`);
+        const names = await lockProjectSectionNames(tx, projectId);
+        const selected = await tx.select({ id: tasks.id }).from(tasks)
+          .where(and(eq(tasks.projectId, projectId), eq(tasks.sectionName, sectionName)));
+        const result = await deleteTaskTreesInTransaction(tx, projectId, selected.map(task => task.id));
+        await tx.execute(sql`DELETE FROM capacity_group_estimates WHERE project_id=${projectId} AND scope='section' AND section_name=${sectionName}`);
+        await tx.update(activeProjects).set({ taskSectionNames: names.filter(name => name !== sectionName) }).where(eq(activeProjects.id, projectId));
+        return result;
       });
-      res.json({ message: "Sección eliminada" });
-    } catch (error) {
-      res.status(500).json({ message: "Error al eliminar sección" });
+      for (const parentId of result.parentTaskIds) await recalculateTaskLoggedHours(parentId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(error instanceof z.ZodError ? 400 : error.status || 500).json({ message: error.message || "No se pudo eliminar la sección" });
     }
   });
 
@@ -24254,6 +24267,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error.name === "ZodError") return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       console.error("Error al crear tarea:", error?.message || error);
       res.status(500).json({ message: "Error al crear tarea" });
+    }
+  });
+
+  app.post("/api/tasks/:id(\\d+)/move", requireAuth, async (req, res) => {
+    try {
+      const taskId = Number(req.params.id);
+      const { sectionName, targetId, after } = z.object({
+        sectionName: z.string().trim().min(1).max(250),
+        targetId: z.number().int().positive().nullable(),
+        after: z.boolean().default(false),
+      }).strict().parse(req.body);
+      const [task] = await db.select({ projectId: tasks.projectId }).from(tasks).where(eq(tasks.id, taskId));
+      if (!task) return res.status(404).json({ message: "Tarea no encontrada" });
+      const { projectId } = task;
+      if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+      await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(293, ${projectId})`);
+        const names = await lockProjectSectionNames(tx, projectId);
+        const [source] = await tx.select().from(tasks).where(eq(tasks.id, taskId)).for("update");
+        const destination = await tx.select({ id: tasks.id }).from(tasks)
+          .where(and(eq(tasks.projectId, projectId), eq(tasks.sectionName, sectionName), isNull(tasks.parentTaskId)))
+          .orderBy(asc(tasks.position), asc(tasks.createdAt), asc(tasks.id));
+        if (!source || source.projectId !== projectId || source.parentTaskId || (!destination.length && !names.includes(sectionName))) {
+          throw Object.assign(new Error("La tarea o la sección cambió. Actualizá la lista y volvé a intentar."), { status: 409 });
+        }
+        const ids = destination.map(row => row.id).filter(id => id !== taskId);
+        const index = targetId == null ? ids.length : ids.indexOf(targetId);
+        if (index < 0) throw Object.assign(new Error("La tarea de destino cambió de sección"), { status: 409 });
+        ids.splice(index + (targetId != null && after ? 1 : 0), 0, taskId);
+        await tx.execute(sql`UPDATE tasks SET position=ordered.position-1
+          FROM unnest(ARRAY[${sql.join(ids.map(id => sql`${id}`), sql`, `)}]::int[]) WITH ORDINALITY ordered(id, position)
+          WHERE tasks.id=ordered.id`);
+        if (source.sectionName !== sectionName) await tx.execute(sql`WITH RECURSIVE tree AS (
+          SELECT id FROM tasks WHERE id=${taskId}
+          UNION SELECT child.id FROM tasks child JOIN tree parent ON child.parent_task_id=parent.id
+        ) UPDATE tasks SET section_name=${sectionName}, updated_at=NOW() WHERE id IN (SELECT id FROM tree)`);
+      });
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(error instanceof z.ZodError ? 400 : error.status || 500).json({ message: error.message || "No se pudo mover la tarea" });
     }
   });
 
@@ -25204,7 +25257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         taskCount: parseInt(stats.task_count) || 0,
         pendingCount: parseInt(stats.pending_count) || 0,
         completedCount: parseInt(stats.completed_count) || 0,
-        totalHours: isOperationsRequest(req) ? parseFloat(stats.total_hours) || 0 : null,
+        totalHours: parseFloat(stats.total_hours) || 0,
         canManageMembers: await canManageTaskProject(req, projectId),
         members: (membersResult.rows as any[]).map(m => ({
           personnelId: m.personnel_id,
@@ -26681,8 +26734,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) { return res.status(400).json({ message: (error as Error).message }); }
       const closingDate = new Date(parsed.year, parsed.month - 1, 1);
       const canonicalRate = await resolveCanonicalPersonnelRate(parsed.personnelId, closingDate);
+      const billingCurrency = (person.billingCurrency ?? "ARS").toUpperCase();
+      const isUSD = billingCurrency === "USD";
       const rateError = canonicalRateErrorMessage(canonicalRate, closingDate);
-      if (rateError || canonicalRate.hourlyRateARS == null) {
+      if (!isUSD && (rateError || canonicalRate.hourlyRateARS == null)) {
         return res.status(422).json({
           message: rateError ?? "No se pudo resolver la tarifa histórica del período.",
           errors: [{ path: ["hourlyRate"], message: rateError ?? "Tarifa histórica faltante" }],
@@ -26700,14 +26755,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .orderBy(desc(exchangeRates.updatedAt))
         .limit(1);
       const exchangeRateAtClose = canonicalRate.exchangeRate ?? (periodFx ? Number(periodFx.rate) : null);
-      const billingCurrency = person.billingCurrency ?? "ARS";
-      const usesUsdRate = billingCurrency === "USD" || billingCurrency === "mixed";
-      const hourlyRate = usesUsdRate
+      const usesUsdRate = billingCurrency === "MIXED";
+      const nativeUSD = isUSD ? nativeUsdClosing(person, parsed.adjustedHours, canonicalRate, exchangeRateAtClose) : null;
+      if (isUSD && !nativeUSD) return res.status(422).json({ message: "No hay una tarifa histórica en USD vigente para cerrar este período." });
+      const hourlyRate = nativeUSD?.hourlyRate ?? (usesUsdRate
         ? canonicalRate.hourlyRateUSD
           ?? (exchangeRateAtClose && exchangeRateAtClose > 0
-            ? canonicalRate.hourlyRateARS / exchangeRateAtClose
+            ? Number(canonicalRate.hourlyRateARS) / exchangeRateAtClose
             : null)
-        : canonicalRate.hourlyRateARS;
+        : canonicalRate.hourlyRateARS);
       if (hourlyRate == null || hourlyRate <= 0 || (usesUsdRate && (!exchangeRateAtClose || exchangeRateAtClose <= 0))) {
         return res.status(422).json({
           message: usesUsdRate
@@ -26723,7 +26779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // mixed 90/10 split differently after the month is closed.
       const usdFraction = billingCurrency === "USD"
         ? 1
-        : billingCurrency === "mixed"
+        : billingCurrency === "MIXED"
           ? Math.min(1, Math.max(0, Number(person.usdBillingFraction ?? 0)))
           : 0;
       const fx = exchangeRateAtClose && exchangeRateAtClose > 0 ? exchangeRateAtClose : null;
@@ -26737,7 +26793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const invoiceTotalARS = hourlyRateARS != null
         ? parsed.adjustedHours * hourlyRateARS * (1 - usdFraction)
         : 0;
-      const grandTotalARS = Math.round(parsed.adjustedHours * canonicalRate.hourlyRateARS * 100) / 100;
+      const grandTotalARS = Math.round(parsed.adjustedHours * Number(canonicalRate.hourlyRateARS) * 100) / 100;
       const grandTotalUSD = fx ? Math.round(grandTotalARS / fx * 100) / 100 : 0;
 
       // Rate, FX and total are server-owned snapshots. The client only supplies
@@ -26746,13 +26802,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...parsed,
         hourlyRate,
         exchangeRateAtClose,
-        billingCurrency,
+        billingCurrency: isUSD ? "USD" : billingCurrency === "MIXED" ? "mixed" : "ARS",
         usdBillingFraction: usdFraction,
         totalCostARS: invoiceTotalARS,
         totalCostUSD: invoiceTotalUSD,
         grandTotalARS,
         grandTotalUSD,
         totalCost: grandTotalARS,
+        ...nativeUSD,
       };
       const closing = await db.transaction(async (tx) => {
         const period = `${data.year}-${String(data.month).padStart(2, "0")}`;

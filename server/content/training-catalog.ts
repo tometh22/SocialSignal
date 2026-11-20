@@ -167,7 +167,7 @@ const authoredTrainingLessons: AuthoredLesson[] = [
   },
   {
     id: "facturas-personales",
-    version: 3,
+    version: 4,
     module: "Gestión personal",
     title: "Mis facturas",
     access: {
@@ -177,7 +177,7 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     description: "Seguí tu base, autorizaciones y comprobantes del mes.",
     explanation: [
       "Elegí el período y revisá la base publicada por Operaciones. Seguí la etapa habilitada: enviar importe, esperar autorización y cargar el comprobante cuando corresponda a tu modalidad.",
-      "Si cobrás una parte en USD, ingresá el TC bancario solicitado para ese tramo. Después del cobro, confirmá recepción y el segundo TC antes de avanzar al tramo ARS. Si tu modalidad es solo ARS, no se exige ese TC.",
+      "Operaciones define si cobrás en ARS, USD + ARS o USD, y si el período requiere factura. En USD directo se usa el importe en dólares de tu cierre.",
       "Revisá los adicionales ya incluidos por Operaciones para no duplicarlos. Agregá únicamente extras nuevos con su motivo. Un importe enviado no equivale a una factura aprobada.",
     ],
     example:
@@ -192,14 +192,11 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     instructions: [
       "Operaciones prepara y publica tu base del mes: horas, tarifa, porcentaje a cobrar en USD y adicionales. Cuando recibas el aviso, abrí Mis facturas y elegí ese período. Si falta la base, pedí su revisión a Operaciones.",
       "Revisá la base publicada, la modalidad de cobro y los bonos o extras ya incluidos. Si detectás una diferencia, consultala antes de enviar importes.",
-      "Si hay tramo USD y emitís factura, ingresá el tipo de cambio comprador más bajo de tu banco del día en que vas a facturar. Si tu modalidad no exige factura, usá el TC de conversión indicado para la liquidación. Revisá el importe calculado y pulsá Enviar importe a Operaciones.",
-      "Esperá la autorización de Operaciones. Si el importe es devuelto, corregí los datos y reenviá. Cuando esté autorizado y tu modalidad requiera factura, adjuntá el comprobante en la moneda y por el importe autorizado y pulsá Enviar a Administración.",
-      "Administración revisa el documento. Consultá su estado y, si lo devuelve, corregí esa presentación con Reemplazar y reenviar para evitar duplicados. La autorización del importe y la aprobación del documento son pasos distintos.",
-      "En una modalidad mixta, después de recibir los USD y de completar la aprobación del tramo anterior, marcá Ya recibí los USD en mi cuenta e ingresá el TC comprador más bajo de tu banco de ese día. Declarar este segundo TC permite calcular el saldo ARS.",
-      "En el tramo ARS, agregá únicamente extras nuevos y comisiones que correspondan, con su motivo. No repitas los adicionales incluidos por Operaciones. Revisá el importe y envialo a Operaciones; después de su autorización, presentá la factura en pesos si corresponde.",
-      "Si cobrás solo ARS, comenzá directamente por Tu factura en pesos o Tu liquidación en pesos: no se requieren los dos TC. Si tu modalidad no exige factura, completá las autorizaciones de liquidación sin emitir ni adjuntar documentos."
+      "Seguí la modalidad publicada. ARS: revisá el importe en pesos y agregá extras si corresponden. USD + ARS: completá el TC del tramo USD y, después de cobrar, confirmá la recepción, el TC del cobro y los extras para calcular el saldo ARS. USD: si la base fue cerrada directamente en dólares, confirmá ese importe sin ingresar TC. Enviá cada importe a Operaciones.",
+      "Esperá la autorización de Operaciones. Si te devuelven el importe, corregilo y reenviá. Una vez autorizado, adjuntá el comprobante en la moneda publicada si tu modalidad requiere factura.",
+      "Administración revisa el comprobante. Si lo devuelve, usá Reemplazar y reenviar para corregir esa presentación."
     ],
-    verification: "Usá el período correcto, un TC positivo y la moneda de cada tramo. Un saldo negativo requiere revisión de Operaciones antes de emitir. Los adicionales ya incluidos nunca se vuelven a declarar.",
+    verification: "Usá el período correcto y la moneda de cada tramo. Un saldo negativo requiere revisión de Operaciones antes de emitir. Los adicionales ya incluidos nunca se vuelven a declarar.",
   },
   {
     id: "crm",
@@ -352,7 +349,7 @@ const authoredTrainingLessons: AuthoredLesson[] = [
   },
   {
     id: "proyectos-tareas",
-    version: 3,
+    version: 4,
     module: "Proyectos y tareas",
     title: "Proyectos de tareas: lista y kanban",
     access: {
@@ -368,7 +365,7 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     explanation: [
       "La lista permite encontrar y abrir proyectos de tareas. El kanban de proyectos agrupa esos proyectos por etapa operativa; no es una vista de estados de las tareas individuales.",
       "Dentro del proyecto, las secciones organizan las tareas. El completado se registra sobre cada tarea y no depende del nombre de su sección.",
-      "Cartera de proyectos es la vista de gestión económica y requiere permisos de Proyectos y Operaciones. Si no aparece, solicitá una revisión de permisos; los filtros o asignaciones también pueden limitar la lista de tareas."
+      "Los filtros y tus asignaciones determinan qué proyectos aparecen en la lista."
     ],
     example:
       "Buscás la campaña de Acme. Revisás filtros, abrís el proyecto y ubicás las tareas en su sección correspondiente.",
@@ -385,10 +382,9 @@ const authoredTrainingLessons: AuthoredLesson[] = [
     ],
     instructions: [
       "Entrá a Proyectos de tareas o Mis proyectos. La lista sirve para buscar un proyecto y abrir sus tareas; revisá filtros y asignaciones si no lo encontrás.",
-      "Abrí el kanban de proyectos para consultar la etapa operativa de cada proyecto. Sus columnas representan etapas de proyectos, no tareas individuales ni rentabilidad financiera.",
+      "Abrí el kanban de proyectos para consultar la etapa operativa de cada proyecto. Sus columnas representan las etapas operativas de los proyectos.",
       "Dentro de un proyecto, revisá sus miembros y tareas y organizá el trabajo en secciones. Abrí cada tarea para revisar responsable, vencimiento y estado.",
       "Completá una tarea usando su control de completado. Cambiar el nombre de una sección o la etapa de un proyecto no completa automáticamente sus tareas.",
-      "Si necesitás presupuesto, costos o rentabilidad, usá Cartera de proyectos cuando tu perfil tenga Proyectos y Operaciones. Sus datos financieros se consultan aparte del kanban de tareas."
     ],
     verification:
       "La lista depende de filtros y de los proyectos habilitados para tu cuenta.",

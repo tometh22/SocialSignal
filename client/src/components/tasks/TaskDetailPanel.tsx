@@ -1,3 +1,4 @@
+import { statusSourcePath } from "@/lib/status-source";
 import { taskHourAttribution } from "@shared/utils/task-hour-owner";
 import { mergeTaskAssignment } from "@/lib/task-detail-cache";
 import { taskDateBucket } from "@shared/utils/task-date-bucket";
@@ -949,6 +950,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                   {/* Descripción */}
                   <div>
                     <p className="text-[11px] text-muted-foreground mb-1.5">Descripción</p>
+                    {statusSourcePath(task.description) && <a className="mb-2 inline-block text-xs text-primary underline" href={statusSourcePath(task.description)} target="_blank" rel="noreferrer">Abrir tema de Status</a>}
                     <Textarea
                       key={`desc-${taskId}`}
                       defaultValue={task.description || ""}

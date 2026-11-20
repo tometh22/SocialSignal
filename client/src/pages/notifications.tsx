@@ -42,7 +42,7 @@ type NotificationGroup = { key: string; items: ProductNotification[]; latest: Pr
 type PushTestStatus = { kind: "success" | "warning" | "error"; message: string };
 
 const categories: { key: Category; label: string; detail: string }[] = [
-  { key: "mind", label: "Conversaciones en Mind", detail: "Respuestas en los espacios que seguís" },
+  { key: "mind", label: "Conversaciones en Mind", detail: "Menciones y respuestas en tus temas" },
   { key: "daily", label: "Dailies", detail: "Cuando alguien completa una daily en tus espacios" },
   { key: "tasks", label: "Tareas", detail: "Asignaciones y nuevas respuestas" },
   { key: "crm", label: "CRM", detail: "Recordatorios asignados a vos" },

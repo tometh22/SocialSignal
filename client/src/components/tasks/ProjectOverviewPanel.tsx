@@ -1,4 +1,3 @@
-import { usePermissions } from "@/hooks/use-permissions";
 import { parseTaskCivilDate } from "@shared/utils/task-civil-date";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -86,7 +85,6 @@ function StatCard({ icon: Icon, label, value, sub, color }: {
 }
 
 export default function ProjectOverviewPanel({ projectId, members, projectColor, canManageMembers, onManageMembers }: Props) {
-  const { isOperations } = usePermissions();
   const [selectedSection, setSelectedSection] = useState<string>("all");
 
   // Si el usuario navega de un proyecto a otro sin desmontar este componente,
@@ -96,9 +94,9 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
     setSelectedSection("all");
   }, [projectId]);
 
-  const { data, isLoading } = useQuery<{ tasks: Task[]; sections: Record<string, Task[]> }>({
-    queryKey: ["/api/tasks/project", projectId],
-    queryFn: () => authFetchJson(`/api/tasks/project/${projectId}?layout=flat`),
+  const { data, isLoading } = useQuery<{ tasks: Task[]; sections: Record<string, Task[]>; hoursByPerson: { taskId: number; personnelId: number; hours: number }[] }>({
+    queryKey: ["/api/tasks/project", projectId, "hours-by-person"],
+    queryFn: () => authFetchJson(`/api/tasks/project/${projectId}?layout=flat&includeHoursByPerson=true`),
     enabled: !!projectId,
   });
 
@@ -125,7 +123,13 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
   ).length;
   const unassigned = allTasks.filter((t) => !t.assigneeId && t.status !== "done").length;
   const visibleTaskIds = new Set(allTasks.map(task => task.id));
-  const totalLogged = allTasks.filter(task => !task.parentTaskId || !visibleTaskIds.has(task.parentTaskId)).reduce((sum, task) => sum + (task.loggedHours || 0), 0);
+  const actualHours = new Map<number, number>();
+  let totalLogged = 0;
+  for (const row of data?.hoursByPerson ?? []) {
+    if (!visibleTaskIds.has(row.taskId)) continue;
+    actualHours.set(row.personnelId, (actualHours.get(row.personnelId) ?? 0) + row.hours);
+    totalLogged += row.hours;
+  }
   const totalEstimated = allTasks.reduce(
     (sum, task) => sum + Number(task.estimatedHoursTotal ?? 0),
     0,
@@ -145,7 +149,7 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
     const mTasks = allTasks.filter((t) => t.assigneeId === m.personnelId);
     const mDone = mTasks.filter((t) => t.status === "done").length;
     const mPending = mTasks.filter((t) => t.status !== "done" && t.status !== "cancelled").length;
-    const mLogged = mTasks.reduce((s, t) => s + (t.loggedHours || 0), 0);
+    const mLogged = actualHours.get(m.personnelId) ?? 0;
     const mEstimated = allTasks
       .filter((task) => task.assigneeId === m.personnelId)
       .reduce((sum, task) => sum + Number(task.estimatedHoursTotal ?? 0), 0);
@@ -180,7 +184,7 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
         <StatCard icon={Clock} label="Pendientes" value={pending} color="bg-blue-500" />
         <StatCard icon={AlertCircle} label="En progreso" value={inProgress} color="bg-amber-500" />
         <StatCard icon={CheckCircle2} label="Completadas" value={done} color="bg-green-500" />
-        <StatCard icon={Timer} label={isOperations ? "Horas registradas" : "Tus horas registradas"} value={formatHours(totalLogged)} sub={totalEstimated > 0 ? `de ${formatHours(totalEstimated)} estimadas` : undefined} />
+        <StatCard icon={Timer} label="Horas registradas del equipo" value={formatHours(totalLogged)} sub={totalEstimated > 0 ? `de ${formatHours(totalEstimated)} estimadas` : undefined} />
       </div>
 
       {/* Overdue + unassigned alerts */}
@@ -280,7 +284,7 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
                   <th className="text-center px-3 py-2.5 font-medium">Completadas</th>
                   <th className="text-center px-3 py-2.5 font-medium">Pendientes</th>
                   <th className="text-center px-3 py-2.5 font-medium hidden sm:table-cell">Progreso</th>
-                  {isOperations && <th className="text-right px-5 py-2.5 font-medium">Horas</th>}
+                  <th className="text-right px-5 py-2.5 font-medium">Horas</th>
                 </tr>
               </thead>
               <tbody>
@@ -318,12 +322,12 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
                           <span className="text-xs text-muted-foreground w-8 text-right">{pct}%</span>
                         </div>
                       </td>
-                      {isOperations && <td className="px-5 py-3 text-right">
+                      <td className="px-5 py-3 text-right">
                         <span className="text-foreground font-medium">{formatHours(m.logged)}</span>
                         {m.estimated > 0 && (
                           <span className="text-muted-foreground text-xs"> / {formatHours(m.estimated)}</span>
                         )}
-                      </td>}
+                      </td>
                     </tr>
                   );
                 })}

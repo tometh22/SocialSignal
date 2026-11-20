@@ -597,7 +597,7 @@ export default function ProjectTasksPage({ params }: Props) {
 
       {/* Members management sheet */}
       {canManageProject && <Sheet open={membersOpen} onOpenChange={setMembersOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md">
+        <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
@@ -606,7 +606,7 @@ export default function ProjectTasksPage({ params }: Props) {
             <p className="text-sm text-muted-foreground">{project.clientName ? `${project.clientName} · ` : ""}{project.name}</p>
           </SheetHeader>
 
-          <div className="space-y-4 mt-6">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto mt-6 pr-1">
             {/* Add member form */}
             <div className="bg-muted/30 rounded-xl p-3 space-y-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Agregar miembro</p>

@@ -6,6 +6,7 @@ import { exchangeRates, personnelHistoricalCosts, systemConfig } from "@shared/s
 export type CanonicalPersonnelRate = {
   hourlyRateARS: number | null;
   hourlyRateUSD: number | null;
+  monthlySalaryUSD?: number | null;
   exchangeRate: number | null;
   exchangeRateId: number | null;
   sourcePeriod: string | null;
@@ -33,6 +34,7 @@ export async function resolveCanonicalPersonnelRate(
       month: personnelHistoricalCosts.month,
       hourlyRateARS: personnelHistoricalCosts.hourlyRateARS,
       hourlyRateUSD: personnelHistoricalCosts.hourlyRateUSD,
+      monthlySalaryUSD: personnelHistoricalCosts.monthlySalaryUSD,
     })
     .from(personnelHistoricalCosts)
     .where(and(
@@ -63,12 +65,14 @@ export async function resolveCanonicalPersonnelRate(
   const hourlyRateUSD = historicalRate.hourlyRateUSD == null
     ? null
     : Number(historicalRate.hourlyRateUSD);
+  const monthlySalaryUSD = historicalRate.monthlySalaryUSD == null ? null : Number(historicalRate.monthlySalaryUSD);
   const sourcePeriod = `${historicalRate.year}-${String(historicalRate.month).padStart(2, "0")}`;
 
   if (hourlyRateARS != null && hourlyRateARS > 0) {
     return {
       hourlyRateARS,
       hourlyRateUSD,
+      monthlySalaryUSD,
       exchangeRate: null,
       exchangeRateId: null,
       sourcePeriod,
@@ -99,6 +103,7 @@ export async function resolveCanonicalPersonnelRate(
       return {
         hourlyRateARS: hourlyRateUSD * exchangeRate,
         hourlyRateUSD,
+        monthlySalaryUSD,
         exchangeRate,
         exchangeRateId: fx?.id ?? null,
         sourcePeriod,
@@ -108,6 +113,7 @@ export async function resolveCanonicalPersonnelRate(
     return {
       hourlyRateARS: null,
       hourlyRateUSD,
+      monthlySalaryUSD,
       exchangeRate: null,
       exchangeRateId: null,
       sourcePeriod,
@@ -118,6 +124,7 @@ export async function resolveCanonicalPersonnelRate(
   return {
     hourlyRateARS: null,
     hourlyRateUSD,
+    monthlySalaryUSD,
     exchangeRate: null,
     exchangeRateId: null,
     sourcePeriod,

@@ -1,9 +1,10 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { createUserNotifications } from "./user-notifications";
 import { db } from "../db";
 import { projectStatusReviews, weeklyStatusItems, statusUpdateEntries, statusChangeLog } from "@shared/schema";
 
 /** One atomic write for the canonical state, its update entry, and its audit event. */
-export async function saveStatusCurrentAction(roomId: number, reference: { projectId: number } | { customId: number }, content: string, userId: number, expected?: string | null) {
+export async function saveStatusCurrentAction(roomId: number, reference: { projectId: number } | { customId: number }, content: string, userId: number, expected?: string | null, mentionIds: number[] = []) {
   const value = content.trim();
   return db.transaction(async tx => {
     const projectId = 'projectId' in reference ? reference.projectId : null;
@@ -22,8 +23,56 @@ export async function saveStatusCurrentAction(roomId: number, reference: { proje
         ? await tx.update(projectStatusReviews).set(update).where(eq(projectStatusReviews.id, current.id)).returning()
         : await tx.insert(projectStatusReviews).values({ roomId, projectId, ...update }).returning();
     } else [saved] = await tx.update(weeklyStatusItems).set(update).where(eq(weeklyStatusItems.id, customId!)).returning();
-    await tx.insert(statusUpdateEntries).values({ roomId, projectId, weeklyStatusItemId: customId, content: value, authorId: userId });
+    const [entry] = await tx.insert(statusUpdateEntries).values({ roomId, projectId, weeklyStatusItemId: customId, content: value, authorId: userId }).returning({ id: statusUpdateEntries.id });
+    if (mentionIds.length) {
+      const itemKey = projectId != null ? `p_${projectId}` : `c_${customId}`;
+      await createUserNotifications(mentionIds.filter(id => id !== userId), {
+        eventKey: `mind-mention:${entry.id}`,
+        type: "mind_mention",
+        title: "Te mencionaron en Status",
+        message: "Abrí el tema para leer la actualización.",
+        entityType: "review_room",
+        entityId: roomId,
+        actionUrl: `/review/${roomId}?item=${itemKey}&updateId=${entry.id}`,
+      }, tx);
+    }
     await tx.insert(statusChangeLog).values({ roomId, projectId, weeklyStatusItemId: customId, userId, fieldName: 'currentAction', oldValue: current?.currentAction ?? null, newValue: value });
     return saved;
+  });
+}
+
+
+export async function editStatusUpdate(roomId: number, entryId: number, authorId: number, content: string) {
+  return db.transaction(async tx => {
+    const where = and(eq(statusUpdateEntries.id, entryId), eq(statusUpdateEntries.roomId, roomId));
+    const [target] = await tx.select().from(statusUpdateEntries).where(where);
+    if (!target) throw Object.assign(new Error("Update no encontrado"), { statusCode: 404 });
+    if (target.authorId !== authorId) throw Object.assign(new Error("Solo el autor puede editarlo"), { statusCode: 403 });
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${roomId}, ${target.projectId ?? target.weeklyStatusItemId!})`);
+    const [entry] = await tx.select().from(statusUpdateEntries).where(where).for("update");
+    if (!entry) throw Object.assign(new Error("Update no encontrado"), { statusCode: 404 });
+    const item = entry.projectId != null
+      ? eq(statusUpdateEntries.projectId, entry.projectId)
+      : eq(statusUpdateEntries.weeklyStatusItemId, entry.weeklyStatusItemId!);
+    const [latest] = await tx.select({ id: statusUpdateEntries.id }).from(statusUpdateEntries)
+      .where(and(eq(statusUpdateEntries.roomId, roomId), item))
+      .orderBy(desc(statusUpdateEntries.createdAt), desc(statusUpdateEntries.id)).limit(1);
+
+    if (latest?.id === entryId && entry.content !== content) {
+      const values = { currentAction: content, updatedBy: authorId, updatedAt: new Date() };
+      if (entry.projectId != null) {
+        await tx.update(projectStatusReviews).set(values).where(and(
+          eq(projectStatusReviews.roomId, roomId), eq(projectStatusReviews.projectId, entry.projectId),
+          eq(projectStatusReviews.currentAction, entry.content),
+        ));
+      } else {
+        await tx.update(weeklyStatusItems).set(values).where(and(
+          eq(weeklyStatusItems.roomId, roomId), eq(weeklyStatusItems.id, entry.weeklyStatusItemId!),
+          eq(weeklyStatusItems.currentAction, entry.content),
+        ));
+      }
+    }
+    const [updated] = await tx.update(statusUpdateEntries).set({ content }).where(where).returning();
+    return updated;
   });
 }

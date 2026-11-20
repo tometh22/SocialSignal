@@ -19,10 +19,11 @@ describe("Asana module QA: production hours presentation", () => {
   it.each([[1 / 60, "1m"], [19 / 60, "19m"], [32 / 60, "32m"], [1.999, "2h"], [1.15, "1h 9m"], [0, "0h"]])("formats %s hours as %s", (hours, label) => {
     expect(formatTaskHoursLabel(Number(hours))).toBe(label);
   });
-  it("renders civil week and entry dates and includes every matrix project", () => {
+  it("renders civil weeks and period totals per task and includes every matrix project", () => {
     const page = source("client/src/pages/hours-dashboard.tsx");
     expect(page).toContain("parseTaskCivilDate(w.week)");
-    expect(page).toContain("parseTaskCivilDate(entry.date)");
+    expect(page).toContain("row.hours += Number(entry.hours)");
+    expect(page).toContain("Total del período");
     expect(page).not.toContain("byProject.slice(0, 5)");
     expect(page).not.toContain("{entry.hours}h");
   });

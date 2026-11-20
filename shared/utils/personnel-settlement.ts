@@ -1,6 +1,9 @@
+import { contractualMonthlyHours } from "./payroll-hours";
+
 export type PersonnelSettlementInputs = {
   billingCurrencySnapshot?: string;
   totalARS: number;
+  directUSD?: { base: number; referenceFx: number | null };
   usdPercentage: number;
   bonusARS?: number | null;
   bonusUSD?: number | null;
@@ -40,6 +43,17 @@ export function calculatePersonnelSettlement(input: PersonnelSettlementInputs): 
   const invoiceFx = Number(input.invoiceFx) > 0 ? Number(input.invoiceFx) : null;
   const receivedFx = Number(input.receivedFx) > 0 ? Number(input.receivedFx) : null;
 
+  if (input.billingCurrencySnapshot?.toUpperCase() === "USD" && input.directUSD) {
+    const { base, referenceFx } = input.directUSD;
+    const arsExtras = bonusARS + extrasARS;
+    const total = arsExtras > 0 && !referenceFx ? null : money(base + bonusUSD + (referenceFx ? arsExtras / referenceFx : 0));
+    return {
+      plannedUSDARS: 0, baseInvoiceUSD: base, totalInvoiceUSD: total, pesifiedBaseARS: null, finalInvoiceARS: 0,
+      financialCostARS: total != null && referenceFx ? money(total * referenceFx) : null,
+      financialCostUSD: total,
+    };
+  }
+
   const plannedUSDARS = money(totalARS * usdPercentage / 100);
   const hasUSD = plannedUSDARS > 0 || bonusUSD > 0;
   const baseInvoiceUSD = !hasUSD ? 0 : invoiceFx ? money(plannedUSDARS / invoiceFx) : null;
@@ -73,4 +87,36 @@ export function calculatePersonnelSettlement(input: PersonnelSettlementInputs): 
     financialCostARS,
     financialCostUSD,
   };
+}
+
+
+/** Prepare a USD base from the native historical rate, with optional ARS valuation for reporting. */
+export function nativeUsdClosing(
+  person: Parameters<typeof contractualMonthlyHours>[0],
+  hours: number,
+  rate: { hourlyRateUSD: number | null; monthlySalaryUSD?: number | null },
+  exchangeRate: number | null,
+) {
+  const monthlySalary = Number(rate.monthlySalaryUSD);
+  const contractualHours = contractualMonthlyHours(person);
+  const hasFixedSalary = person.contractType !== "freelance" && monthlySalary > 0 && Number.isFinite(monthlySalary);
+  const hourlyRateUSD = hasFixedSalary ? monthlySalary / contractualHours : rate.hourlyRateUSD;
+  if (hourlyRateUSD == null || !Number.isFinite(hourlyRateUSD) || hourlyRateUSD <= 0) return null;
+  const fx = exchangeRate && exchangeRate > 0 ? exchangeRate : null;
+  const totalUSD = money(hasFixedSalary ? monthlySalary * (hours / contractualHours) : hours * hourlyRateUSD);
+  const totalARS = fx ? money(totalUSD * fx) : null;
+  return {
+    hourlyRate: hourlyRateUSD, billingCurrency: "USD", usdBillingFraction: 1,
+    exchangeRateAtClose: fx, totalCostUSD: totalUSD, grandTotalUSD: totalUSD,
+    totalCostARS: 0, grandTotalARS: totalARS, totalCost: totalARS ?? 0,
+  };
+}
+
+/** Read the amount already frozen by Cierre del equipo. */
+export function closedUsdBase(closing: { billingCurrency?: string | null; totalCostUSD?: number | null; grandTotalUSD?: number | null; exchangeRateAtClose?: number | null } | null) {
+  if (closing?.billingCurrency?.toUpperCase() !== "USD") return undefined;
+  const base = closing.totalCostUSD ?? closing.grandTotalUSD;
+  if (base == null || !Number.isFinite(base) || base < 0) return undefined;
+  const fx = closing.exchangeRateAtClose;
+  return { base: money(base), referenceFx: fx && fx > 0 ? fx : null };
 }

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-for (const index of [1, 3]) test(`a project member with ${index === 3 ? "task_manager" : "projects"} permission can rename and duplicate collapsed and empty sections`, async ({ page }) => {
+for (const index of [1, 3]) test(`a project member with ${index === 3 ? "task_manager" : "projects"} permission can move, fold and delete sections without losing logged hours`, async ({ page }) => {
   const request = page.request;
   expect((await request.post("/api/login", { data: { email: `e2e-${index}@example.test`, password: "mind-local-test-only" } })).ok()).toBeTruthy();
   const projects = await (await request.get("/api/tasks/projects")).json();
@@ -8,18 +8,19 @@ for (const index of [1, 3]) test(`a project member with ${index === 3 ? "task_ma
   expect(project).toBeTruthy();
   const path = `/api/tasks/project/${project.id}`;
   const original = await (await request.get(path)).json();
-  expect(original).toMatchObject({ canManageSections: false, canEditSections: true });
+  expect(original).toMatchObject({ canManageSections: true, canEditSections: true });
 
-  // Membership permits section edits, but neither edits in another project nor section deletion.
+  // Section permissions stay scoped to the member’s project.
   expect((await request.put("/api/tasks/section/rename", { data: { projectId: 2, oldName: "General", newName: "Ajena" } })).status()).toBe(403);
   expect((await request.post("/api/tasks/section/duplicate", { data: { projectId: 2, sectionName: "General", newName: "Ajena" } })).status()).toBe(403);
-  expect((await request.delete("/api/tasks/section", { data: { projectId: project.id, sectionName: "Capacitaciones" } })).status()).toBe(403);
+  expect((await request.delete("/api/tasks/section", { data: { projectId: project.id, sectionName: "Capacitaciones" } })).status()).toBe(409);
+  expect((await request.delete("/api/tasks/section", { data: { projectId: 2, sectionName: "General" } })).status()).toBe(403);
 
   await page.goto(`/tasks/projects/${project.id}`);
   await page.getByRole("button", { name: "Opciones de sección Capacitaciones", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Renombrar sección" })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Duplicar sección" })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Eliminar sección" })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Eliminar sección" })).toBeVisible();
   await page.getByRole("menuitem", { name: "Renombrar sección" }).click();
   await page.getByRole("textbox", { name: "Nombre de sección Capacitaciones", exact: true }).fill("Capacitaciones del equipo");
   await page.getByRole("textbox", { name: "Nombre de sección Capacitaciones", exact: true }).press("Enter");
@@ -48,6 +49,28 @@ for (const index of [1, 3]) test(`a project member with ${index === 3 ? "task_ma
   expect(state.sections["Vacía renombrada"]).toEqual([]);
   expect((await request.post("/api/tasks/section/duplicate", { data: { projectId: project.id, sectionName: "Vacía renombrada", newName: "Capacitaciones copia" } })).status()).toBe(409);
   expect((await request.post("/api/tasks/section/duplicate", { data: { projectId: project.id, sectionName: "Vacía renombrada", newName: "Vacía copia" } })).status()).toBe(201);
+
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Renombrar sección Vacía copia", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Contraer todas", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Desplegar sección Capacitaciones copia", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Desplegar todas", exact: true }).click();
+
+  const handle = page.locator(`[data-task-row="${root.id}"] [aria-roledescription="sortable"]`);
+  await handle.hover();
+  await handle.dragTo(page.getByRole("button", { name: "Renombrar sección Vacía copia", exact: true }));
+  await expect.poll(async () => {
+    const moved = await (await request.get(path)).json();
+    return moved.tasks.filter((task: any) => [root.id, child.id].includes(task.id)).map((task: any) => task.sectionName);
+  }).toEqual(["Vacía copia", "Vacía copia"]);
+  await page.getByRole("button", { name: "Opciones de sección Vacía copia", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Eliminar sección" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Eliminar", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Renombrar sección Vacía copia", exact: true })).toHaveCount(0);
+  await expect.poll(async () => {
+    const afterDelete = await (await request.get(path)).json();
+    return afterDelete.tasks.some((task: any) => [root.id, child.id].includes(task.id));
+  }).toBe(false);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();

@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ChevronRight,
   Command,
+  GraduationCap,
   Loader2,
   LogOut,
   Mail,
@@ -483,6 +484,11 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
                     </div>
                   </div>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild className="rounded-xl">
+                    <Link href="/training" className="flex items-center gap-2">
+                      <GraduationCap className="h-4 w-4" />Capacitación
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setProfileNameOpen(true)} className="rounded-xl">
                     <UserPen className="h-4 w-4" />
                     <span>Mi nombre</span>

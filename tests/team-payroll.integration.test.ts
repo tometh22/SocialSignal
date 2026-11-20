@@ -65,25 +65,29 @@ describe.skipIf(!setup.url)("team payroll workflow with PostgreSQL",()=>{
       expectedBase: { closingId: closing.id, hours: closing.adjusted_hours, totalARS: closing.grand_total_ars },
       earlyPublication: { confirmed: true, reason: "Facturación anticipada con base revisada" }, ...overrides };
   }
-  it("authorizes USD-only once, converts ARS additions at the same FX and rejects an ARS phase", async () => {
+  it("authorizes a native USD amount, values exceptional ARS extras at the closing reference and rejects an ARS phase", async () => {
+    await query("UPDATE personnel SET billing_currency='USD', monthly_hours=120; UPDATE personnel_historical_costs SET hourly_rate_ars=NULL, hourly_rate_usd=10, monthly_salary_usd=1200");
     await preparePayroll(period,2);
     const row=await savePersonnelSettlement(1,2,await publicationInput({billingCurrency:"USD",bonusUSD:3,bonusARS:1000,extrasARS:500}),earlyNow);
     expect(row.usdPercentage).toBe(100);expect(row.workflow.requiresInvoice).toBe(true);
     const sent=await changeSettlement(row.id,1,false,{phase:"usd",action:"submit",version:1,invoiceFx:1000,requiresInvoice:false});
     expect(sent.workflow.requiresInvoice).toBe(true);
-    expect(sent.totalInvoiceUSD).toBe(14.5);expect(sent.finalInvoiceARS).toBe(0);
+    expect(sent.invoiceFx).toBeNull();
+    expect(sent.totalInvoiceUSD).toBe(1204);expect(sent.finalInvoiceARS).toBe(0);
     const approved=await changeSettlement(row.id,2,true,{phase:"usd",action:"approve",version:2});
-    expect(assertSettlementInvoiceAllowed(approved,"usd","USD")).toBe(14.5);
+    expect(assertSettlementInvoiceAllowed(approved,"usd","USD")).toBe(1204);
     expect((await query("SELECT * FROM financial_payroll_pending")).rows).toHaveLength(1);
-    await query("INSERT INTO personal_monthly_invoices(settlement_id,invoice_currency,approval_status,declared_invoice_amount) VALUES($1,'USD','approved',14.5)",[row.id]);
+    await query("INSERT INTO personal_monthly_invoices(settlement_id,invoice_currency,approval_status,declared_invoice_amount) VALUES($1,'USD','approved',1204)",[row.id]);
     expect((await query("SELECT * FROM financial_payroll_pending")).rows).toHaveLength(0);
     await expect(changeSettlement(row.id,1,false,{phase:"ars",action:"submit",version:3})).rejects.toMatchObject({statusCode:400});
     expect(settlementProgress({closing:{id:1},settlement:approved,invoices:[{invoiceComponent:"usd",approvalStatus:"approved"}]}).group).toBe("done");
   });
-  it("completes authorized USD without a phantom invoice, and cannot upload a document in that mode", async () => {
+  it("closes a USD freelancer without any FX and authorizes it without an invoice", async () => {
+    await query("UPDATE personnel SET billing_currency='USD', contract_type='freelance'; UPDATE personnel_historical_costs SET hourly_rate_ars=NULL, hourly_rate_usd=20; DELETE FROM exchange_rates; INSERT INTO time_entries(project_id,personnel_id,date,hours,entry_type,total_cost,hourly_rate_at_time) VALUES(1,1,'2026-10-05',12,'hours',0,0)");
     await preparePayroll(period,2);
     const row=await savePersonnelSettlement(1,2,await publicationInput({billingCurrency:"USD",requiresInvoice:false}),earlyNow);
-    await changeSettlement(row.id,1,false,{phase:"usd",action:"submit",version:1,invoiceFx:1000});
+    expect(row.workflow.directUSD).toEqual({base:240,referenceFx:null});
+    await changeSettlement(row.id,1,false,{phase:"usd",action:"submit",version:1});
     const approved=await changeSettlement(row.id,2,true,{phase:"usd",action:"approve",version:2});
     expect(()=>assertSettlementInvoiceAllowed(approved,"usd","USD")).toThrow("sin factura");
     expect(settlementProgress({closing:{id:1},settlement:approved,invoices:[]})).toMatchObject({group:"done",label:"Liquidación autorizada sin factura"});

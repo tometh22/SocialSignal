@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, afterAll, describe, expect, it, vi } from 'vitest';
 import { Pool } from 'pg';
 import { getTableColumns, getTableName } from 'drizzle-orm';
-import { projectStatusReviews, weeklyStatusItems, statusUpdateEntries, statusChangeLog } from '../shared/schema';
+import { projectStatusReviews, weeklyStatusItems, statusUpdateEntries, statusChangeLog, reviewRooms, reviewRoomMembers, users, userNotifications, userNotificationPreferences, userNotificationThreadMutes, tasks, activeProjects, taskProjectMembers, personnel, crmLeads, quotations, quotationApprovals, quotationRevisions, personnelAbsences, personnelMonthlySettlements, monthlySettlementDeclarations } from '../shared/schema';
 const fixture = vi.hoisted(() => ({ url: process.env.FINANCIAL_TEST_DATABASE_URL, schema: `status_action_${process.pid}` }));
 if (fixture.url && !['localhost','127.0.0.1','[::1]'].includes(new URL(fixture.url).hostname)) throw new Error('Local test database required');
 vi.mock('../server/db', async () => {
@@ -10,18 +10,18 @@ vi.mock('../server/db', async () => {
   return {pool,db:drizzle(pool)};
 });
 import {pool} from '../server/db';
-import {saveStatusCurrentAction} from '../server/services/status-current-action';
+import {editStatusUpdate, saveStatusCurrentAction} from '../server/services/status-current-action';
 describe.skipIf(!fixture.url)('canonical Status and Daily state in PostgreSQL', () => {
   let admin: Pool;
   beforeAll(async () => {
     admin=new Pool({connectionString:fixture.url}); await admin.query(`CREATE SCHEMA ${fixture.schema}`);
-    for (const table of [projectStatusReviews,weeklyStatusItems,statusUpdateEntries,statusChangeLog]) {
+    for (const table of [projectStatusReviews,weeklyStatusItems,statusUpdateEntries,statusChangeLog,reviewRooms,reviewRoomMembers,users,userNotifications,userNotificationPreferences,userNotificationThreadMutes, tasks, activeProjects, taskProjectMembers, personnel, crmLeads, quotations, quotationApprovals, quotationRevisions, personnelAbsences, personnelMonthlySettlements, monthlySettlementDeclarations]) {
       const columns = Object.values(getTableColumns(table)).map(col => `"${col.name}" ${col.getSQLType()}${col.primary ? ' PRIMARY KEY' : ''}`);
       await pool.query(`CREATE TABLE "${getTableName(table)}" (${columns.join(',')})`);
     }
   });
   beforeEach(async () => {
-    await pool.query('TRUNCATE project_status_reviews,weekly_status_items,status_update_entries,status_change_log RESTART IDENTITY');
+    await pool.query('TRUNCATE project_status_reviews,weekly_status_items,status_update_entries,status_change_log,review_rooms,review_room_members,users,user_notifications RESTART IDENTITY');
     await pool.query("INSERT INTO project_status_reviews(room_id,project_id,current_action,next_milestone) VALUES(1,100,'Anterior','Conservar historial'); INSERT INTO weekly_status_items(id,room_id,title,current_action) VALUES(10,1,'QA','Anterior')");
   });
   afterAll(async () => {await pool.end(); if(admin) {await admin.query(`DROP SCHEMA ${fixture.schema} CASCADE`);await admin.end();}});
@@ -46,6 +46,26 @@ describe.skipIf(!fixture.url)('canonical Status and Daily state in PostgreSQL', 
     finally {await pool.query('ALTER TABLE status_change_log DROP CONSTRAINT reject_test');}
     expect((await pool.query('SELECT current_action FROM project_status_reviews')).rows[0].current_action).toBe('Primero');
     expect((await pool.query('SELECT count(*)::int n FROM status_update_entries')).rows[0].n).toBe(1);
+  });
+  it('notifies the selected active member only and deep-links to the update', async () => {
+    await pool.query(`
+      INSERT INTO users(id,is_active,permissions) VALUES(2,true,'{status}'),(3,true,'{status}'),(4,true,'{status}'),(5,false,'{status}'),(6,true,'{}');
+      INSERT INTO review_rooms(id,name) VALUES(1,'Daily');
+      INSERT INTO review_room_members(room_id,user_id) VALUES(1,2),(1,3),(1,5),(1,6);
+    `);
+    await saveStatusCurrentAction(1,{customId:10},'Seguimiento con @Ana',2,'Anterior',[2,3,3,4,5,6]);
+    expect((await pool.query("SELECT user_id,type,action_url FROM user_notifications")).rows).toEqual([
+      { user_id: 3, type: "mind_mention", action_url: "/review/1?item=c_10&updateId=1" },
+    ]);
+  });
+  it('syncs edits to the current update while preserving other updates as history', async () => {
+    await saveStatusCurrentAction(1,{customId:10},'Primero',2);
+    await saveStatusCurrentAction(1,{customId:10},'Último',2);
+    await editStatusUpdate(1,1,2,'Corrección del primero');
+    expect((await pool.query('SELECT current_action FROM weekly_status_items')).rows[0].current_action).toBe('Último');
+    await expect(editStatusUpdate(1,2,3,'Ajeno')).rejects.toMatchObject({statusCode:403});
+    await editStatusUpdate(1,2,2,'Corrección del último');
+    expect((await pool.query('SELECT current_action FROM weekly_status_items')).rows[0].current_action).toBe('Corrección del último');
   });
   it('serializes concurrent edits of the same state', async () => {
     const edits=await Promise.allSettled(['A','B'].map(value=>saveStatusCurrentAction(1,{projectId:100},value,2,'Anterior')));

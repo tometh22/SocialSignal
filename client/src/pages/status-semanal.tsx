@@ -15,6 +15,8 @@ import AddItemButton, { type NewItemInput } from "@/components/review/AddStatusI
 import StatusText from "@/components/review/StatusText";
 import StatusFocusWorkspace from "@/components/review/StatusFocusWorkspace";
 import DailyDraftSuggestion from "@/components/review/DailyDraftSuggestion";
+import { useStatusMentions } from "@/components/review/useStatusMentions";
+import StatusFollowUpActions from "@/components/review/StatusFollowUpActions";
 import DailyStatusEditor from "@/components/review/DailyStatusEditor";
 import { useAutoResize } from "@/hooks/use-auto-resize-textarea";
 import RoomTitleEditor from "@/components/review/RoomTitleEditor";
@@ -1469,6 +1471,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                 )}
 
                 {/* Propuesta */}
+                {roomId && <StatusFollowUpActions source={{ title: item.title, text: item.currentAction ?? "", projectId: item.projectId, path: `/review/${roomId}?item=${item.key}` }} />}
                 <ProposalSection projectId={item.projectId} customId={item.customId} currentUserId={currentUserId} />
 
                 {/* Footer */}
@@ -1935,11 +1938,13 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
   const { user } = useAuth();
   const { toast } = useToast();
   const [newNote, setNewNote] = useState('');
+  const [publishUpdate, setPublishUpdate] = useState(true);
   const [editingEntry, setEditingEntry] = useState<{ id: number; type: 'note' | 'update' } | null>(null);
   const [editText, setEditText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const newNoteRef = useRef<HTMLTextAreaElement>(null);
   const editNoteRef = useRef<HTMLTextAreaElement>(null);
+  const mentions = useStatusMentions(newNote, setNewNote, newNoteRef);
   useAutoResize(newNoteRef, newNote);
   useAutoResize(editNoteRef, editText, editingEntry !== null);
   const currentUserId = (user as any)?.id;
@@ -1967,15 +1972,16 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
   });
   // The compact thread counts notes AND updates. Read the same update query here
   // so opening its history includes all counted entries, not just field changes.
+  const updatesUrl = projectId
+    ? `/api/status-semanal/${projectId}/updates`
+    : `/api/status-semanal/custom/${customItemId}/updates`;
   const updatesCacheKey = projectId
     ? ['/api/status-semanal', projectId, 'updates']
     : ['/api/status-semanal/custom', customItemId, 'updates'];
   const { data: updates = [], isLoading: updatesLoading, isError: updatesError } = useQuery<UpdateEntry[]>({
     queryKey: updatesCacheKey,
     queryFn: async () => {
-      const r = await authFetch(projectId
-        ? `/api/status-semanal/${projectId}/updates`
-        : `/api/status-semanal/custom/${customItemId}/updates`);
+      const r = await authFetch(updatesUrl);
       if (!r.ok) throw new Error('Error al obtener updates');
       return r.json();
     },
@@ -1988,14 +1994,17 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
   const hasError = activityError || updatesError;
 
   const addMutation = useMutation({
-    mutationFn: (content: string) => mutationFetch(notesUrl, 'POST', { content }),
+    mutationFn: (content: string) => mutationFetch(publishUpdate ? updatesUrl : notesUrl, 'POST', { content, ...(publishUpdate ? { mentionIds: mentions.mentionIds } : {}) }),
     onSuccess: () => {
+      setNewNote('');
+      mentions.reset();
+      queryClient.refetchQueries({ queryKey: updatesCacheKey });
       queryClient.refetchQueries({ queryKey: activityCacheKey });
       queryClient.refetchQueries({ queryKey: notesCacheKey });
       queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
       if (customItemId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
     },
-    onError: (err: Error) => toast({ title: 'Error al guardar comentario', description: err.message, variant: 'destructive' }),
+    onError: (err: Error) => toast({ title: 'No se pudo publicar', description: err.message, variant: 'destructive' }),
   });
 
   const deleteMutation = useMutation({
@@ -2023,12 +2032,13 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
     onError: (err: Error) => toast({ title: 'Error al editar comentario', description: err.message, variant: 'destructive' }),
   });
 
+  const query = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+  const entryToOpen = query.has("updateId") ? `mind-update-${query.get("updateId")}` : query.has("noteId") ? `mind-note-${query.get("noteId")}` : null;
   useEffect(() => {
-    const noteId = new URLSearchParams(window.location.search).get('noteId');
-    const target = noteId ? document.getElementById(`mind-note-${noteId}`) : null;
+    const target = entryToOpen ? document.getElementById(entryToOpen) : null;
     if (target) target.scrollIntoView({ behavior:'smooth',block:'center' });
     else bottomRef.current?.scrollIntoView({ behavior:'smooth' });
-  }, [timeline.length]);
+  }, [timeline.length, entryToOpen]);
 
   return (
     <div className="flex flex-col h-full">
@@ -2054,8 +2064,9 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
           if (entry.type === 'note' || entry.type === 'update') {
             const isOwn = currentUserId != null && entry.authorId === currentUserId;
             const isEditing = editingEntry?.id === entry.id && editingEntry.type === entry.type;
+            const entryElementId = `mind-${entry.type}-${entry.id}`;
             return (
-              <div id={entry.type === "note" ? `mind-note-${entry.id}` : undefined} key={`${entry.type}_${entry.id}`} data-testid={`activity-${entry.type}-${entry.id}`} className={cn("group flex gap-2 py-1 rounded-lg", typeof window !== "undefined" && new URLSearchParams(window.location.search).get("noteId") === String(entry.id) && entry.type === "note" && "bg-indigo-50 ring-2 ring-indigo-200")}>
+              <div id={entryElementId} key={`${entry.type}_${entry.id}`} data-testid={`activity-${entry.type}-${entry.id}`} className={cn("group flex gap-2 py-1 rounded-lg", entryToOpen === entryElementId && "bg-indigo-50 ring-2 ring-indigo-200")}>
                 <div className={cn("h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5", isOwn ? "bg-indigo-100 text-indigo-700" : "bg-teal-100 text-teal-700")}>
                   {initials(entry.authorName)}
                 </div>
@@ -2152,18 +2163,32 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
       </div>
 
       <div className="px-3 py-2 border-t border-border shrink-0 bg-slate-50/80">
-        <div className="flex gap-1.5 items-end">
-          <Textarea ref={newNoteRef} value={newNote} onChange={e => setNewNote(e.target.value)}
+        <label className="mb-2 inline-flex items-center gap-2 text-xs text-slate-600">
+          <input type="checkbox" checked={publishUpdate} onChange={event => { setPublishUpdate(event.target.checked); mentions.reset(); }} />
+          Actualizar el estado actual
+        </label>
+        <div className="relative flex gap-1.5 items-end">
+          <Textarea ref={newNoteRef} value={newNote}
+            {...(publishUpdate ? mentions.inputProps : { onChange: event => setNewNote(event.target.value) })}
             rows={embedded ? 4 : 1}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } } }}
-            placeholder="Escribí un comentario..." className={cn("resize-y overflow-auto flex-1 bg-white px-2.5 py-1.5 leading-relaxed", embedded ? "text-sm min-h-[100px]" : "text-[11px] min-h-[32px]")} />
-          <Button size="sm" onClick={() => { const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } }}
+            disabled={addMutation.isPending}
+            onKeyDown={event => {
+              if (publishUpdate) mentions.inputProps.onKeyDown(event);
+              if (event.defaultPrevented || event.nativeEvent.isComposing || event.key !== 'Enter' || event.shiftKey) return;
+              event.preventDefault();
+              if (newNote.trim() && !addMutation.isPending) addMutation.mutate(newNote.trim());
+            }}
+            placeholder={publishUpdate ? "Escribí una actualización…" : "Escribí un comentario…"}
+            className={cn("resize-y overflow-auto flex-1 bg-white px-2.5 py-1.5 leading-relaxed", embedded ? "text-sm min-h-[100px]" : "text-[11px] min-h-[32px]")} />
+          {publishUpdate && mentions.menu}
+          <Button size="sm" onClick={() => addMutation.mutate(newNote.trim())}
+            aria-label={publishUpdate ? "Publicar actualización" : "Enviar comentario"}
             disabled={!newNote.trim() || addMutation.isPending}
             className="bg-indigo-600 hover:bg-indigo-700 text-white h-7 w-7 p-0 shrink-0">
             {addMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
           </Button>
         </div>
-        <p className="text-[9px] text-muted-foreground mt-0.5">Enter para enviar · Shift+Enter nueva línea</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">{publishUpdate && "Escribí @ para mencionar · "}Enter para enviar · Shift+Enter nueva línea</p>
       </div>
     </div>
   );
@@ -2173,7 +2198,7 @@ function StatusFocusDetail({ item, users, currentUserId, roomId, onUpdate, onRes
   item: Item; users: AppUser[]; currentUserId: number | null; roomId?: number;
   onUpdate: (data: Record<string, any>) => void; onResolve: () => void; onRemove: () => void;
 }) {
-  const [tab, setTab] = useState<'overview' | 'activity'>(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).has('noteId') ? 'activity' : 'overview');
+  const [tab, setTab] = useState<'overview' | 'activity'>(() => typeof window !== "undefined" && /[?&](noteId|updateId)=/.test(window.location.search) ? 'activity' : 'overview');
   const { hasUnread, markAsRead } = useUnreadComments(item, roomId);
   useEffect(() => { if (tab === 'activity' && hasUnread) markAsRead(); }, [tab, hasUnread, markAsRead]);
   return <div className="flex flex-col flex-1 min-h-0" data-testid="status-focus-detail">
@@ -2224,6 +2249,7 @@ function StatusFocusDetail({ item, users, currentUserId, roomId, onUpdate, onRes
         {(item.updatedByName || item.updatedAt) && <p className="text-[11px] text-slate-400">{item.updatedByName && `Actualizado por ${item.updatedByName}`}{item.updatedAt && ` · ${shortDateTime(item.updatedAt)}`}</p>}
         {item.mainRisk && <div className="border-l-2 border-amber-300 pl-4"><p className="text-xs text-slate-400 mb-1">Riesgo a seguir</p><StatusText className="text-sm text-slate-600">{item.mainRisk}</StatusText></div>}
         {item.nextMilestone && <details className="text-sm text-slate-400"><summary className="cursor-pointer">Próximo paso anterior</summary><StatusText className="mt-3 text-slate-600">{item.nextMilestone}</StatusText></details>}
+        {roomId && <StatusFollowUpActions source={{ title: item.title, text: item.currentAction ?? "", projectId: item.projectId, path: `/review/${roomId}?item=${item.key}` }} />}
         <ProposalSection projectId={item.projectId} customId={item.customId} currentUserId={currentUserId} />
       </div> : <div className="max-w-4xl w-full mx-auto flex-1 min-h-0 py-4"><ActivityPanel embedded projectId={item.projectId} customItemId={item.customId} projectName={item.title} onClose={() => setTab('overview')} /></div>}
     </div>
@@ -2352,6 +2378,8 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   const [copied, setCopied] = useState(false);
   const [listening, setListening] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mentions = useStatusMentions(draft, setDraft, textareaRef);
+  const savingUpdate = useRef(false);
   const dateRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
 
@@ -2365,7 +2393,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   const item = entry ? { ...entry.item, ...(local.get(entry.item.key) ?? {}) } as Item : null;
 
   // The saved update belongs in the history, never in the new-message draft.
-  useEffect(() => { setDraft(''); setPicker(null); if (!done) setTimeout(() => textareaRef.current?.focus(), 30); }, [idx, done]);
+  useEffect(() => { setDraft(''); mentions.reset(); setPicker(null); if (!done) setTimeout(() => textareaRef.current?.focus(), 30); }, [idx, done]);
 
   const record = (it: Item, text: string) => {
     setChanges(prev => {
@@ -2379,7 +2407,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
 
   const postUpdate = async (it: Item, content: string) => {
     const url = it.projectId ? `/api/status-semanal/${it.projectId}/updates` : `/api/status-semanal/custom/${it.customId}/updates`;
-    await mutationFetch(url, 'POST', { content, expectedCurrentAction: it.currentAction });
+    await mutationFetch(url, 'POST', { content, expectedCurrentAction: it.currentAction, ...(mentions.mentionIds.length ? { mentionIds: mentions.mentionIds } : {}) });
     const key = it.projectId ? ['/api/status-semanal', it.projectId, 'updates'] : ['/api/status-semanal/custom', it.customId, 'updates'];
     queryClient.refetchQueries({ queryKey: key });
     queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
@@ -2387,9 +2415,10 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   };
 
   const next = async () => {
-    if (!item) return;
+    if (!item || savingUpdate.current) return;
     const t = draft.trim();
     if (t && t !== (item.currentAction ?? '').trim()) {
+      savingUpdate.current = true;
       try {
         await postUpdate(item, t);
         patchLocal(item, { currentAction: t });
@@ -2397,6 +2426,8 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
       } catch (err: any) {
         toast({ title: 'No se pudo guardar el update', description: err.message, variant: 'destructive' });
         return;
+      } finally {
+        savingUpdate.current = false;
       }
     }
     setIdx(i => i + 1);
@@ -2463,7 +2494,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   // Atajos: Enter guarda y avanza; Shift+Enter agrega una línea en el editor.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.isComposing) return;
+      if (e.defaultPrevented || e.isComposing || document.querySelector('[data-status-task-dialog]')) return;
       const el = document.activeElement as HTMLElement | null;
       const inText = el?.tagName === 'TEXTAREA' || el?.tagName === 'INPUT' || el?.tagName === 'SELECT' || el?.isContentEditable;
       if (e.key === 'Escape') { e.preventDefault(); if (picker) setPicker(null); else if (listening) toggleListening(); else onExit(); return; }
@@ -2593,8 +2624,9 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
               </div>
 
               <div className="mt-5">
-                <DailyStatusEditor itemKey={item.key} value={draft} onChange={setDraft}
+                <DailyStatusEditor itemKey={item.key} value={draft} mentionInput={mentions.inputProps} mentionMenu={mentions.menu}
                   textareaRef={textareaRef} listening={listening} onToggleListening={toggleListening} />
+                {roomId && <div className="mt-3"><StatusFollowUpActions key={item.key} source={{ title: item.title, text: draft.trim() || item.currentAction || "", projectId: item.projectId, path: `/review/${roomId}?item=${item.key}` }} /></div>}
                 <DailyDraftSuggestion key={item.key} kind={item.isCustom ? 'custom' : 'project'}
                   targetId={(item.isCustom ? item.customId : item.projectId)!} draft={draft}
                   onUse={text => { setDraft(text); textareaRef.current?.focus(); }} />
