@@ -55,13 +55,11 @@ function StatusTaskDialog({ source, isOperations, onClose }: { source: StatusSou
   });
   const project = projects.data?.find(item => item.id === projectId);
   const create = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("/api/tasks", "POST", {
+    mutationFn: (): Promise<{ id: number; projectId: number }> =>
+      apiRequest("/api/tasks", "POST", {
         title: title.trim(), projectId, assigneeId: assigneeId || null,
         dueDate: dueDate || null, description: [description.trim(), `Status: ${source.path}`].filter(Boolean).join("\n\n"),
-      });
-      return response.json() as Promise<{ id: number; projectId: number }>;
-    },
+      }),
     onSuccess: task => {
       setCreated(task);
       void queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
