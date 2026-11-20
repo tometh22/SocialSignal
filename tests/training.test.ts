@@ -74,7 +74,7 @@ describe("training access and curriculum", () => {
     );
     expect(new Set(trainingLessons.map((l) => l.module)).size).toBe(8);
     for (const lesson of trainingLessons) {
-      expect(lesson.version).toBe(3);
+      expect(lesson.version).toBe(["facturas-personales", "proyectos-tareas"].includes(lesson.id) ? 4 : 3);
       expect(lesson.instructions.length).toBeGreaterThanOrEqual(3);
       expect(lesson.instructions.every((step) => step.length > 30)).toBe(true);
       expect(lesson.verification.length).toBeGreaterThan(20);

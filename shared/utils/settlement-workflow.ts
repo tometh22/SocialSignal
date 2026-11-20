@@ -3,6 +3,7 @@ export type SettlementStage = { status: "draft" | "pending" | "approved" | "reje
 export type SettlementWorkflow = {
   version: number;
   requiresInvoice?: boolean;
+  directUSD?: { base: number; referenceFx: number | null };
   publication?: { beforeCut: boolean; actorId: number; at: string; reason?: string };
   usd: SettlementStage;
   ars: SettlementStage;

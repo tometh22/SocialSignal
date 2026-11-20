@@ -40,7 +40,7 @@ export function notificationCategory(
   type: string,
 ): NotificationCategory | null {
   if (type === "mind_daily") return "daily";
-  if (type === "mind_reply") return "mind";
+  if (type === "mind_reply" || type === "mind_mention") return "mind";
   if (["task_assigned", "task_reply"].includes(type)) return "tasks";
   if (type === "crm_reminder") return "crm";
   if (
@@ -60,6 +60,7 @@ export const isActivityNotification = (type: string) =>
   ["mind_daily", "mind_reply", "task_reply"].includes(type);
 export const notificationTypes = [
   "mind_daily",
+  "mind_mention",
   "mind_reply",
   "task_assigned",
   "task_reply",

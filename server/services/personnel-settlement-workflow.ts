@@ -57,10 +57,10 @@ export async function changeSettlement(id: number, actorId: number, operations: 
     const updates: any = {};
     if (action === "submit") {
       if (flow[phase].status === "approved" || flow[phase].status === "pending") fail("El importe está enviado. Operaciones puede devolverlo con un motivo.");
-      if (phase === "usd") {
+      if (phase === "usd" && !flow.directUSD) {
         updates.invoiceFx = Number(input.invoiceFx);
         if (!Number.isFinite(updates.invoiceFx) || updates.invoiceFx <= 0) fail("Ingresá el TC comprador de tu banco al facturar", 400);
-      } else {
+      } else if (phase === "ars") {
         if (usesUSD) {
           const usdInvoice = invoices.find(i => (i.invoiceComponent === "usd" || i.invoiceCurrency === "USD") && i.approvalStatus === "approved");
           if (flow.requiresInvoice === false && flow.usd.status !== "approved") fail("Operaciones debe autorizar primero el importe USD.");
@@ -77,7 +77,7 @@ export async function changeSettlement(id: number, actorId: number, operations: 
         flow.extrasReason = String(input.extrasReason ?? "").trim().slice(0, 2000);
         if ((flow.extrasARS > 0 || updates.bankCommissionUSD > 0) && flow.extrasReason.length < 5) fail("Detallá el concepto de los extras o comisión", 400);
       }
-      const calc = calculatePersonnelSettlement({ ...row, ...updates, extrasARS: row.extrasARS + flow.extrasARS });
+      const calc = calculatePersonnelSettlement({ ...row, ...updates, directUSD: flow.directUSD, extrasARS: row.extrasARS + flow.extrasARS });
       const amount = phase === "usd" ? calc.totalInvoiceUSD : calc.finalInvoiceARS;
       if (amount == null) fail("Faltan datos para calcular el importe", 400);
       if (amount < 0) fail("El saldo ARS es negativo. Operaciones debe resolver la diferencia antes de emitir; no se genera una factura negativa.");

@@ -3,7 +3,7 @@ import { db } from "../db";
 import { financialAuditEvents, monthlyClosings, personnel, personnelMonthlySettlements, personalMonthlyInvoices } from "@shared/schema";
 import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
 import { settlementWorkflow } from "@shared/utils/settlement-workflow";
-import { calculatePersonnelSettlement } from "./personnel-settlement";
+import { calculatePersonnelSettlement, closedUsdBase } from "@shared/utils/personnel-settlement";
 import { lockSettlementPeriod, notifySettlement } from "./personnel-settlement-workflow";
 
 function fail(message: string, statusCode = 409): never {
@@ -58,7 +58,11 @@ export async function savePersonnelSettlement(personnelId: number, actorId: numb
     const bonusUSD = billingCurrency !== "ARS" ? nonNegative(input.bonusUSD, "Bono USD") : 0;
     const bonusARS = nonNegative(input.bonusARS, "Bono ARS");
     const extrasARS = nonNegative(input.extrasARS, "Extra ARS");
-    const calculated = calculatePersonnelSettlement({ billingCurrencySnapshot: billingCurrency, totalARS, usdPercentage, bonusUSD, bonusARS, extrasARS, invoiceFx: null, receivedFx: null, bankCommissionUSD: 0 });
+    const directUSD = billingCurrency === "USD" ? closedUsdBase(closing) : undefined;
+    if (billingCurrency === "USD" && !directUSD) fail("Prepará primero una base en USD en Cierre del equipo con la tarifa histórica en dólares.");
+    if (directUSD && !directUSD.referenceFx && bonusARS + extrasARS > 0) fail("Cargá los adicionales en USD o prepará la base con una cotización de referencia para convertir los adicionales en pesos.");
+    if (expected?.totalUSD !== undefined && expected.totalUSD !== (directUSD?.base ?? null)) fail("La base en USD cambió. Volvé a revisar el cierre.");
+    const calculated = calculatePersonnelSettlement({ directUSD, billingCurrencySnapshot: billingCurrency, totalARS, usdPercentage, bonusUSD, bonusARS, extrasARS, invoiceFx: null, receivedFx: null, bankCommissionUSD: 0 });
     const at = now.toISOString();
     const publication = flow.publication ?? (publish ? { beforeCut, actorId, at, ...(beforeCut ? { reason } : {}) } : undefined);
     const action = !publish ? "settlement_draft_saved" : current?.status === "published" ? "settlement_publication_updated" : beforeCut ? "settlement_published_early" : "settlement_published";
@@ -72,7 +76,7 @@ export async function savePersonnelSettlement(personnelId: number, actorId: numb
       status: publish ? "published" : "draft",
       publishedBy: publish ? actorId : current?.publishedBy ?? null,
       publishedAt: publish ? now : current?.publishedAt ?? null, updatedAt: now,
-      workflow: { ...settlementWorkflow(), requiresInvoice, version: flow.version + 1, publication, events: [...(flow.events ?? []), ...(publish ? [{ action, actorId, at, ...(beforeCut ? { reason: publication?.reason } : {}) }] : [])] },
+      workflow: { ...settlementWorkflow(), requiresInvoice, directUSD, version: flow.version + 1, publication, events: [...(flow.events ?? []), ...(publish ? [{ action, actorId, at, ...(beforeCut ? { reason: publication?.reason } : {}) }] : [])] },
     };
     const [saved] = await tx.insert(personnelMonthlySettlements).values({ personnelId, period, createdBy: actorId, ...values })
       .onConflictDoUpdate({ target: [personnelMonthlySettlements.personnelId, personnelMonthlySettlements.period], set: { ...values, invoiceFx: null, receivedFx: null, bankCommissionUSD: 0 } }).returning();
@@ -80,7 +84,7 @@ export async function savePersonnelSettlement(personnelId: number, actorId: numb
       periodKey: period, entityType: "personnel_settlement", entityId: saved.id, action, actorUserId: actorId,
       reason: beforeCut ? publication?.reason : null,
       beforeData: current ? { status: current.status, version: flow.version, totalARS: current.totalARS, billingCurrency: current.billingCurrencySnapshot, requiresInvoice: flow.requiresInvoice !== false } : null,
-      afterData: { personnelId, closingId: closing.id, status: saved.status, version: saved.workflow.version, totalARS, hours: hoursSnapshot, billingCurrency, requiresInvoice, beforeCut, operationalHoursRemainOpen: !cut },
+      afterData: { personnelId, closingId: closing.id, status: saved.status, version: saved.workflow.version, totalARS, totalUSD: directUSD?.base, hours: hoursSnapshot, billingCurrency, requiresInvoice, beforeCut, operationalHoursRemainOpen: !cut },
     });
     if (saved.status === "published") await notifySettlement(saved,"person","Tu cierre está listo: completá el siguiente paso",tx);
     return saved;

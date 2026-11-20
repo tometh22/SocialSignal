@@ -1,5 +1,5 @@
 import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -202,12 +202,20 @@ export default function HoursDashboardPage() {
     };
   })();
 
-  // Sorted entries for table
-  const allEntries = (summary?.entries || []).slice().sort((a: any, b: any) =>
-    new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
-  const totalPages = Math.ceil(allEntries.length / PAGE_SIZE);
-  const pagedEntries = allEntries.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const taskTotals = useMemo(() => {
+    const totals = new Map<string, { key: string; projectName: string; taskTitle: string; people: Set<string>; hours: number }>();
+    for (const entry of summary?.entries ?? []) {
+      const key = JSON.stringify([entry.projectId, entry.taskId ?? null]);
+      const row = totals.get(key) ?? { key, projectName: entry.projectName, taskTitle: entry.taskTitle, people: new Set<string>(), hours: 0 };
+      row.people.add(entry.personnelName);
+      row.hours += Number(entry.hours);
+      totals.set(key, row);
+    }
+    return [...totals.values()].sort((a, b) => b.hours - a.hours || a.taskTitle.localeCompare(b.taskTitle, "es"));
+  }, [summary?.entries]);
+  const totalPages = Math.ceil(taskTotals.length / PAGE_SIZE);
+  const currentPage = Math.min(page, Math.max(0, totalPages - 1));
+  const pagedEntries = taskTotals.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
   const handleFilterChange = () => setPage(0);
 
@@ -540,66 +548,45 @@ export default function HoursDashboardPage() {
             </div>
           </div>
 
-          {/* Entries table with pagination */}
           <div className="bg-card rounded-xl border overflow-hidden">
             <div className="px-4 py-3 border-b bg-muted/20 flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Entradas detalladas</h3>
-              <Badge variant="secondary">{allEntries.length} entradas</Badge>
+              <h3 className="text-sm font-semibold">Horas por tarea</h3>
+              <Badge variant="secondary">{taskTotals.length} filas</Badge>
             </div>
-
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b bg-muted/10">
-                    <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">Persona</th>
-                    <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground">Proyecto</th>
-                    <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground">Tarea</th>
-                    <th className="text-center px-3 py-2.5 font-semibold text-muted-foreground">Fecha</th>
-                    <th className="text-right px-4 py-2.5 font-semibold text-muted-foreground">Horas</th>
-                    <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground hidden md:table-cell">Descripción</th>
+                    <th className="px-4 py-2.5 text-left text-muted-foreground">Proyecto</th>
+                    <th className="px-3 py-2.5 text-left text-muted-foreground">Tarea</th>
+                    <th className="px-3 py-2.5 text-left text-muted-foreground">Personas</th>
+                    <th className="px-4 py-2.5 text-right text-muted-foreground">Total del período</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {pagedEntries.map((entry: any) => (
-                    <tr key={entry.id} className="hover:bg-accent/20 transition-colors">
-                      <td className="px-4 py-2.5 font-medium text-foreground">{entry.personnelName}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground max-w-[120px]">
-                        <span className="truncate block" title={entry.projectName}>{entry.projectName || "—"}</span>
-                      </td>
-                      <td className="px-3 py-2.5 text-muted-foreground max-w-[160px]">
-                        <span className="truncate block" title={entry.taskTitle}>{entry.taskTitle}</span>
-                      </td>
-                      <td className="px-3 py-2.5 text-center text-muted-foreground">
-                        {format(parseTaskCivilDate(entry.date), "dd/MM/yy")}
-                      </td>
-                      <td className="px-4 py-2.5 text-right font-semibold text-primary">
-                        {formatTaskHoursLabel(entry.hours)}
-                      </td>
-                      <td className="px-3 py-2.5 text-muted-foreground/70 hidden md:table-cell max-w-[180px]">
-                        {entry.description ? (
-                          <span className="truncate block" title={entry.description}>{entry.description}</span>
-                        ) : (
-                          <span className="opacity-40">—</span>
-                        )}
-                      </td>
+                  {pagedEntries.map(entry => (
+                    <tr key={entry.key} className="hover:bg-accent/20">
+                      <td className="px-4 py-2.5 text-muted-foreground">{entry.projectName}</td>
+                      <td className="px-3 py-2.5 font-medium">{entry.taskTitle}</td>
+                      <td className="px-3 py-2.5 text-muted-foreground">{[...entry.people].sort().join(", ")}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-right font-semibold text-primary">{formatTaskHoursLabel(entry.hours)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-2.5 border-t bg-muted/10">
                 <span className="text-xs text-muted-foreground">
-                  {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, allEntries.length)} de {allEntries.length}
+                  {currentPage * PAGE_SIZE + 1}–{Math.min((currentPage + 1) * PAGE_SIZE, taskTotals.length)} de {taskTotals.length}
                 </span>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>
                     <ChevronLeft className="h-3.5 w-3.5" />
                   </Button>
-                  <span className="text-xs font-medium px-2">{page + 1}/{totalPages}</span>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>
+                  <span className="text-xs font-medium px-2">{currentPage + 1}/{totalPages}</span>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={currentPage >= totalPages - 1} onClick={() => setPage(currentPage + 1)}>
                     <ChevronRight className="h-3.5 w-3.5" />
                   </Button>
                 </div>

@@ -43,7 +43,7 @@ type Settlement = {
 type SettlementRow = {
   person: { id: number; name: string; email: string | null; contractType: string; billingCurrency: string };
   closing: { id: number } | null;
-  system: { hours: number | null; hourlyRateARS: number | null; totalARS: number | null };
+  system: { hours: number | null; hourlyRateARS: number | null; totalARS: number | null; directUSD?: { base: number; referenceFx: number | null } };
   settlement: Settlement | null;
   suggestion: { sourcePeriod: string; billingCurrency: string; requiresInvoice?: boolean; usdPercentage: number } | null;
   invoices: Array<{ id: number; invoiceComponent: "single" | "usd" | "ars"; invoiceCurrency?: string | null; approvalStatus: "pending" | "approved" | "rejected"; documentCount: number; uploadedAt: string; reviewReason: string | null }>;
@@ -126,7 +126,16 @@ export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: {
     setDrafts(previous => Object.fromEntries(query.data.map(row => [row.person.id, dirtyIds.current.has(row.person.id) && previous[row.person.id] ? previous[row.person.id] : draftFor(row)])));
   }, [query.data]);
 
-  const payloadFor = (row: SettlementRow, publish: boolean, draftOverride?: Draft) => ({ period, ...(draftOverride ?? drafts[row.person.id] ?? draftFor(row)), publish, expectedBase: { closingId: row.closing?.id, totalARS: row.system.totalARS, hours: row.system.hours } });
+  const payloadFor = (row: SettlementRow, publish: boolean, draftOverride?: Draft) => {
+    const draft = draftOverride ?? drafts[row.person.id] ?? draftFor(row);
+    return {
+      period, ...draft, publish,
+      expectedBase: {
+        closingId: row.closing?.id, totalARS: row.system.totalARS, hours: row.system.hours,
+        totalUSD: draft.billingCurrency === "USD" ? row.system.directUSD?.base ?? null : null,
+      },
+    };
+  };
   const mutation = useMutation({
     mutationFn: ({ row, publish, earlyPublication, draftOverride }: { row: SettlementRow; publish: boolean; earlyPublication?: { confirmed: true; reason: string }; draftOverride?: Draft }) => authFetchJson(`/api/finance/personnel-settlements/${row.person.id}`, {
       method: "PUT",
@@ -187,7 +196,7 @@ export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: {
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader><DialogTitle>Publicar anticipadamente</DialogTitle><DialogDescription>Habilitá la facturación de {earlyTarget?.person.name} antes del corte general de {cutoffLabel}, a las 23:59 de Buenos Aires.</DialogDescription></DialogHeader>
         <div className="space-y-4">
-          <div className="rounded-lg border bg-muted/30 p-3 text-sm"><p className="font-medium">Base a fijar: {ars(earlyTarget?.system.totalARS)}</p><p>{Number(earlyTarget?.system.hours ?? 0).toFixed(1)} horas · {periodLabel(period)}</p></div>
+          <div className="rounded-lg border bg-muted/30 p-3 text-sm"><p className="font-medium">Base a fijar: {earlyTarget?.system.directUSD ? usd(earlyTarget.system.directUSD.base) : ars(earlyTarget?.system.totalARS)}</p><p>{Number(earlyTarget?.system.hours ?? 0).toFixed(1)} horas · {periodLabel(period)}</p></div>
           <p className="text-sm">Esta base queda protegida para facturar. Las horas operativas de esta persona y del resto del equipo siguen abiertas hasta el corte general.</p>
           <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">{earlyTarget?.person.contractType === "freelance" ? "Para freelancers, revisá que estén incluidas todas las horas a pagar. " : ""}Las horas cargadas después no se suman automáticamente a esta liquidación. El corte general conservará la base publicada.</p>
           <div className="space-y-1.5"><Label htmlFor="early-publication-reason">Motivo de la publicación anticipada</Label><Textarea id="early-publication-reason" value={earlyReason} onChange={event => setEarlyReason(event.target.value)} maxLength={2000} placeholder="Ej. Adelantar la factura del mes con la base ya revisada" /><p className="text-xs text-muted-foreground">Queda registrado con tu usuario y la fecha.</p></div>
@@ -198,7 +207,7 @@ export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: {
     <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <h2 className="text-lg font-semibold">Facturación y seguimiento</h2>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">La base del paso 1 se trae automáticamente. Publicá las condiciones y autorizá cada importe antes de que la persona facture. El colaborador carga los TC y extras en Mis facturas.</p>
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">La base del paso 1 se trae automáticamente. Publicá las condiciones y autorizá cada importe antes de que la persona facture. Los TC y extras que correspondan se completan en Mis facturas.</p>
       </div>
       <Button variant="outline" disabled={!bulkRows.length || bulkMutation.isPending} onClick={() => bulkMutation.mutate()}>
         {bulkMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <WandSparkles className="mr-2 h-4 w-4" />}
@@ -246,18 +255,21 @@ export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: {
         const isOpen = openId === row.person.id;
         const isMixed = draft.billingCurrency === "MIXED";
         const usesUSD = draft.billingCurrency !== "ARS";
+        const flow = normalizeWorkflow(row.settlement?.workflow);
+        const usesDirectUSD = draft.billingCurrency === "USD";
+        const legacyUSD = row.settlement?.status === "published" && row.settlement.billingCurrencySnapshot === "USD" && !flow.directUSD;
+        const directUSD = usesDirectUSD && !legacyUSD ? row.system.directUSD : undefined;
         const pct = isMixed ? Math.min(100, Math.max(0, Number(draft.usdPercentage) || 0)) : draft.billingCurrency === "USD" ? 100 : 0;
         const planned = Number(row.system.totalARS ?? 0) * pct / 100;
         const published = row.settlement?.status === "published";
-        const flow = normalizeWorkflow(row.settlement?.workflow);
-        const calculated = calculatePersonnelSettlement({ billingCurrencySnapshot: draft.billingCurrency, totalARS: Number(row.system.totalARS ?? 0), usdPercentage: pct, bonusUSD: Number(draft.bonusUSD), bonusARS: Number(draft.bonusARS), extrasARS: Number(draft.extrasARS) + flow.extrasARS, invoiceFx: row.settlement?.invoiceFx, receivedFx: row.settlement?.receivedFx, bankCommissionUSD: row.settlement?.bankCommissionUSD });
+        const calculated = calculatePersonnelSettlement({ directUSD: flow.directUSD ?? directUSD, billingCurrencySnapshot: draft.billingCurrency, totalARS: Number(row.system.totalARS ?? 0), usdPercentage: pct, bonusUSD: Number(draft.bonusUSD), bonusARS: Number(draft.bonusARS), extrasARS: Number(draft.extrasARS) + flow.extrasARS, invoiceFx: row.settlement?.invoiceFx, receivedFx: row.settlement?.receivedFx, bankCommissionUSD: row.settlement?.bankCommissionUSD });
         const conditionsLocked = (row.invoices ?? []).length > 0 || [flow.usd.status, flow.ars.status].some(s => s === "pending" || s === "approved");
         return <Card key={row.person.id} className={state.group === "ops" ? "border-indigo-200" : state.group === "done" ? "border-emerald-200" : ""}>
           <CardHeader className="p-0 sm:p-0">
             <button type="button" className="flex w-full items-center gap-4 px-5 py-4 text-left" onClick={() => setOpenId(isOpen ? null : row.person.id)} aria-expanded={isOpen}>
               <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${state.group === "done" ? "bg-emerald-100 text-emerald-700" : state.group === "ops" ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-700"}`}>{state.step}</span>
               <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{row.person.name}</span><span className="block truncate text-xs text-muted-foreground">{row.person.contractType} · {row.person.email || "Sin email vinculado"}</span><span className="mt-0.5 block text-xs font-medium text-indigo-700 md:hidden">{state.label}</span></span>
-              <span className="hidden text-right sm:block"><span className="block text-xs text-muted-foreground">Base del mes</span><span className="block font-semibold tabular-nums">{ars(row.system.totalARS)}</span></span>
+              <span className="hidden text-right sm:block"><span className="block text-xs text-muted-foreground">Base del mes</span><span className="block font-semibold tabular-nums">{row.system.directUSD ? usd(row.system.directUSD.base) : ars(row.system.totalARS)}</span></span>
               <StageBadge tone={state.tone} label={state.label} />
               <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
             </button>
@@ -266,7 +278,9 @@ export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: {
             {!row.closing ? <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>Falta el cierre operativo. Prepará primero su base en el paso 1: Base a cobrar. Después podés publicar sus condiciones, también antes del corte general.</span></div> : <>
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mind completa automáticamente</p>
-                <div className="grid gap-3 sm:grid-cols-3"><ReadOnly label="Horas del cierre" value={`${Number(row.system.hours ?? 0).toFixed(1)} h`} /><ReadOnly label="Valor hora ARS" value={ars(row.system.hourlyRateARS)} /><ReadOnly label="Base del mes en ARS" value={ars(row.system.totalARS)} /></div>
+                <div className="grid gap-3 sm:grid-cols-3"><ReadOnly label="Horas del cierre" value={`${Number(row.system.hours ?? 0).toFixed(1)} h`} />{row.system.directUSD
+                    ? <ReadOnly label="Base del mes en USD" value={usd(row.system.directUSD.base)} />
+                    : <><ReadOnly label="Valor hora ARS" value={ars(row.system.hourlyRateARS)} /><ReadOnly label="Base del mes en ARS" value={ars(row.system.totalARS)} /></>}</div>
               </div>
 
               {flow.publication?.beforeCut && <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm"><p className="font-medium">Publicada antes del corte general · base protegida</p><p className="mt-1">{flow.publication.reason}</p></div>}
@@ -297,7 +311,10 @@ export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: {
                 {conditionsLocked && <p className="mt-2 text-sm text-muted-foreground">Condiciones congeladas: ya hay importes enviados o facturas.</p>}
               </fieldset>
 
-              {usesUSD ? <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4"><div className="flex items-center gap-2"><Calculator className="h-4 w-4 text-indigo-600" /><p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">{isMixed ? "El colaborador completa el TC al facturar y al cobrar" : "El colaborador completa un TC; el importe se autoriza sólo en USD"}</p></div><div className="mt-3 grid gap-3 sm:grid-cols-3"><ReadOnly label="Pesos a cobrar en USD" value={ars(planned)} /><ReadOnly label={draft.requiresInvoice ? "USD a facturar" : "USD a liquidar"} value={row.settlement?.invoiceFx ? usd(calculated.totalInvoiceUSD) : "Se calcula con su TC"} />{isMixed ? <ReadOnly label="Diferencia final ARS" value={calculated.finalInvoiceARS == null ? "Se calcula al cobrar" : ars(calculated.finalInvoiceARS)} /> : <ReadOnly label="Adicionales ARS a convertir al mismo TC" value={ars(Number(draft.bonusARS || 0) + Number(draft.extrasARS || 0))} />}</div></div> : <div className="rounded-lg border bg-slate-50 p-3 text-sm text-muted-foreground">{draft.billingCurrency === "USD" ? "Mind usa el total del cierre como base y la persona adjunta su comprobante en USD." : "Mind usa directamente el total ARS del cierre. La persona agrega extras y envía el importe a autorización. No se pide tipo de cambio."}</div>}
+              {directUSD ? <div className="grid gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 sm:grid-cols-2">
+                <ReadOnly label="Base del cierre en USD" value={usd(directUSD.base)} />
+                <ReadOnly label={draft.requiresInvoice ? "USD a facturar" : "USD a liquidar"} value={calculated.totalInvoiceUSD == null ? "Revisá los adicionales en ARS" : usd(calculated.totalInvoiceUSD)} />
+              </div> : usesDirectUSD && !legacyUSD ? <p className="rounded-lg border bg-slate-50 p-3 text-sm text-muted-foreground">Prepará una base con tarifa histórica en USD en Cierre del equipo antes de publicar.</p> : usesUSD ? <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4"><div className="flex items-center gap-2"><Calculator className="h-4 w-4 text-indigo-600" /><p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">{isMixed ? "El colaborador completa el TC al facturar y al cobrar" : "Cierre histórico con tipo de cambio bancario"}</p></div><div className="mt-3 grid gap-3 sm:grid-cols-3"><ReadOnly label="Pesos a cobrar en USD" value={ars(planned)} /><ReadOnly label={draft.requiresInvoice ? "USD a facturar" : "USD a liquidar"} value={row.settlement?.invoiceFx ? usd(calculated.totalInvoiceUSD) : "Se calcula con su TC"} />{isMixed ? <ReadOnly label="Diferencia final ARS" value={calculated.finalInvoiceARS == null ? "Se calcula al cobrar" : ars(calculated.finalInvoiceARS)} /> : <ReadOnly label="Adicionales ARS a convertir al mismo TC" value={ars(Number(draft.bonusARS || 0) + Number(draft.extrasARS || 0))} />}</div></div> : <div className="rounded-lg border bg-slate-50 p-3 text-sm text-muted-foreground">Mind usa el total ARS del cierre. La persona agrega los extras que correspondan y envía el importe a autorización.</div>}
 
               {published && row.settlement && <div className="grid gap-3 sm:grid-cols-2">{settlementPhases(row.settlement).map(phase => <div key={phase} className="space-y-2"><ProgressItem done={flow[phase].status === "approved"} label={`Importe ${phase.toUpperCase()} autorizado`} />{flow.requiresInvoice !== false && <InvoiceProgress invoice={invoiceForPhase(row, phase)} label={`Factura ${phase.toUpperCase()}`} />}</div>)}{flow.requiresInvoice === false && <p className="text-sm text-muted-foreground sm:col-span-2">Sin factura: la autorización no registra un pago. Finanzas debe registrar el Pasivo y el pago correspondientes.</p>}</div>}
 

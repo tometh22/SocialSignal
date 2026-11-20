@@ -9,6 +9,7 @@ import { notificationReliabilityMigrationSql } from "./migrations/notification-r
 import { accountAccessLinksMigrationSql } from "./migrations/account-access-links";
 import { pipelineShareLinksMigrationSql } from "./migrations/pipeline-share-links";
 import { pipelineProbabilityMigrationSql } from "./migrations/pipeline-probability";
+import { statusMessageEditsMigrationSql } from "./migrations/status-message-edits";
 import { financialIntakeDetailsMigrationSql } from "./migrations/financial-intake-details";
 import { verifyNotificationWebhook, recordNotificationEmailEvent,verifySendgridWebhook,recordSendgridEvents } from "./services/notification-email-events";
 import { registerRoutes } from "./routes";
@@ -934,6 +935,7 @@ async function applyPendingMigrations() {
     await run('0098 pipeline share links', pipelineShareLinksMigrationSql);
     await run('0099 pipeline probability model', pipelineProbabilityMigrationSql);
     await run('0100 financial intake details', financialIntakeDetailsMigrationSql);
+    await run('0101 Status message edits', statusMessageEditsMigrationSql);
     // Install payroll guards before serving requests; financial cutover stays independent.
     await client.query("BEGIN");
     try {

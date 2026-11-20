@@ -44,7 +44,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { toast } from "@/hooks/use-toast";
 import {
   DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragOverEvent,
-  PointerSensor, useSensor, useSensors, closestCenter, UniqueIdentifier,
+  PointerSensor, useSensor, useSensors, closestCenter, pointerWithin, type CollisionDetection, UniqueIdentifier,
   useDroppable, useDraggable,
 } from "@dnd-kit/core";
 import {
@@ -647,10 +647,10 @@ function TaskRow(props: TaskRowProps) {
         </div>
 
         {/* Tiempo real */}
-        <div className="hidden w-24 px-2 flex-shrink-0 text-xs items-center gap-1 lg:flex">
+        <div className="flex w-16 shrink-0 items-center gap-1 px-1 text-xs sm:w-24 sm:px-2">
           {loggedH > 0 || plannedH > 0 ? (
             <>
-              <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+              <Clock className="hidden h-3 w-3 shrink-0 text-muted-foreground sm:block" />
               <span className={cn(
                 "font-medium",
                 plannedH > 0 && loggedH > plannedH ? "text-red-500" : "text-foreground"
@@ -742,12 +742,13 @@ interface SectionBlockProps {
   sortBy?: string;
   allPersonnelForSort?: Personnel[];
   isFirst?: boolean;
-  taskOrderOverride?: number[];
+  collapsed?: boolean;
+  onToggleSection?: () => void;
+  enableDrag?: boolean;
 }
 
-function SectionBlock({ canManageSections = false, canEditSections = canManageSections, sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, onDuplicateSection, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, taskOrderOverride }: SectionBlockProps) {
+function SectionBlock({ canManageSections = false, canEditSections = canManageSections, sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, onDuplicateSection, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, collapsed = false, onToggleSection, enableDrag = true }: SectionBlockProps) {
   const [visibleLimit, setVisibleLimit] = useState(80);
-  const [collapsed, setCollapsed] = useState(false);
   const effectiveCollapsed = forceExpand ? false : collapsed;
   const [showAdd, setShowAdd] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
@@ -783,7 +784,8 @@ function SectionBlock({ canManageSections = false, canEditSections = canManageSe
 
   const deleteMutation = useMutation({
     mutationFn: () => apiRequest("/api/tasks/section", "DELETE", { projectId, sectionName }),
-    onSuccess: () => { onRefresh(); toast({ title: "Sección eliminada", description: "Las tareas se movieron a General" }); },
+    onSuccess: () => { onRefresh(); toast({ title: "Sección eliminada" }); },
+    onError: (error: Error) => toast({ title: "No se pudo eliminar la sección", description: error.message, variant: "destructive" }),
   });
 
   const handleRenameBlur = () => {
@@ -806,14 +808,7 @@ function SectionBlock({ canManageSections = false, canEditSections = canManageSe
     });
   };
 
-  const rawRootTasks = rootTasks;
-  const orderedRootTasks = taskOrderOverride
-    ? [
-        ...taskOrderOverride.map(id => rawRootTasks.find(t => t.id === id)).filter(Boolean) as Task[],
-        ...rawRootTasks.filter(t => !taskOrderOverride.includes(t.id))
-      ]
-    : rawRootTasks;
-  const sortedRootTasks = sortTaskList(orderedRootTasks, sortBy, allPersonnelForSort);
+  const sortedRootTasks = sortTaskList(rootTasks, sortBy, allPersonnelForSort);
   const pendingTasks = sortedRootTasks.filter(t => t.status !== "done");
   const completedTasks = sortedRootTasks.filter(t => t.status === "done");
 
@@ -824,7 +819,7 @@ function SectionBlock({ canManageSections = false, canEditSections = canManageSe
       {/* Section header row */}
       <div
         className="flex items-center border-b border-border bg-muted/60 hover:bg-muted/80 cursor-pointer transition-colors group border-l-2 border-l-primary/40"
-        onClick={() => !renamingSection && setCollapsed(!collapsed)}
+        onClick={() => !renamingSection && onToggleSection?.()}
       >
         {/* Drag handle for section */}
         <div
@@ -837,7 +832,7 @@ function SectionBlock({ canManageSections = false, canEditSections = canManageSe
         <button type="button" className="w-3 flex-shrink-0 flex items-center justify-center py-3"
           aria-label={`${effectiveCollapsed ? "Desplegar" : "Plegar"} sección ${sectionName}`}
           aria-expanded={!effectiveCollapsed}
-          onClick={e => { e.stopPropagation(); setCollapsed(!collapsed); }}>
+          onClick={e => { e.stopPropagation(); onToggleSection?.(); }}>
           {effectiveCollapsed
             ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
             : <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -940,6 +935,7 @@ function SectionBlock({ canManageSections = false, canEditSections = canManageSe
           <SortableContext items={pendingTasks.map(t => `task:${t.id}`)} strategy={verticalListSortingStrategy}>
           {pendingTasks.slice(0, visibleLimit).map(task => (
             <SortableTaskRow
+              enableDrag={enableDrag}
               key={task.id}
               taskId={task.id}
               task={task}
@@ -976,6 +972,7 @@ function SectionBlock({ canManageSections = false, canEditSections = canManageSe
                 <SortableContext items={completedTasks.map(t => `task:${t.id}`)} strategy={verticalListSortingStrategy}>
                   {completedTasks.slice(0, visibleLimit).map(task => (
                     <SortableTaskRow
+                      enableDrag={enableDrag}
                       key={task.id}
                       taskId={task.id}
                       task={task}
@@ -1027,13 +1024,14 @@ function SectionBlock({ canManageSections = false, canEditSections = canManageSe
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar sección "{sectionName}"?</AlertDialogTitle>
             <AlertDialogDescription>
-              Las tareas de esta sección se moverán a "General". Esta acción no se puede deshacer.
+              Se eliminarán la sección, sus tareas y su planificación. Si alguna tarea tiene horas registradas, la sección se conservará.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
+              disabled={deleteMutation.isPending}
               onClick={() => deleteMutation.mutate()}
             >
               Eliminar
@@ -1045,9 +1043,19 @@ function SectionBlock({ canManageSections = false, canEditSections = canManageSe
   );
 }
 
+const listCollisionDetection: CollisionDetection = args => {
+  if (args.active.data.current?.type === "section") {
+    return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter(container => container.data.current?.type === "section") });
+  }
+  const hits = pointerWithin(args);
+  const row = hits.find(hit => String(hit.id).startsWith("task:"));
+  return row ? [row] : hits;
+};
+
 // ─── Sortable wrappers ──────────────────────────────────────────────────────
 
-function SortableTaskRow({ taskId, task, allPersonnel, projectMembers, onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: {
+function SortableTaskRow({ enableDrag = true, taskId, task, allPersonnel, projectMembers, onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: {
+  enableDrag?: boolean;
   taskId: number;
   task: Task;
   allPersonnel: Personnel[];
@@ -1066,6 +1074,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, projectMembers, onOpenTas
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `task:${taskId}`,
+    disabled: !enableDrag,
     data: { type: 'task', taskId, task },
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -1086,16 +1095,17 @@ function SortableTaskRow({ taskId, task, allPersonnel, projectMembers, onOpenTas
         subtaskMap={subtaskMap}
         expandedSubtasks={expandedSubtasks}
         onToggleSubtasks={onToggleSubtasks}
-        dragHandleProps={{ ...attributes, ...listeners }}
+        dragHandleProps={listeners ? { ...attributes, ...listeners } : undefined}
         isDragging={isDragging}
       />
     </div>
   );
 }
 
-function SortableSectionBlock(props: SectionBlockProps & { sectionName: string; sortBy?: string; allPersonnelForSort?: Personnel[]; isFirst?: boolean; taskOrderOverride?: number[] }) {
+function SortableSectionBlock(props: SectionBlockProps & { sectionName: string; sortBy?: string; allPersonnelForSort?: Personnel[]; isFirst?: boolean; enableDrag?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `section:${props.sectionName}`,
+    disabled: props.enableDrag === false,
     data: { type: 'section', sectionName: props.sectionName },
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -1103,7 +1113,7 @@ function SortableSectionBlock(props: SectionBlockProps & { sectionName: string; 
     <div ref={setNodeRef} style={style}>
       <SectionBlock
         {...props}
-        dragHandleProps={{ ...attributes, ...listeners }}
+        dragHandleProps={listeners ? { ...attributes, ...listeners } : undefined}
         isDragging={isDragging}
       />
     </div>
@@ -1316,22 +1326,8 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   const [sectionOrder, setSectionOrder] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem(`sectionOrder:${projectId}`) || '[]'); } catch { return []; }
   });
-  const [taskOrderMap, setTaskOrderMap] = useState<Record<string, number[]>>(() => {
-    try { return JSON.parse(localStorage.getItem(`taskOrder:${projectId}`) || '{}'); } catch { return {}; }
-  });
-
-  const persistTaskOrder = (projectId: number, map: Record<string, number[]>) => {
-    try { localStorage.setItem(`taskOrder:${projectId}`, JSON.stringify(map)); } catch {}
-  };
-
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(`taskOrder:${projectId}`) || '{}');
-      setTaskOrderMap(saved);
-    } catch {
-      setTaskOrderMap({});
-    }
-  }, [projectId]);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => new Set());
+  const [movingTask, setMovingTask] = useState(false);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [activeDragData, setActiveDragData] = useState<any>(null);
 
@@ -1489,6 +1485,8 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     ? orderedSectionNames.filter(s => s === sectionFilter)
     : orderedSectionNames;
 
+  const allSectionsCollapsed = visibleSectionNames.every(section => collapsedSections.has(section));
+  const enableDrag = groupBy === 'section' && !movingTask;
   const totalTasks = allTasks.filter(t => !t.parentTaskId).length;
   const doneTasks = allTasks.filter(t => t.status === "done" && !t.parentTaskId).length;
 
@@ -1507,7 +1505,6 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     const { active, over } = event;
     setActiveId(null);
     setActiveDragData(null);
-    console.log('[DnD] end — active:', active.id, 'over:', over?.id ?? 'null');
     if (!over || active.id === over.id) return;
 
     const activeData = active.data.current;
@@ -1541,50 +1538,16 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
         return;
       }
 
-      // Get current ordered IDs for each section (from override or from sections data)
-      const getOrderedIds = (sec: string) =>
-        taskOrderMap[sec] ?? (sections[sec] || []).filter(t => !t.parentTaskId).map(t => t.id);
-
-      const fromIds = getOrderedIds(fromSection);
-      const toIds = fromSection === targetSection ? fromIds : getOrderedIds(targetSection);
-
-      if (fromSection === targetSection) {
-        // Same-section reorder
-        const fromIdx = fromIds.indexOf(taskId);
-        const toTask = overData?.type === 'task' ? (overData.task as Task) : null;
-        const toIdx = toTask ? toIds.indexOf(toTask.id) : toIds.length - 1;
-        if (fromIdx === -1) return;
-        const newIds = arrayMove(fromIds, fromIdx, toIdx >= 0 ? toIdx : toIds.length - 1);
-        const newMap = { ...taskOrderMap, [fromSection]: newIds };
-        setTaskOrderMap(newMap);
-        persistTaskOrder(projectId, newMap);
-
-        apiRequest("/api/tasks/reorder", "POST", { taskIds: newIds })
-          .then(() => {
-            console.log('[DnD] Reorder saved successfully');
-            queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", projectId] });
-          })
-          .catch((e: any) => { setTaskOrderMap(previous => { const next = { ...previous, [fromSection]: fromIds }; persistTaskOrder(projectId, next); return next; }); refetch(); toast({ title: "No se pudo reordenar", description: e.message, variant: "destructive" }); });
-      } else {
-        // Cross-section move
-        const newFromIds = fromIds.filter(id => id !== taskId);
-        const toTask = overData?.type === 'task' ? (overData.task as Task) : null;
-        const insertIdx = toTask ? toIds.indexOf(toTask.id) : toIds.length;
-        const newToIds = [...toIds];
-        newToIds.splice(insertIdx >= 0 ? insertIdx : newToIds.length, 0, taskId);
-        const newMap = { ...taskOrderMap, [fromSection]: newFromIds, [targetSection]: newToIds };
-        setTaskOrderMap(newMap);
-        persistTaskOrder(projectId, newMap);
-
-        const p1 = newFromIds.length > 0 ? apiRequest("/api/tasks/reorder", "POST", { taskIds: newFromIds }) : Promise.resolve();
-        const p2 = newToIds.length > 0 ? apiRequest("/api/tasks/reorder", "POST", { taskIds: newToIds, sectionName: targetSection }) : Promise.resolve();
-        Promise.all([p1, p2])
-          .then(() => {
-            console.log('[DnD] Cross-section reorder saved successfully');
-            queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", projectId] });
-          })
-          .catch((e: any) => { setTaskOrderMap(previous => { const next = { ...previous, [fromSection]: fromIds, [targetSection]: toIds }; persistTaskOrder(projectId, next); return next; }); refetch(); toast({ title: "No se pudo mover la tarea", description: e.message, variant: "destructive" }); });
-      }
+      if (movingTask) return;
+      const targetTask = overData?.type === 'task' ? overData.task as Task : null;
+      const roots = (sectionsRaw[fromSection] ?? []).filter(task => !task.parentTaskId);
+      const after = fromSection === targetSection && targetTask != null
+        && roots.findIndex(task => task.id === taskId) < roots.findIndex(task => task.id === targetTask.id);
+      setMovingTask(true);
+      void apiRequest(`/api/tasks/${taskId}/move`, "POST", { sectionName: targetSection, targetId: targetTask?.id ?? null, after })
+        .then(() => invalidateRelated())
+        .catch((error: Error) => toast({ title: "No se pudo mover la tarea", description: error.message, variant: "destructive" }))
+        .finally(async () => { await refetch(); setMovingTask(false); });
     }
   };
 
@@ -1671,6 +1634,20 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                 </SelectContent>
               </Select>
             ) : <div />}
+            {visibleSectionNames.length > 0 && !filterText.trim() && (
+              <Button size="sm" variant="outline" className="ml-auto h-7 text-xs"
+                onClick={() => setCollapsedSections(current => {
+                  const next = new Set(current);
+                  const expand = visibleSectionNames.every(section => current.has(section));
+                  for (const section of visibleSectionNames) {
+                    if (expand) next.delete(section);
+                    else next.add(section);
+                  }
+                  return next;
+                })}>
+                {allSectionsCollapsed ? "Desplegar todas" : "Contraer todas"}
+              </Button>
+            )}
             {data?.canCreateSections && <Button size="sm" className="h-7 text-xs" onClick={() => setShowAddSection(true)}>
               <Plus className="h-3 w-3 mr-1" />Nueva sección
             </Button>}
@@ -1694,9 +1671,10 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
           ) : (
             <DndContext
               sensors={sensors}
-              collisionDetection={closestCenter}
+              collisionDetection={listCollisionDetection}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
+              onDragCancel={() => { setActiveId(null); setActiveDragData(null); }}
             >
               <div className="rounded-xl border border-border overflow-hidden">
                 {/* Column headers */}
@@ -1708,7 +1686,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                   <div className="hidden w-36 shrink-0 px-2 py-2.5 sm:block">Estado</div>
                   <div className="w-12 px-1 flex-shrink-0 py-2.5 text-center sm:w-28 sm:px-2 sm:text-left"><span className="sr-only sm:not-sr-only">Responsable</span></div>
                   <div className="hidden w-32 px-2 flex-shrink-0 py-2.5 md:block">Fechas</div>
-                  <div className="hidden w-24 px-2 flex-shrink-0 py-2.5 lg:block">Tiempo real</div>
+                  <div className="w-16 shrink-0 px-1 py-2.5 sm:w-24 sm:px-2">Tiempo real</div>
                   <div className="hidden w-28 px-2 flex-shrink-0 py-2.5 xl:block">Cliente</div>
                   <div className="w-8 flex-shrink-0" />
                 </div>
@@ -1719,8 +1697,8 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                 >
                   {visibleSectionNames.map((section, idx) => (
                     <SortableSectionBlock
-                      canManageSections={data?.canManageSections}
-                      canEditSections={data?.canEditSections}
+                      canManageSections={groupBy === 'section' && data?.canManageSections}
+                      canEditSections={groupBy === 'section' && data?.canEditSections}
                       key={section}
                       sectionName={section}
                       tasks={sections[section] || []}
@@ -1742,7 +1720,14 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                       sortBy={sortBy}
                       allPersonnelForSort={allPersonnel}
                       isFirst={idx === 0}
-                      taskOrderOverride={taskOrderMap[section]}
+                      enableDrag={enableDrag}
+                      collapsed={collapsedSections.has(section)}
+                      onToggleSection={() => setCollapsedSections(current => {
+                        const next = new Set(current);
+                        if (next.has(section)) next.delete(section);
+                        else next.add(section);
+                        return next;
+                      })}
                     />
                   ))}
                 </SortableContext>

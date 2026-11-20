@@ -163,7 +163,10 @@ test("retired guides disappear from navigation and search; merged guide links an
   await expect(page.getByRole("heading", { name: "Aclaraciones y situaciones frecuentes" })).toHaveCount(1);
   await expect(page.getByRole("heading", { name: "Qué revisar", exact: true })).toHaveCount(0);
   await page.goto("/training/facturas-personales");
-  await expect(page.getByRole("region", { name: "Paso a paso" }).getByRole("listitem")).toHaveCount(8);
+  const steps = page.getByRole("region", { name: "Paso a paso" }).getByRole("listitem");
+  await expect(steps).toHaveCount(5);
+  await expect(steps.nth(2)).toContainText("USD + ARS");
+  await expect(steps.nth(2)).toContainText("sin ingresar TC");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: ".context/feedback-training-invoices-mobile.png", fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

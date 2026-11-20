@@ -3,6 +3,7 @@ import { db } from "../db";
 import { personnel, monthlyClosings, personnelMonthlySettlements, exchangeRates, financialAuditEvents, holidays } from "@shared/schema";
 import { resolveCanonicalPersonnelRate } from "../domain/personnel-rate";
 import { reconcileHourSources } from "@shared/utils/hours-reconciliation";
+import { nativeUsdClosing } from "@shared/utils/personnel-settlement";
 import { payableMonthlyHours } from "@shared/utils/payroll-hours";
 import { settlementWorkflow } from "@shared/utils/settlement-workflow";
 import { lastPayrollBusinessDay } from "@shared/utils/payroll-calendar";
@@ -54,22 +55,32 @@ export async function preparePayroll(period: string, actorId: number | null, opt
       const rate = await resolveCanonicalPersonnelRate(person.id, new Date(`${period}-01T12:00:00Z`), tx);
       const actualHours = totals[person.id] ?? 0;
       if (person.contractType === "freelance" && actualHours === 0 && !closing) continue;
-      if (!rate.hourlyRateARS || rate.error) { issues.push(`${person.name}: falta tarifa o cotización`); continue; }
       const fx = rate.exchangeRate ?? Number(fxRow?.rate ?? 0);
-      // Rebuild only unpublished bases, keeping explicit unpaid-leave adjustments.
-      const adjustedHours = payableMonthlyHours(person, actualHours, Number(closing?.adjustments?.unpaidHours ?? 0), closing?.notes ?? "");
-      const totalARS = Math.round(adjustedHours * rate.hourlyRateARS * 100) / 100;
       const currency = person.billingCurrency.toUpperCase();
-      if (currency !== "ARS" && !(fx > 0)) { issues.push(`${person.name}: falta cotización mensual`); continue; }
+      if (currency !== "USD" && (!rate.hourlyRateARS || rate.error)) { issues.push(`${person.name}: falta tarifa o cotización`); continue; }
+      if (currency === "MIXED" && !(fx > 0)) { issues.push(`${person.name}: falta cotización mensual`); continue; }
+      const adjustedHours = payableMonthlyHours(person, actualHours, Number(closing?.adjustments?.unpaidHours ?? 0), closing?.notes ?? "");
+      const direct = currency === "USD" ? nativeUsdClosing(person, adjustedHours, rate, fx) : null;
+      if (currency === "USD" && !direct) { issues.push(`${person.name}: falta tarifa histórica en USD`); continue; }
+      const arsRate = rate.hourlyRateARS ?? 0;
+      const totalARS = direct?.totalCost ?? Math.round(adjustedHours * arsRate * 100) / 100;
       const fraction = currency === "USD" ? 1 : currency === "MIXED" ? Number(person.usdBillingFraction ?? 0) : 0;
-      const values = { actualHours, adjustedHours, hourlyRate: currency === "ARS" ? rate.hourlyRateARS : rate.hourlyRateARS / fx, totalCost: totalARS, grandTotalARS: totalARS, grandTotalUSD: fx > 0 ? totalARS / fx : null, billingCurrency: person.billingCurrency, usdBillingFraction: fraction, totalCostARS: totalARS * (1-fraction), totalCostUSD: fx > 0 ? totalARS * fraction / fx : 0, exchangeRateAtClose: fx > 0 ? fx : null, closedBy: actorId, adjustments: { unpaidHours: Number(closing?.adjustments?.unpaidHours ?? 0) } };
+      const values = {
+        actualHours, adjustedHours, hourlyRate: currency === "MIXED" ? arsRate / fx : arsRate,
+        totalCost: totalARS, grandTotalARS: totalARS, grandTotalUSD: fx > 0 ? totalARS / fx : null,
+        billingCurrency: person.billingCurrency, usdBillingFraction: fraction,
+        totalCostARS: totalARS * (1-fraction), totalCostUSD: fx > 0 ? totalARS * fraction / fx : 0,
+        exchangeRateAtClose: fx > 0 ? fx : null, closedBy: actorId,
+        adjustments: { unpaidHours: Number(closing?.adjustments?.unpaidHours ?? 0) },
+        ...direct,
+      };
       [closing] = await tx.insert(monthlyClosings).values({ personnelId: person.id, year, month, ...values }).onConflictDoUpdate({ target: [monthlyClosings.personnelId, monthlyClosings.year, monthlyClosings.month], set: values }).returning();
       if (published) {
-        await tx.update(personnelMonthlySettlements).set({ hoursSnapshot: adjustedHours, hourlyRateARSSnapshot: rate.hourlyRateARS, totalARS, plannedUSDARS: totalARS*published.usdPercentage/100, workflow: { ...settlementWorkflow(published.workflow), version: (published.workflow?.version ?? 0)+1 }, updatedAt: new Date() }).where(eq(personnelMonthlySettlements.id, published.id));
+        await tx.update(personnelMonthlySettlements).set({ hoursSnapshot: adjustedHours, hourlyRateARSSnapshot: adjustedHours > 0 ? totalARS / adjustedHours : 0, totalARS, plannedUSDARS: totalARS*published.usdPercentage/100, workflow: { ...settlementWorkflow(published.workflow), version: (published.workflow?.version ?? 0)+1 }, updatedAt: new Date() }).where(eq(personnelMonthlySettlements.id, published.id));
         created++; continue;
       }
       const [prior] = await tx.select().from(personnelMonthlySettlements).where(and(eq(personnelMonthlySettlements.personnelId, person.id), eq(personnelMonthlySettlements.status, "published"), sql`${personnelMonthlySettlements.period}<${period}`)).orderBy(desc(personnelMonthlySettlements.period));
-      await tx.insert(personnelMonthlySettlements).values({ personnelId: person.id, period, contractTypeSnapshot: person.contractType, billingCurrencySnapshot: prior?.billingCurrencySnapshot ?? (currency === "USD" ? "USD" : currency === "ARS" ? "ARS" : "MIXED"), hoursSnapshot: adjustedHours, hourlyRateARSSnapshot: rate.hourlyRateARS, totalARS, usdPercentage: prior?.usdPercentage ?? fraction*100, plannedUSDARS: totalARS*(prior?.usdPercentage ?? fraction*100)/100, createdBy: actorId, status: "draft" });
+      await tx.insert(personnelMonthlySettlements).values({ personnelId: person.id, period, contractTypeSnapshot: person.contractType, billingCurrencySnapshot: prior?.billingCurrencySnapshot ?? (currency === "USD" ? "USD" : currency === "ARS" ? "ARS" : "MIXED"), hoursSnapshot: adjustedHours, hourlyRateARSSnapshot: adjustedHours > 0 ? totalARS / adjustedHours : 0, totalARS, usdPercentage: prior?.usdPercentage ?? fraction*100, plannedUSDARS: totalARS*(prior?.usdPercentage ?? fraction*100)/100, createdBy: actorId, status: "draft" });
       created++;
     }
     if (options.cut || existing?.state === "cut") await tx.execute(sql`UPDATE payroll_periods SET issues=${JSON.stringify(issues)}::jsonb WHERE period=${period}`);

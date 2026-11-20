@@ -1,3 +1,4 @@
+import { loadStatusProjectDraft, statusProjectDraftKey } from "@/lib/status-source";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { countTemplateTasks, type ProjectTaskTemplate } from "@shared/project-task-template";
 import { useEffect, useMemo, useState } from "react";
@@ -68,6 +69,7 @@ export default function NewProjectWithTooltips() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [statusDraft] = useState(loadStatusProjectDraft);
   const [projectTemplate, setProjectTemplate] = useState("none");
   const [memberIds, setMemberIds] = useState<number[]>([]);
   const [projectManagerId, setProjectManagerId] = useState("");
@@ -80,7 +82,8 @@ export default function NewProjectWithTooltips() {
       projectCategory: "billable",
       trackingFrequency: "weekly",
       startDate: new Date(),
-      notes: "",
+      name: statusDraft?.title.slice(0, 255),
+      notes: statusDraft ? [statusDraft.text, `Status: ${statusDraft.path}`].filter(Boolean).join("\n\n") : "",
     },
   });
 
@@ -192,6 +195,9 @@ export default function NewProjectWithTooltips() {
       return response.json();
     },
     onSuccess: (project: { id: number; quotationId?: number | null }) => {
+      if (statusDraft) {
+        try { sessionStorage.removeItem(statusProjectDraftKey); } catch {}
+      }
       toast({
         title: "¡Proyecto creado exitosamente!",
         description: "Ya podés organizar las tareas y cargar horas en el proyecto.",

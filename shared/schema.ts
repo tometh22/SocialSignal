@@ -4782,6 +4782,7 @@ export const projectReviewNotes = pgTable("project_review_notes", {
   noteDate: timestamp("note_date").notNull().defaultNow(),
   authorId: integer("author_id").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  editedAt: timestamp("edited_at"),
 }, (t) => ({
   idxRoom: index("idx_prn_room").on(t.roomId),
 }));
@@ -4789,6 +4790,7 @@ export const projectReviewNotes = pgTable("project_review_notes", {
 export const insertProjectReviewNoteSchema = createInsertSchema(projectReviewNotes).omit({
   id: true,
   createdAt: true,
+  editedAt: true,
 });
 export type ProjectReviewNote = typeof projectReviewNotes.$inferSelect;
 export type InsertProjectReviewNote = z.infer<typeof insertProjectReviewNoteSchema>;
@@ -4891,6 +4893,7 @@ export const statusUpdateEntries = pgTable("status_update_entries", {
   content: text("content").notNull(),
   authorId: integer("author_id").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  editedAt: timestamp("edited_at"),
 }, (t) => ({
   idxRoom: index("idx_sue_room").on(t.roomId),
 }));

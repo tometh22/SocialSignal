@@ -107,13 +107,19 @@ export default function MonthlyClosing({ period, onDirtyChange }: { period: stri
   const getClosing = (personnelId: number) =>
     closings?.find((c: any) => c.personnelId === personnelId);
 
-  // The base is expressed in ARS; invoice FX belongs to the next step.
-  const getBaseRateARS = (person: any): number | null => {
+  const getBaseRate = (person: any): number | null => {
     const closing = getClosing(person.id);
+    const isUSD = String(closing?.billingCurrency ?? person.billingCurrency).toUpperCase() === "USD";
+    if (closing && isUSD) return Number(closing.hourlyRate) > 0 ? Number(closing.hourlyRate) : null;
     if (closing?.adjustedHours > 0) return Number(closing.grandTotalARS ?? closing.totalCost) / closing.adjustedHours;
     const selected = year * 100 + month + 1;
     const historical = [...(person.historicalRates ?? [])].filter((r: any) => r.year*100+r.month <= selected).sort((a:any,b:any) => (b.year*100+b.month)-(a.year*100+a.month))[0];
-    return Number(historical?.hourlyRateARS) > 0 ? Number(historical.hourlyRateARS) : null;
+    const salaryUSD = Number(historical?.monthlySalaryUSD);
+    if (isUSD && person.contractType !== "freelance" && salaryUSD > 0) {
+      return salaryUSD / defaultBaseHours(person);
+    }
+    const rate = Number(isUSD ? historical?.hourlyRateUSD : historical?.hourlyRateARS);
+    return rate > 0 ? rate : null;
   };
   const getAdj = (personnelId: number): HoursAdj =>
     hoursAdjustments[personnelId] ?? { unpaidHours: 0 };
@@ -137,7 +143,7 @@ export default function MonthlyClosing({ period, onDirtyChange }: { period: stri
 
   const doClose = (person: any) => {
     const hrs = effectiveHours(person);
-    const rate = getBaseRateARS(person) ?? 0;
+    const rate = getBaseRate(person) ?? 0;
     const manualAdjustments = hoursAdjustments[person.id];
     const adjustments = manualAdjustments || { unpaidHours: 0 };
     try { payableMonthlyHours(person, realHoursMap[person.id] ?? 0, adjustments.unpaidHours, adjustmentReasons[person.id] || ""); }
@@ -176,20 +182,24 @@ export default function MonthlyClosing({ period, onDirtyChange }: { period: stri
   };
 
   // Billing currency helpers
-  const getBillingCurrency = (person: any): string => person.billingCurrency ?? "ARS";
-  const baseAmountARS = (person: any): number | null => {
+  const getBillingCurrency = (person: any): string => getClosing(person.id)?.billingCurrency ?? person.billingCurrency ?? "ARS";
+  const baseCurrency = (person: any) => getBillingCurrency(person).toUpperCase() === "USD" ? "USD" : "ARS";
+  const baseAmount = (person: any): number | null => {
     const closing = getClosing(person.id);
-    if (closing) return Number(closing.grandTotalARS ?? closing.totalCost);
-    const rate = getBaseRateARS(person);
+    if (closing) {
+      const amount = baseCurrency(person) === "USD" ? closing.totalCostUSD ?? closing.grandTotalUSD : closing.grandTotalARS ?? closing.totalCost;
+      return amount == null ? null : Number(amount);
+    }
+    const rate = getBaseRate(person);
     return rate == null ? null : Math.round(effectiveHours(person) * rate * 100) / 100;
   };
   const getCostDisplay = (person: any) => {
-    const total = baseAmountARS(person);
-    return { primary: total == null ? "Pendiente de preparar" : `ARS ${total.toLocaleString("es-AR", {minimumFractionDigits:2, maximumFractionDigits:2})}`, secondary: null };
+    const total = baseAmount(person);
+    return { primary: total == null ? "Pendiente de preparar" : `${baseCurrency(person)} ${total.toLocaleString("es-AR", {minimumFractionDigits:2, maximumFractionDigits:2})}`, secondary: null };
   };
   const getRateDisplay = (person: any) => {
-    const rate = getBaseRateARS(person);
-    return { text: rate == null ? "Pendiente" : `ARS ${rate.toLocaleString("es-AR", {minimumFractionDigits:2, maximumFractionDigits:2})}`, isEstimated: false };
+    const rate = getBaseRate(person);
+    return { text: rate == null ? "Pendiente" : `${baseCurrency(person)} ${rate.toLocaleString("es-AR", {minimumFractionDigits:2, maximumFractionDigits:2})}`, isEstimated: false };
   };
 
   // Filter personnel
@@ -203,7 +213,7 @@ export default function MonthlyClosing({ period, onDirtyChange }: { period: stri
   // paste into Excel as numbers, ready for the honorarios sheet.
   const EXPORT_HEADERS = [
     "Persona", "Contrato", "Facturación", "Hs Base", "Hs Reales",
-    "Valor Hora ARS", "Base a cobrar ARS", "Estado",
+    "Moneda base", "Valor Hora", "Base a cobrar", "Estado",
   ];
   const buildExportRows = (): (string | number)[][] => {
     return filteredPersonnel.map((p: any) => {
@@ -211,14 +221,15 @@ export default function MonthlyClosing({ period, onDirtyChange }: { period: stri
       const baseHrs = closing ? closing.adjustedHours : effectiveHours(p);
       const realHrs = realHoursMap[p.id] ?? 0;
       const billing = getBillingCurrency(p);
-      const rate = getBaseRateARS(p);
-      const total = baseAmountARS(p);
+      const rate = getBaseRate(p);
+      const total = baseAmount(p);
       return [
         p.name,
         p.contractType || "full-time",
         billing === "mixed" ? "Mixto" : billing,
         Math.round(baseHrs * 100) / 100,
         Math.round(realHrs * 100) / 100,
+        baseCurrency(p),
         rate == null ? "Pendiente" : Math.round(rate * 100) / 100,
         total == null ? "Pendiente" : total,
         publishedIds.has(p.id) ? "Publicada" : closing ? "Base guardada" : "Pendiente",
@@ -381,7 +392,7 @@ export default function MonthlyClosing({ period, onDirtyChange }: { period: stri
                   <th className="text-center py-2 px-3">Hs Base</th>
                   <th className="text-center py-2 px-3">Hs Reales</th>
                   <th className="text-center py-2 px-3">Valor Hora</th>
-                  <th className="text-center py-2 px-3">Base a cobrar ARS</th>
+                  <th className="text-center py-2 px-3">Base a cobrar</th>
                   <th className="text-center py-2 px-3">Estado</th>
                   <th className="text-center py-2 px-3">Acción</th>
                 </tr>

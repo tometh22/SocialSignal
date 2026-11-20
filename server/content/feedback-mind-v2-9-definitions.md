@@ -1,6 +1,6 @@
 ---
-version: 2.39.0
-updatedAt: 2026-10-29
+version: 2.40.0
+updatedAt: 2026-11-20
 feedbackCount: 70
 ---
 
@@ -487,3 +487,20 @@ histórica que todavía necesitan cotizaciones y registros anteriores.
 ## Addendum — Modalidad al aplicar la receta
 
 El filtro de Servicio sin modalidad permite explorar las cuatro recetas. Al aplicar una se asigna su tipo canónico (One Shot, Fee, Intelligence Event Track o Demo); no se conserva el vacío. Un tipo histórico compatible se mantiene. El benchmark y el guardado de un borrador sin tipo usan esa misma resolución. Si un borrador local antiguo conserva alcance sin modalidad, se solicita volver a seleccionar el servicio. No se reescriben precios ni cotizaciones existentes en lote.
+
+
+## Addendum — Feedback Mind 16-11
+
+| Módulo | Definición |
+|---|---|
+| Panel de horas | El desglose muestra un total por tarea para el período y los filtros seleccionados. Los registros sin tarea se agrupan por proyecto. |
+| Capacitación | Se accede desde la navegación y desde el menú de usuario. La guía de Mis facturas explica las tres monedas en un mismo paso. La guía de proyectos de tareas se centra en el flujo operativo. |
+| Tareas | Los usuarios con acceso operativo al proyecto pueden mover tareas principales entre secciones junto con sus subtareas. Pueden contraer o desplegar todas las secciones y recorrer el listado de miembros. |
+| Tareas | Eliminar una sección requiere confirmación y elimina sus tareas y planificación en la misma operación. Cualquier carga de horas, incluida la importada, bloquea todo el borrado. |
+| Tareas | Los miembros autorizados del proyecto consultan las horas operativas del equipo, incluidas las cargas de compañeros. Los permisos de edición y costos se conservan. |
+| Cierre del equipo y Mis facturas | Operaciones publica moneda y modalidad. En USD directo, el cierre congela el monto mensual histórico de los fijos con sus ajustes, o el valor hora histórico multiplicado por las horas reales del freelance. El titular confirma el monto en USD y la autorización sigue la modalidad con o sin factura. Los tramos mixtos conservan sus tipos de cambio. |
+| Status | Publicar una actualización desde Actividad actualiza Estado actual. Los comentarios siguen disponibles como conversación. Una edición del update vigente también actualiza el estado. |
+| Status | Al guardar una actualización desde la daily se avisa a los miembros seleccionados con @. La campana abre el tema en la actualización mencionada. Cerrar la daily sigue generando el aviso de sala. |
+| Status | Un tema puede iniciar una tarea con el contexto y el enlace al origen. Crear proyecto abre el formulario de Vista de proyectos con el contexto precargado y los permisos vigentes. |
+| Status | Las personas pueden corregir sus actualizaciones y comentarios desde la daily y Actividad. La fecha original se conserva y se muestra la fecha y hora de la última edición. |
+| Status | La agenda permite volver a abrir y copiar el último resumen guardado de la sala, con enlaces a los temas. Salir desde la pantalla de resumen guarda la daily. |
