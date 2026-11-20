@@ -1,7 +1,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { createUserNotifications } from "./user-notifications";
 import { db } from "../db";
-import { projectStatusReviews, weeklyStatusItems, statusUpdateEntries, statusChangeLog } from "@shared/schema";
+import { projectStatusReviews, weeklyStatusItems, projectReviewNotes, statusUpdateEntries, statusChangeLog } from "@shared/schema";
 
 /** One atomic write for the canonical state, its update entry, and its audit event. */
 export async function saveStatusCurrentAction(roomId: number, reference: { projectId: number } | { customId: number }, content: string, userId: number, expected?: string | null, mentionIds: number[] = []) {
@@ -37,7 +37,7 @@ export async function saveStatusCurrentAction(roomId: number, reference: { proje
       }, tx);
     }
     await tx.insert(statusChangeLog).values({ roomId, projectId, weeklyStatusItemId: customId, userId, fieldName: 'currentAction', oldValue: current?.currentAction ?? null, newValue: value });
-    return saved;
+    return { ...saved, updateEntryId: entry.id };
   });
 }
 
@@ -51,6 +51,9 @@ export async function editStatusUpdate(roomId: number, entryId: number, authorId
     await tx.execute(sql`SELECT pg_advisory_xact_lock(${roomId}, ${target.projectId ?? target.weeklyStatusItemId!})`);
     const [entry] = await tx.select().from(statusUpdateEntries).where(where).for("update");
     if (!entry) throw Object.assign(new Error("Update no encontrado"), { statusCode: 404 });
+    if (entry.content === content) return { ...entry, currentActionChanged: false };
+    const editedAt = new Date();
+    let currentActionChanged = false;
     const item = entry.projectId != null
       ? eq(statusUpdateEntries.projectId, entry.projectId)
       : eq(statusUpdateEntries.weeklyStatusItemId, entry.weeklyStatusItemId!);
@@ -58,21 +61,37 @@ export async function editStatusUpdate(roomId: number, entryId: number, authorId
       .where(and(eq(statusUpdateEntries.roomId, roomId), item))
       .orderBy(desc(statusUpdateEntries.createdAt), desc(statusUpdateEntries.id)).limit(1);
 
-    if (latest?.id === entryId && entry.content !== content) {
-      const values = { currentAction: content, updatedBy: authorId, updatedAt: new Date() };
+    if (latest?.id === entryId) {
+      const values = { currentAction: content, updatedBy: authorId, updatedAt: editedAt };
       if (entry.projectId != null) {
-        await tx.update(projectStatusReviews).set(values).where(and(
+        const [changed] = await tx.update(projectStatusReviews).set(values).where(and(
           eq(projectStatusReviews.roomId, roomId), eq(projectStatusReviews.projectId, entry.projectId),
           eq(projectStatusReviews.currentAction, entry.content),
-        ));
+        )).returning({ id: projectStatusReviews.id });
+        currentActionChanged = Boolean(changed);
       } else {
-        await tx.update(weeklyStatusItems).set(values).where(and(
+        const [changed] = await tx.update(weeklyStatusItems).set(values).where(and(
           eq(weeklyStatusItems.roomId, roomId), eq(weeklyStatusItems.id, entry.weeklyStatusItemId!),
           eq(weeklyStatusItems.currentAction, entry.content),
-        ));
+        )).returning({ id: weeklyStatusItems.id });
+        currentActionChanged = Boolean(changed);
       }
     }
-    const [updated] = await tx.update(statusUpdateEntries).set({ content }).where(where).returning();
+    const [updated] = await tx.update(statusUpdateEntries).set({ content, editedAt }).where(where).returning();
+    return { ...updated, currentActionChanged };
+  });
+}
+
+
+export async function editStatusNote(roomId: number, noteId: number, authorId: number, content: string) {
+  return db.transaction(async tx => {
+    const where = and(eq(projectReviewNotes.id, noteId), eq(projectReviewNotes.roomId, roomId));
+    const [note] = await tx.select().from(projectReviewNotes).where(where).for("update");
+    if (!note) throw Object.assign(new Error("Comentario no encontrado"), { statusCode: 404 });
+    if (note.authorId !== authorId) throw Object.assign(new Error("Solo el autor puede editarlo"), { statusCode: 403 });
+    if (note.content === content) return note;
+
+    const [updated] = await tx.update(projectReviewNotes).set({ content, editedAt: new Date() }).where(where).returning();
     return updated;
   });
 }

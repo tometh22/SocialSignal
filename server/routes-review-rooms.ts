@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { editStatusUpdate, saveStatusCurrentAction } from "./services/status-current-action";
+import { editStatusNote, editStatusUpdate, saveStatusCurrentAction } from "./services/status-current-action";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db } from "./db";
 import { storage } from "./storage";
@@ -293,7 +293,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
         })
         .from(reviewDailySessions)
         .where(eq(reviewDailySessions.roomId, roomId))
-        .orderBy(desc(reviewDailySessions.finishedAt))
+        .orderBy(desc(reviewDailySessions.finishedAt), desc(reviewDailySessions.id))
         .limit(60);
 
       const dayKey = (d: Date) => {
@@ -1082,6 +1082,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
           authorId: projectReviewNotes.authorId,
           authorName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
           createdAt: projectReviewNotes.createdAt,
+          editedAt: projectReviewNotes.editedAt,
         })
         .from(projectReviewNotes)
         .leftJoin(users, eq(users.id, projectReviewNotes.authorId))
@@ -1137,6 +1138,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
           authorId: projectReviewNotes.authorId,
           authorName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
           createdAt: projectReviewNotes.createdAt,
+          editedAt: projectReviewNotes.editedAt,
         })
         .from(projectReviewNotes)
         .leftJoin(users, eq(users.id, projectReviewNotes.authorId))
@@ -1204,20 +1206,12 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       const roomId = req.roomMember!.roomId;
       const noteId = parseInt(req.params.noteId, 10);
       const { content } = req.body ?? {};
-      if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
-      const userId = req.user!.id;
-      const [note] = await db.select({ authorId: projectReviewNotes.authorId })
-        .from(projectReviewNotes)
-        .where(and(eq(projectReviewNotes.id, noteId), eq(projectReviewNotes.roomId, roomId)));
-      if (!note) return res.status(404).json({ message: "Nota no encontrada" });
-      if (note.authorId !== userId) return res.status(403).json({ message: "Solo el autor puede editarla" });
-      const [updated] = await db.update(projectReviewNotes)
-        .set({ content: content.trim() })
-        .where(and(eq(projectReviewNotes.id, noteId), eq(projectReviewNotes.roomId, roomId)))
-        .returning();
-      res.json(updated);
-    } catch (error) {
-      res.status(500).json({ message: "Error al editar nota" });
+      if (typeof content !== "string" || !content.trim() || content.length > 20000) {
+        return res.status(400).json({ message: "El contenido es requerido" });
+      }
+      res.json(await editStatusNote(roomId, noteId, req.user!.id, content.trim()));
+    } catch (error: any) {
+      res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : "Error al editar comentario" });
     }
   });
 
@@ -1235,6 +1229,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
         authorId: statusUpdateEntries.authorId,
         authorName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, 'Usuario')`,
         createdAt: statusUpdateEntries.createdAt,
+        editedAt: statusUpdateEntries.editedAt,
       }).from(statusUpdateEntries)
         .leftJoin(users, eq(users.id, statusUpdateEntries.authorId))
         .where(and(eq(statusUpdateEntries.roomId, roomId), eq(statusUpdateEntries.projectId, projectId)))
@@ -1268,6 +1263,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
         authorId: statusUpdateEntries.authorId,
         authorName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, 'Usuario')`,
         createdAt: statusUpdateEntries.createdAt,
+        editedAt: statusUpdateEntries.editedAt,
       }).from(statusUpdateEntries)
         .leftJoin(users, eq(users.id, statusUpdateEntries.authorId))
         .where(and(eq(statusUpdateEntries.roomId, roomId), eq(statusUpdateEntries.weeklyStatusItemId, itemId)))
@@ -1612,6 +1608,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
           authorId: projectReviewNotes.authorId,
           authorName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
           createdAt: projectReviewNotes.noteDate,
+          editedAt: projectReviewNotes.editedAt,
         }).from(projectReviewNotes)
           .leftJoin(users, eq(users.id, projectReviewNotes.authorId))
           .where(and(eq(projectReviewNotes.roomId, roomId), eq(projectReviewNotes.projectId, where.projectId)))
@@ -1621,6 +1618,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
           authorId: projectReviewNotes.authorId,
           authorName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
           createdAt: projectReviewNotes.noteDate,
+          editedAt: projectReviewNotes.editedAt,
         }).from(projectReviewNotes)
           .leftJoin(users, eq(users.id, projectReviewNotes.authorId))
           .where(and(eq(projectReviewNotes.roomId, roomId), eq(projectReviewNotes.weeklyStatusItemId, where.itemId!)));
@@ -1652,7 +1650,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
     const [notes, changes] = await Promise.all([notesQ, changesQ.catch(() => [] as any[])]);
 
     return [
-      ...notes.map(n => ({ type: 'note' as const, id: n.id, content: n.content, authorId: n.authorId, authorName: n.authorName, createdAt: n.createdAt })),
+      ...notes.map(n => ({ ...n, type: 'note' as const })),
       ...changes.map((c: any) => ({ type: 'change' as const, id: c.id, userId: c.userId, userName: c.userName, fieldName: c.fieldName, oldValue: c.oldValue, newValue: c.newValue, createdAt: c.createdAt })),
     ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }

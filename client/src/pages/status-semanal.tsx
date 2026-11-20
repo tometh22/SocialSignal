@@ -17,6 +17,7 @@ import StatusFocusWorkspace from "@/components/review/StatusFocusWorkspace";
 import DailyDraftSuggestion from "@/components/review/DailyDraftSuggestion";
 import { useStatusMentions } from "@/components/review/useStatusMentions";
 import StatusFollowUpActions from "@/components/review/StatusFollowUpActions";
+import StatusMessageEditor, { StatusMessageEditedAt, type SavedStatusMessage, type StatusMessage, type StatusMessageType } from "@/components/review/StatusMessageEditor";
 import DailyStatusEditor from "@/components/review/DailyStatusEditor";
 import { useAutoResize } from "@/hooks/use-auto-resize-textarea";
 import RoomTitleEditor from "@/components/review/RoomTitleEditor";
@@ -29,7 +30,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   ClipboardList, MessageSquare, X, Send, Trash2, Pencil,
   AlertTriangle, Loader2, User, EyeOff, Eye,
@@ -117,10 +118,7 @@ type CustomItem = {
   lastDecisionChangeAt?: string | null;
 };
 
-type Note = {
-  id: number; projectId?: number; weeklyStatusItemId?: number; content: string; noteDate: string;
-  authorId: number | null; authorName: string | null; createdAt: string;
-};
+type Note = StatusMessage & { projectId?: number; weeklyStatusItemId?: number; noteDate: string };
 
 type AppUser = { id: number; name: string; email: string };
 
@@ -198,8 +196,7 @@ type DailySession = {
 };
 
 type ActivityEntry =
-  | { type: 'note'; id: number; content: string; authorId: number | null; authorName: string | null; createdAt: string }
-  | { type: 'update'; id: number; content: string; authorId: number | null; authorName: string | null; createdAt: string }
+  | (StatusMessage & { type: StatusMessageType })
   | { type: 'change'; id: number; userId: number | null; userName: string | null; fieldName: string; oldValue: string | null; newValue: string | null; createdAt: string };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1126,7 +1123,7 @@ function AttachmentBar({ onPickFile, onAddLink, uploading }: {
 
 // ─── Types for activity thread ──────────────────────────────────────────────
 
-type UpdateEntry = { id: number; content: string; authorId: number | null; authorName: string | null; createdAt: string };
+type UpdateEntry = StatusMessage;
 
 // (UpdateTimeline + InlineChat removed — superseded by ItemThread)
 
@@ -1531,15 +1528,6 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
 
 // ─── Unified activity thread (updates + notes merged) ────────────────────────
 
-type ThreadEntry = {
-  kind: 'update' | 'note';
-  id: number;
-  content: string;
-  authorId: number | null;
-  authorName: string | null;
-  createdAt: string;
-};
-
 function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull, compact = false }: {
   projectId?: number; customId?: number; currentUserId?: number | null;
   users?: AppUser[]; onOpenFull?: () => void; compact?: boolean;
@@ -1548,7 +1536,6 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
   const { toast } = useToast();
   const [draft, setDraft] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editText, setEditText] = useState('');
 
   const updatesUrl = projectId
     ? `/api/status-semanal/${projectId}/updates`
@@ -1574,9 +1561,9 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
     queryFn: async () => { const r = await authFetch(notesUrl); return r.json(); },
   });
 
-  const thread: ThreadEntry[] = [
+  const thread: (StatusMessage & { kind: StatusMessageType })[] = [
     ...updateEntries.map(e => ({ kind: 'update' as const, ...e })),
-    ...notes.map(n => ({ kind: 'note' as const, id: n.id, content: n.content, authorId: n.authorId, authorName: n.authorName, createdAt: n.createdAt })),
+    ...notes.map(n => ({ ...n, kind: 'note' as const })),
   ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
   const addNoteMutation = useMutation({
@@ -1590,26 +1577,6 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
       if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
     },
     onError: (err: Error) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
-  });
-
-  const addUpdateMutation = useMutation({
-    mutationFn: (content: string) => mutationFetch(updatesUrl, 'POST', { content }),
-    onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: updatesCacheKey });
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
-      if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
-    },
-    onError: (err: Error) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
-  });
-
-  const editUpdateMutation = useMutation({
-    mutationFn: ({ entryId, content }: { entryId: number; content: string }) =>
-      mutationFetch(`/api/status-semanal/updates/${entryId}`, 'PATCH', { content }),
-    onSuccess: () => {
-      setEditingId(null);
-      queryClient.refetchQueries({ queryKey: updatesCacheKey });
-    },
-    onError: (err: Error) => toast({ title: 'Error al editar', description: err.message, variant: 'destructive' }),
   });
 
   const submit = () => {
@@ -1640,7 +1607,7 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
         {visibleThread.map(entry => {
           const isOwn = entry.authorId != null && entry.authorId === currentUserId;
           const edKey = `${entry.kind}-${entry.id}`;
-          const canEdit = isOwn && entry.kind === 'update';
+          const canEdit = isOwn;
           return (
             <div key={edKey} className="flex items-start gap-2 group">
               <div className={cn("h-5 w-5 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0 mt-0.5",
@@ -1651,35 +1618,17 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <span className="text-[10px] font-semibold text-slate-700">{entry.authorName?.split(' ')[0] ?? 'Usuario'}</span>
                   <span className="text-[9px] text-slate-400">{shortDateTime(entry.createdAt)}</span>
+                  <StatusMessageEditedAt date={entry.editedAt} />
                   {canEdit && editingId !== edKey && (
-                    <button onClick={() => { setEditingId(edKey); setEditText(entry.content); }}
-                      className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-slate-300 hover:text-indigo-400">
+                    <button type="button" aria-label={entry.kind === "note" ? "Editar comentario" : "Editar update"} onClick={() => setEditingId(edKey)}
+                      className="ml-auto p-0.5 text-slate-500 hover:text-indigo-600">
                       <Pencil className="h-2.5 w-2.5" />
                     </button>
                   )}
                 </div>
                 {editingId === edKey ? (
-                  <div className="space-y-1">
-                    <textarea value={editText} autoFocus rows={4}
-                      onChange={e => setEditText(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (editText.trim()) editUpdateMutation.mutate({ entryId: entry.id, content: editText }); }
-                        if (e.key === 'Escape') setEditingId(null);
-                      }}
-                      className="w-full min-h-[100px] resize-y text-xs leading-relaxed border border-indigo-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
-                    />
-                    <div className="flex gap-1">
-                      <button onClick={() => { if (editText.trim()) editUpdateMutation.mutate({ entryId: entry.id, content: editText }); }}
-                        disabled={!editText.trim() || editUpdateMutation.isPending}
-                        className="px-2 py-0.5 bg-indigo-600 text-white rounded text-[10px] hover:bg-indigo-700 disabled:opacity-40">
-                        {editUpdateMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Guardar'}
-                      </button>
-                      <button onClick={() => setEditingId(null)}
-                        className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] hover:bg-slate-200">
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
+                  <StatusMessageEditor message={entry} type={entry.kind} projectId={projectId} customId={customId}
+                    onCancel={() => setEditingId(null)} onSaved={() => setEditingId(null)} />
                 ) : (
                   <StatusText className="text-xs text-slate-600">{entry.content}</StatusText>
                 )}
@@ -1940,13 +1889,10 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
   const [newNote, setNewNote] = useState('');
   const [publishUpdate, setPublishUpdate] = useState(true);
   const [editingEntry, setEditingEntry] = useState<{ id: number; type: 'note' | 'update' } | null>(null);
-  const [editText, setEditText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const newNoteRef = useRef<HTMLTextAreaElement>(null);
-  const editNoteRef = useRef<HTMLTextAreaElement>(null);
   const mentions = useStatusMentions(newNote, setNewNote, newNoteRef);
   useAutoResize(newNoteRef, newNote);
-  useAutoResize(editNoteRef, editText, editingEntry !== null);
   const currentUserId = (user as any)?.id;
 
   const notesUrl = projectId
@@ -2018,20 +1964,6 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
     onError: (err: Error) => toast({ title: 'Error al eliminar comentario', description: err.message, variant: 'destructive' }),
   });
 
-  const editMutation = useMutation({
-    mutationFn: ({ id, type, content }: { id: number; type: 'note' | 'update'; content: string }) =>
-      mutationFetch(`/api/status-semanal/${type === 'note' ? 'notes' : 'updates'}/${id}`, 'PATCH', { content }),
-    onSuccess: () => {
-      setEditingEntry(null);
-      queryClient.refetchQueries({ queryKey: updatesCacheKey });
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
-      if (customItemId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
-      queryClient.refetchQueries({ queryKey: activityCacheKey });
-      queryClient.refetchQueries({ queryKey: notesCacheKey });
-    },
-    onError: (err: Error) => toast({ title: 'Error al editar comentario', description: err.message, variant: 'destructive' }),
-  });
-
   const query = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const entryToOpen = query.has("updateId") ? `mind-update-${query.get("updateId")}` : query.has("noteId") ? `mind-note-${query.get("noteId")}` : null;
   useEffect(() => {
@@ -2061,7 +1993,7 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
           </div>
         )}
         {timeline.map((entry, idx) => {
-          if (entry.type === 'note' || entry.type === 'update') {
+          if (entry.type !== 'change') {
             const isOwn = currentUserId != null && entry.authorId === currentUserId;
             const isEditing = editingEntry?.id === entry.id && editingEntry.type === entry.type;
             const entryElementId = `mind-${entry.type}-${entry.id}`;
@@ -2082,44 +2014,18 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose, e
                         <TooltipContent className="text-xs">{fullDateTime(entry.createdAt)}</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
+                    <StatusMessageEditedAt date={entry.editedAt} />
                   </div>
                   {isEditing ? (
-                    <div className="space-y-1">
-                      <Textarea
-                        ref={editNoteRef}
-                        value={editText}
-                        onChange={e => setEditText(e.target.value)}
-                        autoFocus
-                        rows={1}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            if (editText.trim() && !editMutation.isPending) editMutation.mutate({ id: entry.id, type: entry.type, content: editText });
-                          } else if (e.key === 'Escape') {
-                            setEditingEntry(null);
-                          }
-                        }}
-                        className="resize-y overflow-auto text-[11px] min-h-[32px] bg-white px-2.5 py-1.5 leading-relaxed"
-                      />
-                      <div className="flex gap-1">
-                        <Button size="sm" className="h-6 px-2 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white"
-                          disabled={!editText.trim() || editMutation.isPending}
-                          onClick={() => editMutation.mutate({ id: entry.id, type: entry.type, content: editText })}>
-                          {editMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Guardar'}
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]"
-                          onClick={() => setEditingEntry(null)}>
-                          Cancelar
-                        </Button>
-                      </div>
-                    </div>
+                    <StatusMessageEditor message={entry} type={entry.type} projectId={projectId} customId={customItemId}
+                      onCancel={() => setEditingEntry(null)} onSaved={() => setEditingEntry(null)} />
                   ) : (
                     <StatusText className={embedded ? "text-sm leading-7 py-1" : "text-[11px] bg-white border border-slate-100 rounded-md px-2.5 py-1.5"}>{entry.content}</StatusText>
                   )}
                 </div>
                 {isOwn && !isEditing && (
                   <div className="flex flex-col gap-0.5 shrink-0 mt-0.5">
-                    <button aria-label={entry.type === 'note' ? 'Editar comentario' : 'Editar update'} onClick={() => { setEditingEntry({ id: entry.id, type: entry.type }); setEditText(entry.content); }} className="p-1 text-slate-500 hover:text-indigo-600">
+                    <button aria-label={entry.type === 'note' ? 'Editar comentario' : 'Editar update'} onClick={() => setEditingEntry({ id: entry.id, type: entry.type })} className="p-1 text-slate-500 hover:text-indigo-600">
                       <Pencil className="h-3 w-3" />
                     </button>
                     {entry.type === 'note' && <button aria-label="Eliminar comentario" onClick={() => deleteMutation.mutate(entry.id)} className="p-1 text-slate-500 hover:text-red-600">
@@ -2262,7 +2168,7 @@ function StatusFocusDetail({ item, users, currentUserId, roomId, onUpdate, onRes
 
 type DailyAgendaEntry = { item: Item; reasons: DailyReason[] };
 
-function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList }: {
+function DailyAgendaView({ agenda, quiet, dailyStatus, roomId, onStart, onOpenList, addItem }: {
   agenda: DailyAgendaEntry[];
   quiet: Item[];
   dailyStatus: DailyStatus | undefined;
@@ -2272,10 +2178,22 @@ function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList }: {
   addItem?: React.ReactNode;
 }) {
   const [showAllAgenda, setShowAllAgenda] = useState(false);
+  const [lastSummary, setLastSummary] = useState<DailySession | null>(null);
   const shownAgenda = showAllAgenda ? agenda : agenda.slice(0, 6);
   const total = agenda.length + quiet.length;
   const minutes = Math.max(1, Math.round(agenda.length ? agenda.length * 0.7 : quiet.length * 0.5));
   return <div data-testid="status-daily-home" className="flex-1 overflow-y-auto bg-slate-50/50">
+    {lastSummary && <Dialog open onOpenChange={open => { if (!open) setLastSummary(null); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Último resumen de la daily</DialogTitle>
+          <DialogDescription>{fullDateTime(lastSummary.finishedAt)} · {formatDuration(lastSummary.durationSeconds)}{lastSummary.userName ? ` · ${lastSummary.userName}` : ""}</DialogDescription>
+        </DialogHeader>
+        <DailySummaryChanges summary={lastSummary.summary} reviewedCount={lastSummary.reviewedCount} roomId={roomId} />
+        <div className="flex justify-end"><CopyDailySummary summary={lastSummary.summary} reviewedCount={lastSummary.reviewedCount}
+          date={new Date(lastSummary.finishedAt)} durationSeconds={lastSummary.durationSeconds} roomId={roomId} /></div>
+      </DialogContent>
+    </Dialog>}
     <div className="max-w-5xl mx-auto px-6 sm:px-10 py-9 sm:py-12">
       <div className="flex flex-wrap items-start justify-between gap-7 pb-9">
         <div className="max-w-xl">
@@ -2289,6 +2207,9 @@ function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList }: {
             className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40 shadow-sm">
             <Play className="h-3.5 w-3.5 fill-current" />{dailyStatus?.todayDone ? 'Repetir la daily' : 'Empezar la daily'}
           </button>
+          {dailyStatus?.latest && <Button type="button" variant="outline" className="gap-2" onClick={() => setLastSummary(dailyStatus.latest)}>
+            <FileText className="h-4 w-4" />Ver último resumen de la daily
+          </Button>}
           {total > 0 && <span className="text-xs text-slate-400">Aprox. {minutes} min · {agenda.length || quiet.length} temas</span>}
         </div>
       </div>
@@ -2324,9 +2245,72 @@ function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList }: {
 // ─── Modo Daily: runner (pantallas 2 y 3) ────────────────────────────────────
 
 type DailyChange = { key: string; title: string; changes: string[] };
+type DailyRecordedChange = Omit<DailyChange, "changes"> & { changes: { text: string; updateId?: number }[] };
+
+function dailyUnchangedLabel(count: number) {
+  return count === 1 ? "1 tema revisado sin cambios" : `${count} temas revisados sin cambios`;
+}
+
+function DailySummaryChanges({ summary, reviewedCount, roomId }: {
+  summary: DailyChange[];
+  reviewedCount: number;
+  roomId?: number | null;
+}) {
+  return <>
+    {summary.length ? (
+      <ul className="mt-3 space-y-3 text-sm text-slate-700">
+        {summary.map(item => {
+          const path = statusItemPath(roomId, item.key);
+          return <li key={item.key}>
+            {path ? <a href={path} target="_blank" rel="noreferrer" className="font-semibold text-indigo-700 underline underline-offset-2">{item.title}</a> : <strong>{item.title}</strong>}
+            <StatusText className="mt-0.5">{item.changes.join(" · ")}</StatusText>
+          </li>;
+        })}
+      </ul>
+    ) : <p className="mt-3 text-sm text-slate-500">Sin cambios registrados. Todo sigue igual.</p>}
+    <p className="mt-3 text-xs text-slate-500">{dailyUnchangedLabel(Math.max(0, reviewedCount - summary.length))}</p>
+  </>;
+}
+
+function CopyDailySummary({ summary, reviewedCount, date, durationSeconds, roomId }: {
+  summary: DailyChange[];
+  reviewedCount: number;
+  date: Date;
+  durationSeconds: number;
+  roomId?: number | null;
+}) {
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    const lines = [`Daily · ${date.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "short" })} · ${formatDuration(durationSeconds)}`, ""];
+    if (!summary.length) lines.push("Sin cambios. Todo sigue igual.");
+    for (const item of summary) {
+      const url = statusItemUrl(roomId, item.key);
+      lines.push(`• ${item.title}: ${item.changes.join(" · ")}${url ? ` · ${url}` : ""}`);
+    }
+    const unchanged = reviewedCount - summary.length;
+    if (unchanged > 0) lines.push("", `+ ${dailyUnchangedLabel(unchanged)}`);
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      setCopied(true);
+    } catch {
+      toast({ title: "No se pudo copiar", variant: "destructive" });
+    }
+  }
+  return <Button type="button" variant="outline" onClick={copy} className="gap-2 text-indigo-700">
+    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+    {copied ? "Copiado" : "Copiar resumen"}
+  </Button>;
+}
+
 
 // Contexto del ítem actual: últimos 2 updates/comentarios del thread.
-function DailyItemContext({ item }: { item: Item }) {
+function DailyItemContext({ item, currentUserId, onEdited }: {
+  item: Item;
+  currentUserId: number | null;
+  onEdited: (type: StatusMessageType, saved: SavedStatusMessage) => void;
+}) {
+  const [editing, setEditing] = useState<string | null>(null);
   const updatesUrl = item.projectId ? `/api/status-semanal/${item.projectId}/updates` : `/api/status-semanal/custom/${item.customId}/updates`;
   const notesUrl = item.projectId ? `/api/status-semanal/${item.projectId}/notes` : `/api/status-semanal/custom/${item.customId}/notes`;
   const updatesKey = item.projectId ? ['/api/status-semanal', item.projectId, 'updates'] : ['/api/status-semanal/custom', item.customId, 'updates'];
@@ -2334,8 +2318,8 @@ function DailyItemContext({ item }: { item: Item }) {
   const { data: updates = [] } = useQuery<UpdateEntry[]>({ queryKey: updatesKey, queryFn: async () => { const r = await authFetch(updatesUrl); return r.json(); } });
   const { data: notes = [] } = useQuery<Note[]>({ queryKey: notesKey, queryFn: async () => { const r = await authFetch(notesUrl); return r.json(); } });
   const thread = [
-    ...updates.map(e => ({ id: `u${e.id}`, content: e.content, authorName: e.authorName, createdAt: e.createdAt })),
-    ...notes.map(n => ({ id: `n${n.id}`, content: n.content, authorName: n.authorName, createdAt: n.createdAt })),
+    ...updates.map(entry => ({ ...entry, type: 'update' as const })),
+    ...notes.map(entry => ({ ...entry, type: 'note' as const })),
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 2);
 
   if (thread.length === 0) {
@@ -2343,12 +2327,31 @@ function DailyItemContext({ item }: { item: Item }) {
   }
   return (
     <div className="space-y-2">
-      {thread.map((e, i) => (
-        <div key={e.id} className={cn("text-sm bg-slate-50 rounded-lg p-3 border border-slate-100", i > 0 && "opacity-70")}>
-          <StatusText className="text-slate-700">{e.content}</StatusText>
-          <div className="text-[11px] text-slate-400 mt-1">{e.authorName?.split(' ')[0] ?? 'Usuario'} · {shortDateTime(e.createdAt)}</div>
-        </div>
-      ))}
+      {thread.map((entry, index) => {
+        const key = `${entry.type}-${entry.id}`;
+        const canEdit = currentUserId != null && entry.authorId === currentUserId;
+        return (
+          <div key={key} className={cn("text-sm bg-slate-50 rounded-lg p-3 border border-slate-100", index > 0 && !canEdit && "opacity-70")}>
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                {editing !== key && <StatusText className="text-slate-700">{entry.content}</StatusText>}
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-slate-500">
+                  <span>{entry.authorName?.split(' ')[0] ?? 'Usuario'} · {shortDateTime(entry.createdAt)}</span>
+                  <StatusMessageEditedAt date={entry.editedAt} />
+                </div>
+              </div>
+              {canEdit && editing !== key && (
+                <button type="button" onClick={() => setEditing(key)} className="shrink-0 rounded p-1.5 text-slate-500 hover:bg-white hover:text-indigo-600"
+                  aria-label={entry.type === 'note' ? 'Editar comentario' : 'Editar update'} title="Editar mensaje">
+                  <Pencil className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {editing === key && <StatusMessageEditor message={entry} type={entry.type} projectId={item.projectId} customId={item.customId}
+              onCancel={() => setEditing(null)} onSaved={saved => { setEditing(null); if (saved.content !== entry.content) onEdited(entry.type, saved); }} />}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -2370,12 +2373,11 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   const [idx, setIdx] = useState(startIndex);
   const [draft, setDraft] = useState('');
   const [picker, setPicker] = useState<'decision' | 'owner' | 'deadline' | null>(null);
-  const [changes, setChanges] = useState<Map<string, DailyChange>>(new Map());
+  const [changes, setChanges] = useState<Map<string, DailyRecordedChange>>(new Map());
   // Overrides locales para reflejar cambios al instante sin esperar el refetch.
   const [local, setLocal] = useState<Map<string, Partial<Item>>>(new Map());
   const [elapsed, setElapsed] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [listening, setListening] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mentions = useStatusMentions(draft, setDraft, textareaRef);
@@ -2395,11 +2397,14 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   // The saved update belongs in the history, never in the new-message draft.
   useEffect(() => { setDraft(''); mentions.reset(); setPicker(null); if (!done) setTimeout(() => textareaRef.current?.focus(), 30); }, [idx, done]);
 
-  const record = (it: Item, text: string) => {
+  const record = (it: Item, text: string, updateId?: number) => {
     setChanges(prev => {
       const n = new Map(prev);
       const cur = n.get(it.key) ?? { key: it.key, title: it.title, changes: [] };
-      n.set(it.key, { ...cur, changes: [...cur.changes, text] });
+      const matching = updateId == null ? -1 : cur.changes.findIndex(change => change.updateId === updateId);
+      const next = matching === -1 ? [...cur.changes, { text, updateId }]
+        : cur.changes.map((change, index) => index === matching ? { text, updateId } : change);
+      n.set(it.key, { ...cur, changes: next });
       return n;
     });
   };
@@ -2407,11 +2412,12 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
 
   const postUpdate = async (it: Item, content: string) => {
     const url = it.projectId ? `/api/status-semanal/${it.projectId}/updates` : `/api/status-semanal/custom/${it.customId}/updates`;
-    await mutationFetch(url, 'POST', { content, expectedCurrentAction: it.currentAction, ...(mentions.mentionIds.length ? { mentionIds: mentions.mentionIds } : {}) });
+    const saved = await mutationFetch(url, 'POST', { content, expectedCurrentAction: it.currentAction, ...(mentions.mentionIds.length ? { mentionIds: mentions.mentionIds } : {}) });
     const key = it.projectId ? ['/api/status-semanal', it.projectId, 'updates'] : ['/api/status-semanal/custom', it.customId, 'updates'];
     queryClient.refetchQueries({ queryKey: key });
     queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
     if (it.isCustom) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
+    return saved.updateEntryId as number | undefined;
   };
 
   const next = async () => {
@@ -2420,9 +2426,9 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
     if (t && t !== (item.currentAction ?? '').trim()) {
       savingUpdate.current = true;
       try {
-        await postUpdate(item, t);
+        const updateId = await postUpdate(item, t);
         patchLocal(item, { currentAction: t });
-        record(item, `💬 ${t}`);
+        record(item, `💬 ${t}`, updateId);
       } catch (err: any) {
         toast({ title: 'No se pudo guardar el update', description: err.message, variant: 'destructive' });
         return;
@@ -2496,9 +2502,10 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
     const handler = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.isComposing || document.querySelector('[data-status-task-dialog]')) return;
       const el = document.activeElement as HTMLElement | null;
+      if (el?.closest('[data-status-message-editor]')) return;
       const inText = el?.tagName === 'TEXTAREA' || el?.tagName === 'INPUT' || el?.tagName === 'SELECT' || el?.isContentEditable;
-      if (e.key === 'Escape') { e.preventDefault(); if (picker) setPicker(null); else if (listening) toggleListening(); else onExit(); return; }
-      if (done) { if (e.key === 'Enter' && !inText) { e.preventDefault(); void finish(); } return; }
+      if (e.key === 'Escape') { e.preventDefault(); if (picker) setPicker(null); else if (listening) toggleListening(); else if (done) void finish(); else onExit(); return; }
+      if (done) { if (e.key === 'Enter' && !inText && !el?.closest('button, a')) { e.preventDefault(); void finish(); } return; }
       // Keep Ctrl/⌘+Enter working too; Shift+Enter remains a newline.
       const inTextarea = el === textareaRef.current;
       if (e.key === 'Enter' && !e.shiftKey && (!inText || inTextarea)) { e.preventDefault(); void next(); return; }
@@ -2517,27 +2524,15 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
     return () => window.removeEventListener('keydown', handler);
   });
 
-  const summaryList = useMemo(() => Array.from(changes.values()), [changes]);
-  const buildShareText = () => {
-    const lines = [`Daily · ${new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'short' })} · ${formatDuration(elapsed)}`, ''];
-    if (summaryList.length === 0) lines.push('Sin cambios. Todo sigue igual.');
-    for (const s of summaryList) {
-      const url = statusItemUrl(roomId, s.key);
-      lines.push(`• ${s.title}: ${s.changes.join(' · ')}${url ? ` · ${url}` : ''}`);
-    }
-    const untouched = queue.length - summaryList.length + quietCount;
-    if (untouched > 0) lines.push('', `+ ${untouched} ítems revisados sin cambios`);
-    return lines.join('\n');
-  };
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(buildShareText()); setCopied(true); setTimeout(() => setCopied(false), 2000); }
-    catch { toast({ title: 'No se pudo copiar', variant: 'destructive' }); }
-  };
+  const summaryList = useMemo(() => Array.from(changes.values(), item => ({
+    ...item, changes: item.changes.map(change => change.text),
+  })), [changes]);
+  const reviewedCount = queue.length + quietCount;
   const finish = async () => {
     if (saving) return;
     setSaving(true);
     try {
-      await onFinish({ startedAt: startedAt.toISOString(), reviewedCount: queue.length + quietCount, changedCount: summaryList.length, summary: summaryList });
+      await onFinish({ startedAt: startedAt.toISOString(), reviewedCount, changedCount: summaryList.length, summary: summaryList });
     } finally { setSaving(false); }
   };
 
@@ -2554,7 +2549,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
             <span>{done ? 'Daily lista' : <>Ítem <b className="text-slate-800">{idx + 1}</b> de {queue.length}</>}</span>
             <span className="flex items-center gap-3">
               <span className="font-mono">{mm}:{ss}</span>
-              <button onClick={onExit} className="text-slate-400 hover:text-slate-700 underline">salir</button>
+              <button onClick={done ? finish : onExit} disabled={saving} className="text-slate-400 hover:text-slate-700 underline">salir</button>
             </span>
           </div>
           <div className="flex gap-1">
@@ -2569,23 +2564,13 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
           <div className="p-6 grid grid-cols-3 max-md:grid-cols-1 gap-6">
             <div className="col-span-2">
               <h2 className="text-xl font-bold text-slate-800">Daily lista · {formatDuration(elapsed)}</h2>
-              {summaryList.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-500">Sin cambios registrados. Todo sigue igual.</p>
-              ) : (
-                <ul className="mt-3 text-sm space-y-1.5 text-slate-700">
-                  {summaryList.map(s => (
-                    <li key={s.key}><b>{s.title}</b> · {s.changes.join(' · ')}</li>
-                  ))}
-                </ul>
-              )}
-              <p className="text-xs text-slate-400 mt-3">+ {queue.length - summaryList.length + quietCount} ítems revisados sin cambios</p>
+              <DailySummaryChanges summary={summaryList} reviewedCount={reviewedCount} roomId={roomId} />
               <p className="text-xs text-slate-400 mt-4 leading-relaxed">Lo que escribiste ya quedó guardado como update de cada ítem. Este resumen queda registrado como la daily de hoy.</p>
             </div>
             <div className="bg-indigo-50 rounded-xl p-4 text-sm flex flex-col gap-2">
               <div className="text-[11px] text-indigo-500 uppercase tracking-wide font-bold">Compartir</div>
-              <button onClick={copy} className="w-full flex items-center justify-center gap-2 bg-white border border-indigo-200 text-indigo-700 rounded-lg py-2 font-medium hover:bg-indigo-100 transition-colors">
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? 'Copiado' : 'Copiar para WhatsApp / mail'}
-              </button>
+              <CopyDailySummary summary={summaryList} reviewedCount={reviewedCount} date={startedAt}
+                durationSeconds={elapsed} roomId={roomId} />
               <button onClick={finish} disabled={saving} className="mt-auto w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg py-2 font-semibold flex items-center justify-center gap-2">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Cerrar daily <kbd className="text-[10px] bg-indigo-500 rounded px-1.5">⏎</kbd>
               </button>
@@ -2620,7 +2605,10 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
 
               <div className="mt-5 space-y-2">
                 <div className="text-[11px] text-slate-400 uppercase tracking-wide font-bold">Comentarios y antecedentes</div>
-                <DailyItemContext item={item} />
+                <DailyItemContext key={item.key} item={item} currentUserId={currentUserId} onEdited={(type, saved) => {
+                  if (saved.currentActionChanged) patchLocal(item, { currentAction: saved.content });
+                  record(item, `✏️ ${saved.content}`, type === "update" ? saved.id : undefined);
+                }} />
               </div>
 
               <div className="mt-5">
@@ -2632,7 +2620,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
                   onUse={text => { setDraft(text); textareaRef.current?.focus(); }} />
                 {changes.get(item.key)?.changes.length ? (
                   <div className="flex flex-wrap gap-1.5 mt-2">
-                    {changes.get(item.key)!.changes.map((c, i) => <span key={i} className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5">{c}</span>)}
+                    {changes.get(item.key)!.changes.map((c, i) => <span key={i} className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5">{c.text}</span>)}
                   </div>
                 ) : null}
               </div>
@@ -3179,7 +3167,12 @@ export default function StatusSemanalPage({ initialItemKey, initialViewMode }: {
 
   const finishDaily = async (payload: { startedAt: string; reviewedCount: number; changedCount: number; summary: DailyChange[] }) => {
     try {
-      await mutationFetch('/api/status-semanal/daily-sessions', 'POST', payload);
+      const saved: DailySession = await mutationFetch('/api/status-semanal/daily-sessions', 'POST', payload);
+      if (saved?.id && Array.isArray(saved.summary)) {
+        queryClient.setQueryData<DailyStatus>(['/api/status-semanal/daily-sessions/latest'], previous => ({
+          latest: saved, todayDone: true, streak: previous?.streak ?? 0,
+        }));
+      }
       setDailyRun(null);
       toast({ title: 'Daily cerrada', description: payload.changedCount > 0 ? `${payload.changedCount} ítem${payload.changedCount === 1 ? '' : 's'} con cambios.` : 'Sin cambios. Todo sigue igual.' });
       refetchDailyStatus();

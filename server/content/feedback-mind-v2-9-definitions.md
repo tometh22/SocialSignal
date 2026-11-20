@@ -502,3 +502,5 @@ El filtro de Servicio sin modalidad permite explorar las cuatro recetas. Al apli
 | Status | Publicar una actualización desde Actividad actualiza Estado actual. Los comentarios siguen disponibles como conversación. Una edición del update vigente también actualiza el estado. |
 | Status | Al guardar una actualización desde la daily se avisa a los miembros seleccionados con @. La campana abre el tema en la actualización mencionada. Cerrar la daily sigue generando el aviso de sala. |
 | Status | Un tema puede iniciar una tarea con el contexto y el enlace al origen. Crear proyecto abre el formulario de Vista de proyectos con el contexto precargado y los permisos vigentes. |
+| Status | Las personas pueden corregir sus actualizaciones y comentarios desde la daily y Actividad. La fecha original se conserva y se muestra la fecha y hora de la última edición. |
+| Status | La agenda permite volver a abrir y copiar el último resumen guardado de la sala, con enlaces a los temas. Salir desde la pantalla de resumen guarda la daily. |

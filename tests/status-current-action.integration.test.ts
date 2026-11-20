@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, afterAll, describe, expect, it, vi } from 'vitest';
 import { Pool } from 'pg';
 import { getTableColumns, getTableName } from 'drizzle-orm';
-import { projectStatusReviews, weeklyStatusItems, statusUpdateEntries, statusChangeLog, reviewRooms, reviewRoomMembers, users, userNotifications, userNotificationPreferences, userNotificationThreadMutes, tasks, activeProjects, taskProjectMembers, personnel, crmLeads, quotations, quotationApprovals, quotationRevisions, personnelAbsences, personnelMonthlySettlements, monthlySettlementDeclarations } from '../shared/schema';
+import { projectStatusReviews, weeklyStatusItems, projectReviewNotes, statusUpdateEntries, statusChangeLog, reviewRooms, reviewRoomMembers, users, userNotifications, userNotificationPreferences, userNotificationThreadMutes, tasks, activeProjects, taskProjectMembers, personnel, crmLeads, quotations, quotationApprovals, quotationRevisions, personnelAbsences, personnelMonthlySettlements, monthlySettlementDeclarations } from '../shared/schema';
 const fixture = vi.hoisted(() => ({ url: process.env.FINANCIAL_TEST_DATABASE_URL, schema: `status_action_${process.pid}` }));
 if (fixture.url && !['localhost','127.0.0.1','[::1]'].includes(new URL(fixture.url).hostname)) throw new Error('Local test database required');
 vi.mock('../server/db', async () => {
@@ -10,18 +10,18 @@ vi.mock('../server/db', async () => {
   return {pool,db:drizzle(pool)};
 });
 import {pool} from '../server/db';
-import {editStatusUpdate, saveStatusCurrentAction} from '../server/services/status-current-action';
+import {editStatusNote, editStatusUpdate, saveStatusCurrentAction} from '../server/services/status-current-action';
 describe.skipIf(!fixture.url)('canonical Status and Daily state in PostgreSQL', () => {
   let admin: Pool;
   beforeAll(async () => {
     admin=new Pool({connectionString:fixture.url}); await admin.query(`CREATE SCHEMA ${fixture.schema}`);
-    for (const table of [projectStatusReviews,weeklyStatusItems,statusUpdateEntries,statusChangeLog,reviewRooms,reviewRoomMembers,users,userNotifications,userNotificationPreferences,userNotificationThreadMutes, tasks, activeProjects, taskProjectMembers, personnel, crmLeads, quotations, quotationApprovals, quotationRevisions, personnelAbsences, personnelMonthlySettlements, monthlySettlementDeclarations]) {
+    for (const table of [projectStatusReviews,weeklyStatusItems,projectReviewNotes,statusUpdateEntries,statusChangeLog,reviewRooms,reviewRoomMembers,users,userNotifications,userNotificationPreferences,userNotificationThreadMutes, tasks, activeProjects, taskProjectMembers, personnel, crmLeads, quotations, quotationApprovals, quotationRevisions, personnelAbsences, personnelMonthlySettlements, monthlySettlementDeclarations]) {
       const columns = Object.values(getTableColumns(table)).map(col => `"${col.name}" ${col.getSQLType()}${col.primary ? ' PRIMARY KEY' : ''}`);
       await pool.query(`CREATE TABLE "${getTableName(table)}" (${columns.join(',')})`);
     }
   });
   beforeEach(async () => {
-    await pool.query('TRUNCATE project_status_reviews,weekly_status_items,status_update_entries,status_change_log,review_rooms,review_room_members,users,user_notifications RESTART IDENTITY');
+    await pool.query('TRUNCATE project_status_reviews,weekly_status_items,status_update_entries,status_change_log,project_review_notes,review_rooms,review_room_members,users,user_notifications RESTART IDENTITY');
     await pool.query("INSERT INTO project_status_reviews(room_id,project_id,current_action,next_milestone) VALUES(1,100,'Anterior','Conservar historial'); INSERT INTO weekly_status_items(id,room_id,title,current_action) VALUES(10,1,'QA','Anterior')");
   });
   afterAll(async () => {await pool.end(); if(admin) {await admin.query(`DROP SCHEMA ${fixture.schema} CASCADE`);await admin.end();}});
@@ -64,8 +64,24 @@ describe.skipIf(!fixture.url)('canonical Status and Daily state in PostgreSQL', 
     await editStatusUpdate(1,1,2,'Corrección del primero');
     expect((await pool.query('SELECT current_action FROM weekly_status_items')).rows[0].current_action).toBe('Último');
     await expect(editStatusUpdate(1,2,3,'Ajeno')).rejects.toMatchObject({statusCode:403});
-    await editStatusUpdate(1,2,2,'Corrección del último');
+    const original = (await pool.query("UPDATE status_update_entries SET created_at='2026-01-02' WHERE id=2 RETURNING created_at::text")).rows[0];
+    await pool.query("UPDATE status_update_entries SET created_at='2026-01-01' WHERE id=1");
+    const edited = await editStatusUpdate(1,2,2,'Corrección del último');
+    expect(edited.currentActionChanged).toBe(true);
+    expect(edited.editedAt).toBeInstanceOf(Date);
+    expect((await pool.query('SELECT created_at::text FROM status_update_entries WHERE id=2')).rows[0]).toEqual(original);
+    expect((await editStatusUpdate(1,2,2,edited.content)).editedAt).toEqual(edited.editedAt);
     expect((await pool.query('SELECT current_action FROM weekly_status_items')).rows[0].current_action).toBe('Corrección del último');
+  });
+  it('timestamps comments on actual changes and restricts edits to their room and author', async () => {
+    await pool.query("INSERT INTO project_review_notes(id,room_id,weekly_status_item_id,author_id,content,created_at) VALUES(1,1,10,2,'Una nota','2026-01-01')");
+    await expect(editStatusNote(2,1,2,'Fuera de la sala')).rejects.toMatchObject({statusCode:404});
+    await expect(editStatusNote(1,1,3,'Autor ajeno')).rejects.toMatchObject({statusCode:403});
+    expect((await editStatusNote(1,1,2,'Una nota')).editedAt).toBeNull();
+    const saved = await editStatusNote(1,1,2,'Nota corregida');
+    expect(saved.editedAt).toBeInstanceOf(Date);
+    expect((await pool.query("SELECT created_at::text FROM project_review_notes WHERE id=1")).rows[0].created_at).toBe("2026-01-01 00:00:00");
+    expect((await editStatusNote(1,1,2,saved.content)).editedAt).toEqual(saved.editedAt);
   });
   it('serializes concurrent edits of the same state', async () => {
     const edits=await Promise.allSettled(['A','B'].map(value=>saveStatusCurrentAction(1,{projectId:100},value,2,'Anterior')));

@@ -2,7 +2,7 @@
 
 ## 1.14.61 — 2026-11-20
 
-- Status: mencioná a los miembros de la sala en una actualización, publicá desde Actividad y creá tareas o iniciá proyectos con el contexto del tema.
+- Status: mencioná a los miembros de la sala en una actualización, publicá desde Actividad y creá tareas o iniciá proyectos con el contexto del tema. Editá tus mensajes con fecha visible y volvé a abrir el último resumen de la daily.
 - Tareas: mové tareas con sus subtareas, plegá todas las secciones y eliminá secciones sin trasladar sus tareas. Las horas registradas protegen el historial contra el borrado.
 - Horas: el Panel de horas totaliza por tarea y los miembros pueden consultar las cargas del equipo dentro de su proyecto.
 - Cierre del equipo y Mis facturas: el cierre directo en USD conserva la tarifa histórica en dólares y habilita la autorización sin pedir un tipo de cambio.
