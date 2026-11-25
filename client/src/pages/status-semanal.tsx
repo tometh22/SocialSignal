@@ -1857,6 +1857,7 @@ const FIELD_LABELS: Record<string, string> = {
   mainRisk: 'Riesgo principal',
   currentAction: 'Update',
   nextMilestone: 'Próximo paso',
+  nextMilestoneDate: 'Fecha del próximo paso',
   deadline: 'Deadline',
   ownerId: 'Owner',
   decisionNeeded: 'Decisión',
@@ -1865,7 +1866,7 @@ const FIELD_LABELS: Record<string, string> = {
 
 function formatChangeValue(fieldName: string, value: string | null): string {
   if (value == null) return '(vacío)';
-  if (fieldName === 'deadline') {
+  if (fieldName === 'deadline' || fieldName === 'nextMilestoneDate') {
     try { return new Date(value).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }); } catch { return value; }
   }
   if (fieldName === 'proposal') {

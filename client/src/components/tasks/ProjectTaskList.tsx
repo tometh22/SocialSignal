@@ -745,9 +745,10 @@ interface SectionBlockProps {
   collapsed?: boolean;
   onToggleSection?: () => void;
   enableDrag?: boolean;
+  otherSectionNames?: string[];
 }
 
-function SectionBlock({ canManageSections = false, canEditSections = canManageSections, sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, onDuplicateSection, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, collapsed = false, onToggleSection, enableDrag = true }: SectionBlockProps) {
+function SectionBlock({ canManageSections = false, canEditSections = canManageSections, sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, onDuplicateSection, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, collapsed = false, onToggleSection, enableDrag = true, otherSectionNames = [] }: SectionBlockProps) {
   const [visibleLimit, setVisibleLimit] = useState(80);
   const effectiveCollapsed = forceExpand ? false : collapsed;
   const [showAdd, setShowAdd] = useState(false);
@@ -755,6 +756,7 @@ function SectionBlock({ canManageSections = false, canEditSections = canManageSe
   const [renamingSection, setRenamingSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState(sectionName);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [moveLoggedTo, setMoveLoggedTo] = useState("");
   const [expandedSubtasks, setExpandedSubtasks] = useState<Set<number>>(new Set());
 
   useEffect(() => {
@@ -782,9 +784,21 @@ function SectionBlock({ canManageSections = false, canEditSections = canManageSe
     },
   });
 
+  const deletePreview = useQuery<{ deletableTaskCount: number; keptTaskCount: number; keptTasks: { id: number; title: string; taskCount: number }[] }>({
+    queryKey: ["/api/tasks/section/delete-preview", projectId, sectionName],
+    queryFn: () => authFetchJson(`/api/tasks/section/delete-preview?${new URLSearchParams({ projectId: String(projectId), sectionName })}`),
+    enabled: showDeleteConfirm,
+    staleTime: 0,
+  });
+  const keptTaskCount = deletePreview.data?.keptTasks.length ?? 0;
+  const moveTarget = moveLoggedTo || otherSectionNames[0] || "";
   const deleteMutation = useMutation({
-    mutationFn: () => apiRequest("/api/tasks/section", "DELETE", { projectId, sectionName }),
-    onSuccess: () => { onRefresh(); toast({ title: "Sección eliminada" }); },
+    mutationFn: () => apiRequest("/api/tasks/section", "DELETE", { projectId, sectionName, ...(keptTaskCount > 0 ? { moveLoggedTo: moveTarget } : {}) }),
+    onSuccess: () => {
+      onRefresh();
+      setShowDeleteConfirm(false);
+      toast({ title: "Sección eliminada", description: keptTaskCount > 0 ? `${keptTaskCount} ${keptTaskCount === 1 ? "tarea con horas se movió" : "tareas con horas se movieron"} a "${moveTarget}".` : undefined });
+    },
     onError: (error: Error) => toast({ title: "No se pudo eliminar la sección", description: error.message, variant: "destructive" }),
   });
 
@@ -1023,16 +1037,39 @@ function SectionBlock({ canManageSections = false, canEditSections = canManageSe
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar sección "{sectionName}"?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se eliminarán la sección, sus tareas y su planificación. Si alguna tarea tiene horas registradas, la sección se conservará.
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                {deletePreview.isError ? <p>No se pudo revisar la sección. Cerrá y volvé a intentar.</p>
+                  : !deletePreview.data ? <p>Revisando las tareas de la sección…</p>
+                  : <>
+                    <p>
+                      Se eliminarán la sección{deletePreview.data!.deletableTaskCount > 0 ? `, ${deletePreview.data!.deletableTaskCount} ${deletePreview.data!.deletableTaskCount === 1 ? "tarea" : "tareas"} sin horas` : ""} y su planificación. Las tareas no se mueven a General.
+                    </p>
+                    {keptTaskCount > 0 && (
+                      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                        <p className="font-medium">{keptTaskCount === 1 ? "1 tarea tiene horas registradas y no se puede borrar sin perder el historial. Se mueve con sus subtareas." : `${keptTaskCount} tareas tienen horas registradas y no se pueden borrar sin perder el historial. Se mueven con sus subtareas.`}</p>
+                        <p className="mt-1 text-xs">{deletePreview.data!.keptTasks.slice(0, 5).map(task => task.title).join(" · ")}{deletePreview.data!.keptTasks.length > 5 ? " …" : ""}</p>
+                        {otherSectionNames.length > 0 ? (
+                          <div className="mt-2 space-y-1">
+                            <label className="text-xs font-medium" htmlFor={`move-logged-${sectionName}`}>Moverlas a</label>
+                            <Select value={moveTarget} onValueChange={setMoveLoggedTo}>
+                              <SelectTrigger id={`move-logged-${sectionName}`} aria-label="Sección para las tareas con horas" className="h-8 bg-white text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>{otherSectionNames.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </div>
+                        ) : <p className="mt-2 text-xs">Creá otra sección para moverlas antes de eliminar esta.</p>}
+                      </div>
+                    )}
+                  </>}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              disabled={deleteMutation.isPending}
-              onClick={() => deleteMutation.mutate()}
+              disabled={deleteMutation.isPending || !deletePreview.data || (keptTaskCount > 0 && !moveTarget)}
+              onClick={event => { event.preventDefault(); deleteMutation.mutate(); }}
             >
               Eliminar
             </AlertDialogAction>
@@ -1721,6 +1758,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                       allPersonnelForSort={allPersonnel}
                       isFirst={idx === 0}
                       enableDrag={enableDrag}
+                      otherSectionNames={Object.keys(sectionsRaw).filter(name => name !== section)}
                       collapsed={collapsedSections.has(section)}
                       onToggleSection={() => setCollapsedSections(current => {
                         const next = new Set(current);

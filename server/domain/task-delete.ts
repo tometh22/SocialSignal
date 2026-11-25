@@ -30,3 +30,30 @@ export async function deleteTaskTreesInTransaction(
   await tx.delete(tasks).where(inArray(tasks.id, ids));
   return { deletedTaskIds: ids, parentTaskIds: parents };
 }
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Split a section into deletable task trees and trees that must survive because
+ * some task in them has native or imported hours. A tree is a task of the
+ * section whose parent is outside it, plus all of its descendants.
+ */
+export async function planSectionDeletion(tx: Tx, projectId: number, sectionName: string) {
+  const { rows } = await tx.execute(sql`WITH RECURSIVE roots AS (
+      SELECT t.id FROM tasks t
+      WHERE t.project_id=${projectId} AND t.section_name=${sectionName}
+        AND (t.parent_task_id IS NULL OR NOT EXISTS (
+          SELECT 1 FROM tasks parent WHERE parent.id=t.parent_task_id AND parent.section_name=${sectionName}))
+    ), tree AS (
+      SELECT id AS root_id, id FROM roots
+      UNION SELECT tree.root_id, child.id FROM tasks child JOIN tree ON child.parent_task_id=tree.id
+    )
+    SELECT tree.root_id, root.title, COUNT(*)::int AS task_count,
+      bool_or(EXISTS (SELECT 1 FROM task_time_entries e WHERE e.task_id=tree.id)
+        OR EXISTS (SELECT 1 FROM asana_time_entries a WHERE a.task_id=tree.id)) AS has_hours
+    FROM tree JOIN tasks root ON root.id=tree.root_id
+    GROUP BY tree.root_id, root.title, root.position, root.created_at
+    ORDER BY root.position, root.created_at, tree.root_id`);
+  const trees = rows.map((row: any) => ({ rootId: Number(row.root_id), title: String(row.title), taskCount: Number(row.task_count), hasHours: Boolean(row.has_hours) }));
+  return { deletable: trees.filter(tree => !tree.hasHours), kept: trees.filter(tree => tree.hasHours) };
+}

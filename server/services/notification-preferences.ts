@@ -73,7 +73,7 @@ export async function saveNotificationPreferences(
       await tx.execute(
         sql`UPDATE user_notification_push_deliveries d SET status='cancelled',locked_at=NULL FROM user_notifications n WHERE n.id=d.notification_id AND n.user_id=${userId} AND d.status='pending'`,
       );
-    if(patch.settings?.activityEmailMode === "off") await tx.execute(sql`UPDATE user_notification_email_deliveries d SET status='cancelled',locked_at=NULL,updated_at=NOW() FROM user_notifications n WHERE n.id=d.notification_id AND n.user_id=${userId} AND n.type IN ('mind_reply','mind_daily','task_reply') AND d.status='pending'`);
+    if(patch.settings?.activityEmailMode === "off") await tx.execute(sql`UPDATE user_notification_email_deliveries d SET status='cancelled',locked_at=NULL,updated_at=NOW() FROM user_notifications n WHERE n.id=d.notification_id AND n.user_id=${userId} AND n.type IN ('mind_reply','mind_daily','mind_update','task_reply') AND d.status='pending'`);
     for (const [category, channels] of Object.entries(
       categoryPreferences ?? {},
     )) {

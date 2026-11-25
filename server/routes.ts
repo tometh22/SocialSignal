@@ -50,7 +50,7 @@ import { taskCostCoverage } from "./domain/task-cost-coverage";
 import { normalizeProjectTimeFilter } from "./domain/project-request-period";
 import { getPersonalHours, hoursCivilBoundary } from "./domain/personal-hours";
 import { reconcileHourSources, hoursCivilDate } from "@shared/utils/hours-reconciliation";
-import { deleteEmptyTaskTrees, deleteTaskTreesInTransaction } from "./domain/task-delete";
+import { deleteEmptyTaskTrees, deleteTaskTreesInTransaction, planSectionDeletion } from "./domain/task-delete";
 import { taskDateSchema, taskDateWindowSchema, taskDateWindowEnd } from "@shared/utils/task-civil-date";
 import { TASK_PROJECT_ROLES } from "@shared/task-project-roles";
 import { projectTemplateKeySchema, projectTaskTemplates, findProjectTaskTemplate, templateTaskValues } from "./services/project-task-templates";
@@ -23722,23 +23722,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return created;
   }
 
-  // DELETE /api/tasks/section — delete the section and its tasks atomically.
-  app.delete("/api/tasks/section", requireAuth, async (req, res) => {
+  // GET /api/tasks/section/delete-preview — what deleting a section removes and what must be kept.
+  app.get("/api/tasks/section/delete-preview", requireAuth, async (req, res) => {
     try {
       const { projectId, sectionName } = z.object({
+        projectId: z.coerce.number().int().positive(),
+        sectionName: z.string().trim().min(1).max(250),
+      }).parse(req.query);
+      if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+      const plan = await db.transaction(tx => planSectionDeletion(tx, projectId, sectionName));
+      res.json({
+        deletableTaskCount: plan.deletable.reduce((sum, tree) => sum + tree.taskCount, 0),
+        keptTaskCount: plan.kept.reduce((sum, tree) => sum + tree.taskCount, 0),
+        keptTasks: plan.kept.map(tree => ({ id: tree.rootId, title: tree.title, taskCount: tree.taskCount })),
+      });
+    } catch (error: any) {
+      res.status(error instanceof z.ZodError ? 400 : 500).json({ message: error instanceof z.ZodError ? "Datos inválidos" : "No se pudo revisar la sección" });
+    }
+  });
+
+  // DELETE /api/tasks/section — delete the section and its tasks atomically.
+  // Tasks with logged hours cannot be deleted without losing history: they move
+  // to the section the user picks (moveLoggedTo); never silently to General.
+  app.delete("/api/tasks/section", requireAuth, async (req, res) => {
+    try {
+      const { projectId, sectionName, moveLoggedTo } = z.object({
         projectId: z.number().int().positive(),
         sectionName: z.string().trim().min(1).max(250),
+        moveLoggedTo: z.string().trim().min(1).max(250).optional(),
       }).strict().parse(req.body);
       if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a este proyecto" });
       const result = await db.transaction(async tx => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(293, ${projectId})`);
         const names = await lockProjectSectionNames(tx, projectId);
-        const selected = await tx.select({ id: tasks.id }).from(tasks)
-          .where(and(eq(tasks.projectId, projectId), eq(tasks.sectionName, sectionName)));
-        const result = await deleteTaskTreesInTransaction(tx, projectId, selected.map(task => task.id));
+        const plan = await planSectionDeletion(tx, projectId, sectionName);
+        let movedTaskIds: number[] = [];
+        if (plan.kept.length) {
+          if (!moveLoggedTo) {
+            throw Object.assign(new Error("Algunas tareas tienen horas registradas. Elegí a qué sección moverlas antes de eliminar."), { status: 409 });
+          }
+          const taskSections = await tx.selectDistinct({ name: tasks.sectionName }).from(tasks).where(eq(tasks.projectId, projectId));
+          const existing = new Set([...names, ...taskSections.map(row => row.name)]);
+          if (moveLoggedTo === sectionName || !existing.has(moveLoggedTo)) {
+            throw Object.assign(new Error("Elegí otra sección existente del proyecto."), { status: 409 });
+          }
+          const rootIds = plan.kept.map(tree => tree.rootId);
+          const [{ next }] = (await tx.execute(sql`SELECT COALESCE(MAX(position), -1) + 1 AS next FROM tasks
+            WHERE project_id=${projectId} AND section_name=${moveLoggedTo} AND parent_task_id IS NULL`)).rows as any[];
+          const moved = await tx.execute(sql`WITH RECURSIVE tree AS (
+              SELECT id FROM tasks WHERE id IN (${sql.join(rootIds.map(id => sql`${id}`), sql`, `)})
+              UNION SELECT child.id FROM tasks child JOIN tree ON child.parent_task_id=tree.id
+            ) UPDATE tasks SET section_name=${moveLoggedTo}, updated_at=NOW() WHERE id IN (SELECT id FROM tree) RETURNING id`);
+          movedTaskIds = moved.rows.map((row: any) => Number(row.id));
+          await tx.execute(sql`UPDATE tasks SET position=${Number(next)} + ordered.position - 1
+            FROM unnest(ARRAY[${sql.join(rootIds.map(id => sql`${id}`), sql`, `)}]::int[]) WITH ORDINALITY ordered(id, position)
+            WHERE tasks.id=ordered.id AND tasks.parent_task_id IS NULL`);
+        }
+        const deleted = await deleteTaskTreesInTransaction(tx, projectId, plan.deletable.map(tree => tree.rootId));
         await tx.execute(sql`DELETE FROM capacity_group_estimates WHERE project_id=${projectId} AND scope='section' AND section_name=${sectionName}`);
         await tx.update(activeProjects).set({ taskSectionNames: names.filter(name => name !== sectionName) }).where(eq(activeProjects.id, projectId));
-        return result;
+        return { ...deleted, movedTaskIds };
       });
       for (const parentId of result.parentTaskIds) await recalculateTaskLoggedHours(parentId);
       res.json(result);

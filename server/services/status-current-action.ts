@@ -1,5 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { createUserNotifications } from "./user-notifications";
+import { notifyStatusItemUpdated } from "./status-item-notifications";
 import { db } from "../db";
 import { projectStatusReviews, weeklyStatusItems, projectReviewNotes, statusUpdateEntries, statusChangeLog } from "@shared/schema";
 
@@ -37,6 +38,10 @@ export async function saveStatusCurrentAction(roomId: number, reference: { proje
       }, tx);
     }
     await tx.insert(statusChangeLog).values({ roomId, projectId, weeklyStatusItemId: customId, userId, fieldName: 'currentAction', oldValue: current?.currentAction ?? null, newValue: value });
+    await notifyStatusItemUpdated(tx, {
+      roomId, kind: projectId != null ? "project" : "custom", itemId: projectId ?? customId!, authorId: userId,
+      fields: ["currentAction"], eventKey: `mind-update:${entry.id}`, excludeUserIds: mentionIds, updateEntryId: entry.id,
+    });
     return { ...saved, updateEntryId: entry.id };
   });
 }

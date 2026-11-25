@@ -25,7 +25,9 @@ const actionSchema = z.discriminatedUnion("operation", [
 ]);
 type Action = z.infer<typeof actionSchema>;
 export type StatusWriterIdentity = { userId: number; grantId: string };
-export type StatusNoteNotifier = (db: PoolClient, note: { id: number; roomId: number; kind: "project" | "custom"; itemId: number; userId: number; title: string }) => Promise<void>;
+export type StatusNoteNotifier = (db: PoolClient, note: { id: number; roomId: number; kind: "project" | "custom"; itemId: number; userId: number; title: string;
+  /** Present for confirmed field edits; `id` is then the first status_change_log row. */
+  changedFields?: string[]; updateEntryId?: number }) => Promise<void>;
 const columns: Record<string, string> = { healthStatus: "health_status", marginStatus: "margin_status", teamStrain: "team_strain",
   mainRisk: "main_risk", currentAction: "current_action", nextMilestone: "next_milestone", nextMilestoneDate: "next_milestone_date",
   deadline: "deadline", ownerId: "owner_id", decisionNeeded: "decision_needed" };
@@ -176,12 +178,20 @@ export class MindStatusWriter {
             ? `($${i + 4}::timestamptz AT TIME ZONE 'UTC')` : `$${i + 4}`}`).join(",");
           await db.query(`UPDATE ${item.table} SET ${assignments},updated_at=now(),updated_by=$3
             WHERE room_id=$1 AND ${item.key}=$2`, [action.roomId, action.itemId, userId, ...changes.map(c => c.after)]);
+          let firstLogId: number | undefined;
+          let updateEntryId: number | undefined;
           for (const c of changes) {
-            await db.query(`INSERT INTO status_change_log(room_id,project_id,weekly_status_item_id,user_id,field_name,old_value,new_value)
-              VALUES($1,$2,$3,$4,$5,$6,$7)`, [...target, userId, c.field, c.before == null ? null : String(c.before), c.after == null ? null : String(c.after)]);
-            if (c.field === "currentAction") await db.query(`INSERT INTO status_update_entries(room_id,project_id,weekly_status_item_id,author_id,content)
-              VALUES($1,$2,$3,$4,$5)`, [...target, userId, c.after]);
+            const log = await db.query(`INSERT INTO status_change_log(room_id,project_id,weekly_status_item_id,user_id,field_name,old_value,new_value)
+              VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`, [...target, userId, c.field, c.before == null ? null : String(c.before), c.after == null ? null : String(c.after)]);
+            firstLogId ??= Number(log.rows[0].id);
+            if (c.field === "currentAction") {
+              const entry = await db.query(`INSERT INTO status_update_entries(room_id,project_id,weekly_status_item_id,author_id,content)
+                VALUES($1,$2,$3,$4,$5) RETURNING id`, [...target, userId, c.after]);
+              updateEntryId = Number(entry.rows[0].id);
+            }
           }
+          if (firstLogId != null) await this.notifyNote?.(db, { id: firstLogId, roomId: action.roomId, kind: action.kind, itemId: action.itemId,
+            userId, title: item.title, changedFields: changes.map(c => c.field), updateEntryId });
         }
       }
       const { rows } = await db.query("UPDATE mcp_status_actions SET state=$2,decided_at=now() WHERE id=$1 RETURNING *", [id, allow ? "applied" : "cancelled"]);

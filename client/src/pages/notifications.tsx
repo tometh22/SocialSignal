@@ -42,7 +42,7 @@ type NotificationGroup = { key: string; items: ProductNotification[]; latest: Pr
 type PushTestStatus = { kind: "success" | "warning" | "error"; message: string };
 
 const categories: { key: Category; label: string; detail: string }[] = [
-  { key: "mind", label: "Conversaciones en Mind", detail: "Menciones y respuestas en tus temas" },
+  { key: "mind", label: "Conversaciones en Mind", detail: "Menciones, respuestas y actualizaciones de los temas de tus salas" },
   { key: "daily", label: "Dailies", detail: "Cuando alguien completa una daily en tus espacios" },
   { key: "tasks", label: "Tareas", detail: "Asignaciones y nuevas respuestas" },
   { key: "crm", label: "CRM", detail: "Recordatorios asignados a vos" },
@@ -317,7 +317,9 @@ export default function NotificationsPage() {
                       const Icon = style.icon;
                       const isUnread = group.unreadIds.length > 0;
                       const displayTitle = group.items.length > 1
-                        ? item.type === "mind_daily" ? `${group.items.length} dailies completadas` : `${group.unreadIds.length || group.items.length} respuestas${group.unreadIds.length ? " nuevas" : ""}`
+                        ? item.type === "mind_daily" ? `${group.items.length} dailies completadas`
+                          : group.items.some(entry => entry.type === "mind_update") ? `${group.unreadIds.length || group.items.length} novedades${group.unreadIds.length ? " sin leer" : ""} en este tema`
+                          : `${group.unreadIds.length || group.items.length} respuestas${group.unreadIds.length ? " nuevas" : ""}`
                         : item.title;
                       const markGroupRead = () => group.unreadIds.length && markOneMutation.mutate(group.unreadIds);
                       return (
