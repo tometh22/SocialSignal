@@ -25,6 +25,7 @@ import { getTableColumns, and, asc, desc, eq, inArray, isNull, sql } from "drizz
 import { requireRoomMember } from "./middleware/requireRoomMember";
 import { uploadPostProposal, deleteOldFile } from "./upload";
 import { createUserNotifications } from "./services/user-notifications";
+import { notifyStatusItemUpdated } from "./services/status-item-notifications";
 
 type RequireAuth = (req: Request, res: Response, next: NextFunction) => any;
 
@@ -738,34 +739,42 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       const [existing] = await db.select().from(projectStatusReviews)
         .where(and(eq(projectStatusReviews.roomId, roomId), eq(projectStatusReviews.projectId, projectId)));
 
-      const trackFields = ['healthStatus', 'marginStatus', 'teamStrain', 'mainRisk', 'currentAction', 'nextMilestone', 'deadline', 'ownerId', 'decisionNeeded'] as const;
+      const trackFields = ['healthStatus', 'marginStatus', 'teamStrain', 'mainRisk', 'currentAction', 'nextMilestone', 'nextMilestoneDate', 'deadline', 'ownerId', 'decisionNeeded'] as const;
       const changeLogs: { fieldName: string; oldValue: string | null; newValue: string | null }[] = [];
-      if (existing) {
-        for (const field of trackFields) {
-          if (update[field] !== undefined) {
-            const oldVal = (existing as any)[field];
-            const newVal = update[field];
-            const oldStr = oldVal != null ? String(oldVal) : null;
-            const newStr = newVal != null ? String(newVal) : null;
-            if (oldStr !== newStr) changeLogs.push({ fieldName: field, oldValue: oldStr, newValue: newStr });
-          }
+      // A project has no review row until its first edit: compare with the column defaults.
+      const baseline: Record<string, unknown> = existing ?? { healthStatus: 'verde', marginStatus: 'medio', teamStrain: 'bajo', decisionNeeded: 'ninguna' };
+      for (const field of trackFields) {
+        if (update[field] !== undefined) {
+          const oldVal = (baseline as any)[field];
+          const newVal = update[field];
+          const oldStr = oldVal != null ? String(oldVal) : null;
+          const newStr = newVal != null ? String(newVal) : null;
+          if (oldStr !== newStr) changeLogs.push({ fieldName: field, oldValue: oldStr, newValue: newStr });
         }
       }
 
-      let result: any;
-      if (existing) {
-        [result] = await db.update(projectStatusReviews).set(update)
-          .where(and(eq(projectStatusReviews.roomId, roomId), eq(projectStatusReviews.projectId, projectId)))
-          .returning();
-      } else {
-        [result] = await db.insert(projectStatusReviews).values({ roomId, projectId, ...update }).returning();
-      }
-
-      if (changeLogs.length > 0) {
-        db.insert(statusChangeLog)
-          .values(changeLogs.map(cl => ({ roomId, projectId, userId, ...cl })))
-          .catch((err: any) => console.error('statusChangeLog insert error:', err));
-      }
+      const result = await db.transaction(async tx => {
+        let result: any;
+        if (existing) {
+          [result] = await tx.update(projectStatusReviews).set(update)
+            .where(and(eq(projectStatusReviews.roomId, roomId), eq(projectStatusReviews.projectId, projectId)))
+            .returning();
+        } else {
+          [result] = await tx.insert(projectStatusReviews).values({ roomId, projectId, ...update })
+            .onConflictDoUpdate({ target: [projectStatusReviews.roomId, projectStatusReviews.projectId], set: update })
+            .returning();
+        }
+        if (changeLogs.length > 0) {
+          const logs = await tx.insert(statusChangeLog)
+            .values(changeLogs.map(cl => ({ roomId, projectId, userId, ...cl })))
+            .returning({ id: statusChangeLog.id });
+          await notifyStatusItemUpdated(tx, {
+            roomId, kind: "project", itemId: projectId, authorId: userId,
+            fields: changeLogs.map(cl => cl.fieldName), eventKey: `mind-update:log:${logs[0].id}`,
+          });
+        }
+        return result;
+      });
 
       res.json(result);
     } catch (error) {
@@ -1036,15 +1045,21 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
         }
       }
 
-      const [item] = await db.update(weeklyStatusItems).set(update)
-        .where(and(eq(weeklyStatusItems.id, id), eq(weeklyStatusItems.roomId, roomId)))
-        .returning();
-
-      if (changeLogs.length > 0) {
-        db.insert(statusChangeLog)
-          .values(changeLogs.map(cl => ({ roomId, weeklyStatusItemId: id, userId, ...cl })))
-          .catch((err: any) => console.error('statusChangeLog insert error (custom):', err));
-      }
+      const item = await db.transaction(async tx => {
+        const [item] = await tx.update(weeklyStatusItems).set(update)
+          .where(and(eq(weeklyStatusItems.id, id), eq(weeklyStatusItems.roomId, roomId)))
+          .returning();
+        if (changeLogs.length > 0) {
+          const logs = await tx.insert(statusChangeLog)
+            .values(changeLogs.map(cl => ({ roomId, weeklyStatusItemId: id, userId, ...cl })))
+            .returning({ id: statusChangeLog.id });
+          await notifyStatusItemUpdated(tx, {
+            roomId, kind: "custom", itemId: id, authorId: userId,
+            fields: changeLogs.map(cl => cl.fieldName), eventKey: `mind-update:log:${logs[0].id}`,
+          });
+        }
+        return item;
+      });
 
       res.json(item);
     } catch (error) {

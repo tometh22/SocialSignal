@@ -77,4 +77,29 @@ for (const index of [1, 3]) test(`a project member with ${index === 3 ? "task_ma
   await page.getByRole("button", { name: "Opciones de sección Capacitaciones del equipo", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Renombrar sección" })).toBeVisible();
   await page.screenshot({ path: `.context/sections-member-${index}-mobile.png`, fullPage: true, animations: "disabled" });
+  await page.keyboard.press("Escape");
+
+  // A section with logged hours is deleted too: tasks without hours go away and
+  // only the tasks with history move to the section the member picks, never to General.
+  const unlogged = await (await request.post("/api/tasks", { data: { projectId: project.id, sectionName: "Capacitaciones del equipo", title: "Sin horas" } })).json();
+  const logged = state.tasks.filter((task: any) => task.sectionName === "Capacitaciones del equipo").map((task: any) => task.id);
+  expect((await request.delete("/api/tasks/section", { data: { projectId: project.id, sectionName: "Capacitaciones del equipo", moveLoggedTo: "General" } })).status()).toBe(409);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.reload();
+  await page.getByRole("button", { name: "Opciones de sección Capacitaciones del equipo", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Eliminar sección" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toContainText("1 tarea tiene horas registradas");
+  await expect(dialog).toContainText("1 tarea sin horas");
+  await dialog.getByRole("combobox", { name: "Sección para las tareas con horas" }).click();
+  await page.getByRole("option", { name: "Vacía renombrada", exact: true }).click();
+  await page.screenshot({ path: `.context/sections-delete-logged-${index}.png`, animations: "disabled" });
+  await dialog.getByRole("button", { name: "Eliminar", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("button", { name: "Renombrar sección Capacitaciones del equipo", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Renombrar sección Vacía renombrada", exact: true })).toBeVisible();
+  const afterLoggedDelete = await (await request.get(path)).json();
+  expect(afterLoggedDelete.tasks.some((task: any) => task.id === unlogged.id)).toBe(false);
+  expect(afterLoggedDelete.tasks.filter((task: any) => logged.includes(task.id)).map((task: any) => task.sectionName)).toEqual(["Vacía renombrada", "Vacía renombrada"]);
+  expect(afterLoggedDelete.sections["Capacitaciones del equipo"]).toBeUndefined();
 });

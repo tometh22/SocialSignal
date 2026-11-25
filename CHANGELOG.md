@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.62 — 2026-11-25
+
+- Status: cada cambio de un tema de la mesa de trabajo (estado actual, semáforo, responsable, fechas, riesgo o decisión) avisa al resto de los miembros de la sala por la campana y por mail, según las preferencias de cada uno. Quien fue mencionado recibe solo la mención y cada tema se puede silenciar.
+- Tareas: eliminar una sección ya no se frena cuando hay tareas con horas. Se borran las tareas sin horas y las que tienen horas registradas se mueven, con sus subtareas, a la sección que elijas en la confirmación. Nunca se mandan a General.
+
 ## 1.14.61 — 2026-11-20
 
 - Status: mencioná a los miembros de la sala en una actualización, publicá desde Actividad y creá tareas o iniciá proyectos con el contexto del tema. Editá tus mensajes con fecha visible y volvé a abrir el último resumen de la daily.

@@ -2,9 +2,17 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
 import type { StatusNoteNotifier } from "../mcp/status-write";
 import { createUserNotifications } from "./user-notifications";
+import { notifyStatusItemUpdated } from "./status-item-notifications";
 
 // Use the existing permission/preference-aware outbox on the same PG transaction as the note.
 export const notifyMcpStatusNote: StatusNoteNotifier = async (client, note) => {
+  if (note.changedFields) {
+    await notifyStatusItemUpdated(drizzle(client, { schema }), {
+      roomId: note.roomId, kind: note.kind, itemId: note.itemId, authorId: note.userId, fields: note.changedFields,
+      eventKey: `mind-update:log:${note.id}`, updateEntryId: note.updateEntryId,
+    });
+    return;
+  }
   const column = note.kind === "project" ? "project_id" : "weekly_status_item_id";
   const previous = await client.query(`SELECT DISTINCT author_id FROM project_review_notes
     WHERE room_id=$1 AND ${column}=$2 AND id<>$3 AND author_id<>$4`, [note.roomId, note.itemId, note.id, note.userId]);

@@ -30,7 +30,7 @@ export function notificationAccess(
     sql`(${admin} OR ${sql.raw(`'${name}'`)} = ANY(COALESCE(u.permissions, '{}'::text[])))`;
   return sql`EXISTS (
     SELECT 1 FROM users u WHERE u.id = ${userId} AND u.is_active = true AND CASE
-    WHEN ${n.type} IN ('mind_reply', 'mind_daily', 'mind_mention') THEN
+    WHEN ${n.type} IN ('mind_reply', 'mind_daily', 'mind_mention', 'mind_update') THEN
       ${section("status")} AND EXISTS (SELECT 1 FROM review_rooms r JOIN review_room_members m ON m.room_id = r.id
         WHERE r.id = ${id} AND r.archived_at IS NULL AND m.user_id = u.id)
     WHEN ${n.type} IN ('task_assigned', 'task_reply') THEN

@@ -217,6 +217,17 @@ describe.skipIf(!process.env.TEST_MCP_DATABASE_URL)("Status editing with browser
     expect((await writer.inspect(1, p.id)).state).toBe("pending");
   });
 
+  it("alerts the room about confirmed edits with the changed fields and the new update", async () => {
+    const calls: any[] = [];
+    const notifyingWriter = new MindStatusWriter(pool, config, async (_db, event) => { calls.push(event); });
+    const p = await notifyingWriter.prepare(await issue(), edit());
+    await notifyingWriter.decide(1, p.id, true);
+    const log = await pool.query("SELECT min(id)::int AS id FROM (SELECT id FROM status_change_log ORDER BY id DESC LIMIT 2) latest");
+    const entry = await pool.query("SELECT max(id)::int AS id FROM status_update_entries");
+    expect(calls).toEqual([expect.objectContaining({ id: log.rows[0].id, roomId: 10, userId: 1,
+      changedFields: expect.arrayContaining(["healthStatus", "currentAction"]), updateEntryId: entry.rows[0].id })]);
+  });
+
   it("exposes safe MCP tools; old tokens cannot prepare and no MCP tool can confirm", async () => {
     for (const scopes of [["mind:read", "offline_access"], ["mind:read", "status:write", "offline_access"]]) {
       const identity = await issue(1, scopes);

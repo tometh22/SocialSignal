@@ -11,6 +11,8 @@ vi.mock('../server/db', async () => {
 });
 import {pool} from '../server/db';
 import {editStatusNote, editStatusUpdate, saveStatusCurrentAction} from '../server/services/status-current-action';
+import express from 'express';
+import { createReviewRoomsRouter } from '../server/routes-review-rooms';
 describe.skipIf(!fixture.url)('canonical Status and Daily state in PostgreSQL', () => {
   let admin: Pool;
   beforeAll(async () => {
@@ -57,6 +59,44 @@ describe.skipIf(!fixture.url)('canonical Status and Daily state in PostgreSQL', 
     expect((await pool.query("SELECT user_id,type,action_url FROM user_notifications")).rows).toEqual([
       { user_id: 3, type: "mind_mention", action_url: "/review/1?item=c_10&updateId=1" },
     ]);
+  });
+  it('alerts every other active room member when the current state changes, without duplicating mentions', async () => {
+    await pool.query(`
+      INSERT INTO users(id,first_name,last_name,is_active,permissions) VALUES(2,'Vicky','A',true,'{status}'),(3,'Ana','B',true,'{status}'),(4,'Santi','C',true,'{status}'),(5,'Baja','D',false,'{status}'),(7,'Fuera','E',true,'{status}');
+      INSERT INTO review_rooms(id,name) VALUES(1,'Daily');
+      INSERT INTO review_room_members(room_id,user_id) VALUES(1,2),(1,3),(1,4),(1,5);
+    `);
+    await saveStatusCurrentAction(1,{customId:10},'Si no responden mandar mail el miércoles',2,'Anterior',[3]);
+    expect((await pool.query("SELECT user_id,type,title,message,thread_key,action_url FROM user_notifications ORDER BY user_id")).rows).toEqual([
+      { user_id: 3, type: "mind_mention", title: "Te mencionaron en Status", message: "Abrí el tema para leer la actualización.", thread_key: "mind_mention:review_room:1", action_url: "/review/1?item=c_10&updateId=1" },
+      { user_id: 4, type: "mind_update", title: "Se actualizó “QA”", message: "Vicky A actualizó el estado actual en la mesa de trabajo.", thread_key: "mind:1:c_10", action_url: "/review/1?item=c_10&updateId=1" },
+    ]);
+    // Saving the same state again is not a change and sends nothing new.
+    await saveStatusCurrentAction(1,{customId:10},'Si no responden mandar mail el miércoles',2);
+    expect((await pool.query("SELECT count(*)::int n FROM user_notifications")).rows[0].n).toBe(2);
+  });
+  it('alerts the room when the traffic light or owner of a work-table item changes', async () => {
+    await pool.query(`
+      INSERT INTO users(id,first_name,last_name,is_active,permissions) VALUES(2,'Vicky','A',true,'{status}'),(4,'Santi','C',true,'{status}');
+      INSERT INTO review_rooms(id,name) VALUES(1,'Daily');
+      INSERT INTO review_room_members(room_id,user_id,role) VALUES(1,2,'owner'),(1,4,'editor');
+      INSERT INTO active_projects(id,name,status) VALUES(100,'Trendsity','active');
+    `);
+    const app = express();
+    app.use(express.json());
+    app.use('/api/reviews', createReviewRoomsRouter((req: any, _res: any, next: any) => { req.user = { id: 2 }; next(); }));
+    const server = app.listen(0);
+    try {
+      const base = `http://127.0.0.1:${(server.address() as any).port}/api/reviews/1/items`;
+      const patch = (path: string, body: unknown) => fetch(`${base}/${path}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      expect((await patch('project/100', { healthStatus: 'rojo', ownerId: 4 })).status).toBe(200);
+      expect((await patch('custom/10', { healthStatus: 'amarillo' })).status).toBe(200);
+      expect((await patch('custom/10', { healthStatus: 'amarillo' })).status).toBe(200);
+      expect((await pool.query("SELECT user_id,type,title,message,thread_key FROM user_notifications ORDER BY id")).rows).toEqual([
+        { user_id: 4, type: 'mind_update', title: 'Se actualizó “Trendsity”', message: 'Vicky A actualizó el semáforo y el responsable en la mesa de trabajo.', thread_key: 'mind:1:p_100' },
+        { user_id: 4, type: 'mind_update', title: 'Se actualizó “QA”', message: 'Vicky A actualizó el semáforo en la mesa de trabajo.', thread_key: 'mind:1:c_10' },
+      ]);
+    } finally { server.close(); }
   });
   it('syncs edits to the current update while preserving other updates as history', async () => {
     await saveStatusCurrentAction(1,{customId:10},'Primero',2);
